@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Changyi Yang — Decks & Proposals</title>
+<style>
+  :root {
+    --bg: #f7f4ee;
+    --ink: #1f2933;
+    --muted: #667085;
+    --line: #d8d2c5;
+    --panel: #fffdfa;
+    --blue: #245f73;
+    --green: #2f6b55;
+    --red: #a13c35;
+    --amber: #b76b1f;
+    --violet: #6a4c93;
+    --shadow: 0 10px 34px rgba(38, 34, 28, 0.08);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    min-height: 100%;
+    background:
+      radial-gradient(circle at 18% 0%, rgba(36, 95, 115, 0.06), transparent 30%),
+      linear-gradient(180deg, #fbf9f5 0%, var(--bg) 100%);
+    color: var(--ink);
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: clamp(40px, 7vw, 96px) clamp(20px, 5vw, 40px) 80px; }
+  .eyebrow {
+    color: var(--blue); font-weight: 720; font-size: 13px;
+    text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  h1 { margin: 10px 0 0; font-size: clamp(32px, 5vw, 54px); line-height: 1.1; letter-spacing: -0.01em; }
+  .lead { color: var(--muted); font-size: clamp(16px, 1.4vw, 20px); margin: 14px 0 0; max-width: 720px; line-height: 1.5; }
+  h2 {
+    margin: 56px 0 18px; font-size: 15px; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--muted); font-weight: 720;
+    border-bottom: 1px solid var(--line); padding-bottom: 10px;
+  }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 18px; }
+  a.card {
+    display: block; text-decoration: none; color: inherit;
+    background: rgba(255, 253, 250, 0.9);
+    border: 1px solid var(--line); border-left: 4px solid var(--blue);
+    border-radius: 8px; padding: 22px; box-shadow: var(--shadow);
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  a.card:hover { transform: translateY(-3px); box-shadow: 0 16px 40px rgba(38,34,28,.13); }
+  a.card.violet { border-left-color: var(--violet); }
+  a.card.green  { border-left-color: var(--green); }
+  a.card h3 { margin: 0 0 8px; font-size: 20px; line-height: 1.3; }
+  a.card p { margin: 0; color: #4b5563; font-size: 15px; line-height: 1.5; }
+  .meta { margin-top: 14px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .tag {
+    display: inline-flex; align-items: center; height: 26px; padding: 0 10px;
+    border-radius: 999px; background: #e9f2ef; color: var(--green);
+    font-size: 12px; font-weight: 700;
+  }
+  .tag.blue { background: #e6f1f5; color: var(--blue); }
+  .tag.violet { background: #eee9f6; color: var(--violet); }
+  .tag.amber { background: #fff2dc; color: var(--amber); }
+  footer { margin-top: 64px; color: var(--muted); font-size: 14px; border-top: 1px solid var(--line); padding-top: 20px; }
+  footer a { color: var(--blue); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Changyi Yang</div>
+  <h1>Decks &amp; Proposals</h1>
+  <p class="lead">Full-duplex 语音交互方向的提案与调研。用 ← / → 或空格翻页。</p>
+
+  <h2>Benchmark 调研</h2>
+  <div class="cards">
+    <a class="card violet" href="./interrupt-benchmark-survey/">
+      <h3>模型主动打断：Instruct-FD 与三个 Benchmark</h3>
+      <p>盘点评测「模型主动打断用户」的四个 benchmark——各自测什么、数据长什么样、有没有开源、缺口在哪。含 MIB 的 detection–interruption gap。</p>
+      <div class="meta">
+        <span class="tag violet">Survey</span>
+        <span class="tag blue">18 slides</span>
+        <span class="tag amber">Instruct-FD · FLEXI · MIB · ProVoice</span>
+      </div>
+    </a>
+  </div>
+
+  <h2>RL 提案</h2>
+  <div class="cards">
+    <a class="card" href="https://changyiyang.github.io/interrupt-rl-proposal/">
+      <h3>Content-Triggered Interrupt RL</h3>
+      <p>能不能用 RL 训练模型主动打断用户？把「用户还在说，但内容已经需要介入」变成可评测、可训练的 full-duplex behavior。</p>
+      <div class="meta"><span class="tag">Proposal</span><span class="tag blue">InterruptPO</span></div>
+    </a>
+    <a class="card green" href="https://changyiyang.github.io/instruction-following-rl-proposal/">
+      <h3>Instruction-Following RL for Full-Duplex</h3>
+      <p>同一段对话、换一条 turn policy 指令，行为要真的跟着变——policy-conditioned 的交互控制器。</p>
+      <div class="meta"><span class="tag">Proposal</span><span class="tag blue">InstructDuplexPO</span></div>
+    </a>
+  </div>
+
+  <footer>
+    源码：<a href="https://github.com/ChangyiYang/changyiyang.github.io">github.com/ChangyiYang/changyiyang.github.io</a>
+  </footer>
+</div>
+</body>
+</html>

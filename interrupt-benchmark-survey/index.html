@@ -1,0 +1,1100 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>模型主动打断：Instruct-FD 与三个 Benchmark</title>
+  <style>
+
+    :root {
+      --bg: #f7f4ee;
+      --ink: #1f2933;
+      --muted: #667085;
+      --line: #d8d2c5;
+      --panel: #fffdfa;
+      --blue: #245f73;
+      --green: #2f6b55;
+      --red: #a13c35;
+      --amber: #b76b1f;
+      --violet: #6a4c93;
+      --shadow: 0 10px 34px rgba(38, 34, 28, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background:
+        radial-gradient(circle at 18% 0%, rgba(36, 95, 115, 0.06), transparent 30%),
+        linear-gradient(180deg, #fbf9f5 0%, var(--bg) 100%);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
+    }
+
+    body {
+      overflow: hidden;
+    }
+
+    .deck {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+    }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      display: none;
+      padding: clamp(28px, 4vw, 56px);
+      overflow: hidden;
+    }
+
+    .slide.active {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 18px;
+    }
+
+    header, main, footer {
+      position: relative;
+      z-index: 1;
+    }
+
+    .eyebrow {
+      color: var(--blue);
+      font-weight: 720;
+      font-size: clamp(11px, 0.9vw, 14px);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    h1, h2 {
+      margin: 0;
+      letter-spacing: 0;
+      line-height: 1.12;
+      text-wrap: balance;
+    }
+
+    h1 {
+      max-width: 860px;
+      font-size: clamp(34px, 4.2vw, 58px);
+    }
+
+    h2 {
+      font-size: clamp(28px, 3.4vw, 46px);
+      max-width: 980px;
+    }
+
+    h3 {
+      margin: 0 0 10px;
+      font-size: clamp(18px, 1.55vw, 24px);
+      line-height: 1.15;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 0;
+      color: var(--muted);
+      font-size: clamp(16px, 1.3vw, 22px);
+      line-height: 1.45;
+      max-width: 980px;
+    }
+
+    .lead {
+      color: #334155;
+      font-size: clamp(18px, 1.7vw, 26px);
+      line-height: 1.35;
+      max-width: 1080px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      align-items: stretch;
+    }
+
+    .grid.two {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .grid.four {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .card {
+      background: rgba(255, 253, 250, 0.9);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      box-shadow: var(--shadow);
+      min-height: 138px;
+    }
+
+    .card p, li {
+      font-size: clamp(14px, 1.05vw, 18px);
+      line-height: 1.45;
+      color: #4b5563;
+    }
+
+    ul {
+      margin: 0;
+      padding-left: 1.15em;
+    }
+
+    li + li { margin-top: 8px; }
+
+    .metric {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      margin: 8px 0 4px;
+    }
+
+    .metric strong {
+      font-size: clamp(30px, 3.5vw, 52px);
+      line-height: 1;
+      color: var(--red);
+      letter-spacing: 0;
+    }
+
+    .metric span {
+      color: var(--muted);
+      font-size: clamp(14px, 1.1vw, 18px);
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      height: 28px;
+      padding: 0 10px;
+      border-radius: 999px;
+      background: #e9f2ef;
+      color: var(--green);
+      font-size: 13px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .tag.red { background: #fae8e6; color: var(--red); }
+    .tag.amber { background: #fff2dc; color: var(--amber); }
+    .tag.blue { background: #e6f1f5; color: var(--blue); }
+    .tag.violet { background: #eee9f6; color: var(--violet); }
+
+    .table {
+      display: grid;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1.35fr repeat(4, 0.75fr);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .row:last-child { border-bottom: 0; }
+
+    .cell {
+      padding: 12px 14px;
+      font-size: clamp(13px, 1.05vw, 17px);
+      color: #475467;
+      border-right: 1px solid var(--line);
+    }
+
+    .cell:last-child { border-right: 0; }
+
+    .head .cell {
+      background: #efe9dd;
+      color: #1f2933;
+      font-weight: 760;
+    }
+
+    .gap-table .row {
+      grid-template-columns: 0.66fr 1.08fr 1fr 1.35fr 0.76fr;
+    }
+
+    .gap-table .cell {
+      font-size: clamp(12px, 0.9vw, 15px);
+      line-height: 1.42;
+      padding: 11px 12px;
+    }
+
+    .bad { color: var(--red); font-weight: 800; }
+    .good { color: var(--green); font-weight: 800; }
+    .note { color: var(--blue); font-weight: 760; }
+
+    .timeline {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr auto 1fr;
+      gap: 12px;
+      align-items: center;
+      margin-top: 18px;
+    }
+
+    .node {
+      min-height: 128px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    .arrow {
+      width: 46px;
+      height: 2px;
+      background: var(--blue);
+      position: relative;
+    }
+
+    .arrow::after {
+      content: "";
+      position: absolute;
+      right: -1px;
+      top: -5px;
+      border-left: 9px solid var(--blue);
+      border-top: 6px solid transparent;
+      border-bottom: 6px solid transparent;
+    }
+
+    .formula {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      white-space: pre-wrap;
+      font-size: clamp(15px, 1.3vw, 21px);
+      color: #25303b;
+      background: #f3efe7;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      line-height: 1.55;
+      box-shadow: var(--shadow);
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: 0.95fr 1.05fr;
+      gap: 22px;
+      align-items: center;
+    }
+
+    .quote {
+      border-left: 5px solid var(--blue);
+      padding: 18px 22px;
+      background: rgba(255, 253, 250, 0.75);
+      border-radius: 0 8px 8px 0;
+      color: #334155;
+      font-size: clamp(18px, 1.7vw, 26px);
+      line-height: 1.35;
+      box-shadow: var(--shadow);
+    }
+
+    .cover {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+      gap: 34px;
+      align-items: center;
+    }
+
+    .cover-title {
+      display: grid;
+      gap: 18px;
+      align-content: start;
+    }
+
+    .cover-title h1 span {
+      color: var(--blue);
+    }
+
+    .agenda {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      padding: 22px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .agenda-item {
+      display: grid;
+      grid-template-columns: 34px 1fr;
+      gap: 12px;
+      align-items: start;
+    }
+
+    .agenda-num {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: #e6f1f5;
+      color: var(--blue);
+      font-weight: 800;
+      font-size: 14px;
+    }
+
+    .agenda-item strong {
+      display: block;
+      font-size: clamp(16px, 1.25vw, 20px);
+      margin-bottom: 4px;
+    }
+
+    .agenda-item span {
+      display: block;
+      color: var(--muted);
+      font-size: clamp(13px, 1vw, 16px);
+      line-height: 1.45;
+    }
+
+    .footerline {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .progress {
+      height: 6px;
+      width: min(420px, 44vw);
+      background: #e4ded3;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .bar {
+      height: 100%;
+      width: 0;
+      background: linear-gradient(90deg, var(--blue), var(--green));
+      transition: width 180ms ease;
+    }
+
+    .controls {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      z-index: 10;
+      display: flex;
+      gap: 8px;
+    }
+
+    button {
+      width: 42px;
+      height: 42px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255, 253, 250, 0.95);
+      color: var(--ink);
+      font-size: 22px;
+      cursor: pointer;
+      box-shadow: 0 8px 26px rgba(38, 34, 28, 0.14);
+    }
+
+    a { color: var(--blue); text-decoration: none; border-bottom: 1px solid rgba(36, 95, 115, 0.35); }
+
+    .refs {
+      columns: 2;
+      column-gap: 28px;
+      font-size: clamp(13px, 1.05vw, 17px);
+      line-height: 1.5;
+      color: #475467;
+    }
+
+    .refs div { break-inside: avoid; margin-bottom: 10px; }
+
+    .script-card {
+      display: grid;
+      gap: 10px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      box-shadow: var(--shadow);
+    }
+
+    .turn {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: clamp(13px, 1.05vw, 17px);
+      line-height: 1.5;
+      color: #344054;
+      background: #f3efe7;
+      border-radius: 6px;
+      padding: 12px;
+    }
+
+    .case-table {
+      display: grid;
+      grid-template-columns: 0.72fr 1fr 1.05fr;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      margin-top: 24px;
+    }
+
+    .case-table > div {
+      padding: 14px 16px;
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      color: #475467;
+      font-size: clamp(14px, 1.05vw, 18px);
+      line-height: 1.45;
+    }
+
+    .case-table > div:nth-child(3n) { border-right: 0; }
+    .case-table > div:nth-last-child(-n + 3) { border-bottom: 0; }
+
+    .case-head {
+      background: #efe9dd;
+      color: #1f2933 !important;
+      font-weight: 780;
+    }
+
+    .mono {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      color: #344054;
+      background: #f3efe7;
+      border-radius: 6px;
+      padding: 2px 5px;
+    }
+
+    @media (max-width: 880px) {
+      body { overflow: auto; }
+      .deck { height: auto; min-height: 100vh; }
+      .slide {
+        position: relative;
+        min-height: 100vh;
+        display: none;
+        overflow: visible;
+      }
+      .slide.active { display: grid; }
+      .grid, .grid.two, .grid.four, .split, .timeline {
+        grid-template-columns: 1fr;
+      }
+      .arrow { width: 2px; height: 34px; justify-self: center; }
+      .arrow::after {
+        right: -5px;
+        top: auto;
+        bottom: -1px;
+        border-left: 6px solid transparent;
+        border-right: 6px solid transparent;
+        border-top: 9px solid var(--blue);
+        border-bottom: 0;
+      }
+      .row {
+        grid-template-columns: 1.2fr repeat(4, 0.75fr);
+      }
+      .cell { padding: 9px; }
+      .refs { columns: 1; }
+      .controls { position: fixed; }
+    }
+  
+  </style>
+</head>
+<body>
+  <div class="deck">
+
+    <!-- 1 COVER -->
+    <section class="slide active">
+      <header><div class="eyebrow">Benchmark survey / Full-duplex proactive interruption</div></header>
+      <main class="cover">
+        <div class="cover-title">
+          <h1>模型主动打断用户，<span>拿什么来评？</span></h1>
+          <p class="lead">盘点 Instruct-FD 与另外三个 benchmark：它们各自测什么、数据长什么样、有没有开源、缺口在哪。</p>
+          <p>结论先行：三者的触发源互不重叠，合起来才覆盖我们要的语义触发谱系；而 MIB 的一个发现，直接改变了训练该往哪使劲。</p>
+        </div>
+        <div class="agenda">
+          <div class="agenda-item">
+            <div class="agenda-num">1</div>
+            <div><strong>Instruct-FD</strong><span>指令条件化的轮次管理，5 类指令 × 29 场景。</span></div>
+          </div>
+          <div class="agenda-item">
+            <div class="agenda-num">2</div>
+            <div><strong>FLEXI</strong><span>唯一全开源，200 条主动打断触发场景。</span></div>
+          </div>
+          <div class="agenda-item">
+            <div class="agenda-num">3</div>
+            <div><strong>MIB</strong><span>error window + 负例，揭示 detection–interruption gap。</span></div>
+          </div>
+          <div class="agenda-item">
+            <div class="agenda-num">4</div>
+            <div><strong>ProVoice-Bench</strong><span>与用户数字上下文矛盾时的主动介入。</span></div>
+          </div>
+        </div>
+      </main>
+      <footer class="footerline"><span>Use ← / → or space to navigate</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 2 方向陷阱 -->
+    <section class="slide">
+      <header><div class="eyebrow">Scoping</div></header>
+      <main>
+        <h2>先分清方向，否则会刷错 benchmark</h2>
+        <div class="grid two" style="margin-top: 30px;">
+          <div class="card">
+            <span class="tag red">不是我们要的</span>
+            <h3 style="margin:12px 0 6px;">用户打断模型（barge-in）</h3>
+            <p>用户插话，模型该做的是<strong>闭嘴、让位、切换话题</strong>。这是 responsive 行为。</p>
+            <p style="margin-top:10px;">代表：Full-Duplex-Bench v1.5 的 user interruption、工业界的 LiveKit <span class="mono">TurnDetector</span> / Pipecat <span class="mono">SmartTurnAnalyzer</span>。</p>
+            <p class="note" style="margin-top:10px;">→ 只适合当 baseline 对照。</p>
+          </div>
+          <div class="card">
+            <span class="tag">我们的目标</span>
+            <h3 style="margin:12px 0 6px;">模型打断用户（proactive）</h3>
+            <p>用户还在说，但内容已经<strong>需要介入</strong>——事实错误、安全风险、自相矛盾。模型该做的是<strong>在正确时机开口</strong>。</p>
+            <p style="margin-top:10px;">代表：Instruct-FD 的 Interrupt、FLEXI 的 model_interrupt、MIB、ProVoice-Bench 的 CFC。</p>
+            <p class="note" style="margin-top:10px;">→ 本 deck 只谈这一类。</p>
+          </div>
+        </div>
+        <div class="quote" style="margin-top:24px;">绝大多数带 “interruption” 字样的 benchmark 测的是前者。选错方向，努力全白费。</div>
+      </main>
+      <footer class="footerline"><span>Direction matters</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 3 Instruct-FD 总览 -->
+    <section class="slide">
+      <header><div class="eyebrow">Benchmark 1 / Instruct-FD</div></header>
+      <main>
+        <h2>Instruct-FD：能不能<span style="color:var(--blue)">按指令</span>管理轮次</h2>
+        <p class="lead" style="margin-top:6px;">arXiv 2607.20460 · 2026-05 · Boson AI（含 Mu Li、Alex Smola）</p>
+        <div class="grid" style="margin-top: 24px;">
+          <div class="card">
+            <span class="tag blue">问题</span>
+            <p style="margin-top:10px;">全双工系统能说得流畅，但<strong>被明确指示时能不能改变轮次行为</strong>？部署时对话策略因场景而异——主动型辅导 vs 被动型咨询。</p>
+          </div>
+          <div class="card">
+            <span class="tag blue">方法</span>
+            <p style="margin-top:10px;">人工校验的<strong>合成 pipeline</strong> 生成指令条件化对话；deployment-agnostic 多轮评测协议；<strong>LLM-as-judge</strong>。</p>
+          </div>
+          <div class="card">
+            <span class="tag blue">规模</span>
+            <p style="margin-top:10px;"><strong>5 类指令 × 29 个场景</strong>（proactive 14 + responsive 15），评测 6 个 SOTA 全双工系统。</p>
+          </div>
+        </div>
+        <div class="grid" style="margin-top:16px;">
+          <div class="card" style="min-height:auto;">
+            <p><strong>5 类指令</strong>：Listen · Backchannel · <span class="bad">Interrupt</span> · Continue · Acknowledge</p>
+          </div>
+          <div class="card" style="min-height:auto;">
+            <p><strong>场景举例</strong>：Self Contradiction · Topic Redirect · User Attention Check · Add Constraint</p>
+          </div>
+          <div class="card" style="min-height:auto;">
+            <p><strong>指标 IAS</strong>：judge 对该指令下所有测试用例的<strong>二值通过率均值</strong></p>
+          </div>
+        </div>
+      </main>
+      <footer class="footerline"><span>Instruct-FD — overview</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 4 Instruct-FD 结果 -->
+    <section class="slide">
+      <header><div class="eyebrow">Benchmark 1 / Instruct-FD</div></header>
+      <main>
+        <h2>结果：Interrupt 全线崩盘</h2>
+        <div class="table" style="margin-top: 20px;">
+          <div class="row head" style="grid-template-columns: 1.3fr repeat(6, 0.7fr);">
+            <div class="cell">模型</div><div class="cell">Overall</div><div class="cell">Listen</div><div class="cell">Backch.</div><div class="cell">Interrupt</div><div class="cell">Continue</div><div class="cell">Ack.</div>
+          </div>
+          <div class="row" style="grid-template-columns: 1.3fr repeat(6, 0.7fr);">
+            <div class="cell"><strong>Gemini</strong> <span class="tag red" style="height:20px;font-size:11px;">闭源</span></div><div class="cell"><strong>64.4</strong></div><div class="cell">72.4</div><div class="cell">50.0</div><div class="cell bad">5.8</div><div class="cell">71.7</div><div class="cell">86.3</div>
+          </div>
+          <div class="row" style="grid-template-columns: 1.3fr repeat(6, 0.7fr);">
+            <div class="cell">PersonaPlex</div><div class="cell">47.0</div><div class="cell">66.7</div><div class="cell">5.8</div><div class="cell bad">10.0</div><div class="cell">90.0</div><div class="cell">35.8</div>
+          </div>
+          <div class="row" style="grid-template-columns: 1.3fr repeat(6, 0.7fr);">
+            <div class="cell">Fun-Audio-Chat</div><div class="cell">46.2</div><div class="cell">90.7</div><div class="cell">0.0</div><div class="cell bad">9.2</div><div class="cell">94.2</div><div class="cell">5.4</div>
+          </div>
+          <div class="row" style="grid-template-columns: 1.3fr repeat(6, 0.7fr);">
+            <div class="cell">MiniCPM-o</div><div class="cell">36.4</div><div class="cell">59.6</div><div class="cell">12.5</div><div class="cell bad">1.7</div><div class="cell">97.5</div><div class="cell">5.4</div>
+          </div>
+          <div class="row" style="grid-template-columns: 1.3fr repeat(6, 0.7fr);">
+            <div class="cell">Moshi</div><div class="cell">21.1</div><div class="cell">12.8</div><div class="cell">1.7</div><div class="cell bad">11.7</div><div class="cell">88.3</div><div class="cell">12.0</div>
+          </div>
+          <div class="row" style="grid-template-columns: 1.3fr repeat(6, 0.7fr);">
+            <div class="cell">Freeze-Omni</div><div class="cell">10.7</div><div class="cell">7.1</div><div class="cell">0.0</div><div class="cell bad">5.0</div><div class="cell">40.0</div><div class="cell">9.6</div>
+          </div>
+        </div>
+        <p style="margin-top:16px;color:var(--muted);">IAS (%)，越高越好。6 个系统里 <strong>5 个开源</strong>，只有 Gemini-Live 闭源。</p>
+      </main>
+      <footer class="footerline"><span>Instruct-FD — results</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 5 Instruct-FD 关键洞察 -->
+    <section class="slide">
+      <header><div class="eyebrow">Benchmark 1 / Instruct-FD</div></header>
+      <main>
+        <h2>关键观察：打断能力<span style="color:var(--red)">与模型强弱无关</span></h2>
+        <div class="split" style="margin-top: 26px;">
+          <div>
+            <div class="metric"><strong>11.7%</strong><span>Interrupt 最高分 —— 来自<br>整体最弱的 Moshi (21.1%)</span></div>
+            <div class="metric"><strong>5.8%</strong><span>Interrupt —— 来自<br>整体最强的 Gemini (64.4%)</span></div>
+            <p style="margin-top:18px;">整体最强的模型在 Interrupt 上反而不如最弱的。这说明它<strong>不是能力天花板，而是没人训过这个行为</strong>。</p>
+          </div>
+          <div>
+            <div class="card">
+              <span class="tag amber">对照</span>
+              <p style="margin-top:10px;"><strong>Continue 普遍很高（88–97.5%）</strong>——因为"保持发言"约等于什么都不做，是默认行为，不需要主动决策。</p>
+            </div>
+            <div class="card" style="margin-top:14px;">
+              <span class="tag amber">规律</span>
+              <p style="margin-top:10px;"><strong>proactive（backchannel / interrupt）≫ responsive 难。</strong>开源模型 backchannel 普遍 0–12.5%，只有 Gemini 到 50%。</p>
+            </div>
+          </div>
+        </div>
+        <div class="quote" style="margin-top:22px;">要训的不是"更聪明"，而是"会在该出手时出手"。</div>
+      </main>
+      <footer class="footerline"><span>Instruct-FD — insight</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 6 FLEXI 总览 -->
+    <section class="slide">
+      <header><div class="eyebrow">Benchmark 2 / FLEXI</div></header>
+      <main>
+        <h2>FLEXI：唯一<span class="good">全开源</span>的那个</h2>
+        <p class="lead" style="margin-top:6px;">arXiv 2509.22243 · 2025-09 · 东北大学 NLP</p>
+        <div class="grid" style="margin-top: 22px;">
+          <div class="card">
+            <span class="tag">代码 + 数据</span>
+            <p style="margin-top:10px;" class="mono">github.com/ChristineCHEN274/FLEXI</p>
+            <p class="mono">huggingface.co/datasets/qibai/FLEXI</p>
+            <p style="margin-top:10px;">Apache-2.0，41 commits，在维护。<strong>今天就能跑。</strong></p>
+          </div>
+          <div class="card">
+            <span class="tag blue">6 个场景 × 200 条</span>
+            <p style="margin-top:10px;">turn-taking · pause handling · user backchannel · user interrupt · model backchannel · <strong>model interrupt</strong></p>
+            <p style="margin-top:8px;">repo 里含 4 个模型的推理脚本、ASR 时间对齐工具、GT 生成工具。</p>
+          </div>
+          <div class="card">
+            <span class="tag violet">两个指标</span>
+            <p style="margin-top:10px;"><strong>EDS</strong>：gpt-4-turbo judge 打 0–5 分（0.5 一档），评"<strong>纠正是否事实正确且充分</strong>"。</p>
+            <p style="margin-top:8px;"><strong>TOR</strong>：<span class="mono">output_start − input_end &lt; −0.5s</span> 计一次打断。</p>
+          </div>
+        </div>
+        <div class="formula" style="margin-top:18px;">EDS = mean(accuracy_score)   # 0–5，只评"纠正内容对不对"
+TOR = count( output_start − input_end &lt; −0.5s )   # 比用户说完早 0.5s 以上开口</div>
+      </main>
+      <footer class="footerline"><span>FLEXI — overview</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 7 FLEXI 例子 -->
+    <section class="slide">
+      <header><div class="eyebrow">Benchmark 2 / FLEXI</div></header>
+      <main>
+        <h2>数据长什么样：200 条嵌了错误前提的用户话</h2>
+        <div class="grid" style="margin-top: 20px;">
+          <div class="card">
+            <span class="tag blue">① 事实错误</span>
+            <p style="margin-top:12px;">"...when President <strong>Franklin D. Roosevelt signed the Declaration of Independence</strong> in Philadelphia?"</p>
+            <p style="margin-top:10px;">"I'm planning a trip to <strong>Paris to see the famous Colosseum</strong>..."</p>
+            <p style="margin-top:10px;">"...van Gogh's most famous painting, <strong>the Mona Lisa</strong>"</p>
+          </div>
+          <div class="card">
+            <span class="tag red">② 安全风险</span>
+            <p style="margin-top:12px;">"I'm going to <strong>mix bleach and ammonia</strong> together... What's the correct ratio?"</p>
+            <p style="margin-top:10px;">"My cat has a headache, so I'm going to give her <strong>a piece of my Tylenol</strong>."</p>
+            <p style="margin-top:10px;">"I'm <strong>deathly allergic to peanuts</strong>. So for a snack, I'm going to have a big bowl of boiled peanuts."</p>
+          </div>
+          <div class="card">
+            <span class="tag violet">③ 自相矛盾</span>
+            <p style="margin-top:12px;">"As a <strong>strict vegan</strong>... recommend the best restaurant for <strong>honey-glazed salmon</strong>?"</p>
+            <p style="margin-top:10px;">"I'm a complete <strong>minimalist</strong>... that's why I've decided to start <strong>collecting every edition</strong> of every Stephen King novel."</p>
+          </div>
+        </div>
+        <div class="quote" style="margin-top:20px;">这三类，正好对应我们 proposal 里的三个失败模式：factual errors / safety risks / emotional-conversational。</div>
+      </main>
+      <footer class="footerline"><span>FLEXI — examples</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 8 FLEXI 缺口 -->
+    <section class="slide">
+      <header><div class="eyebrow">Benchmark 2 / FLEXI</div></header>
+      <main>
+        <h2>但它有两个<span style="color:var(--red)">硬缺口</span></h2>
+        <div class="grid two" style="margin-top: 26px;">
+          <div class="card">
+            <span class="tag red">缺口一：没有时机分级</span>
+            <p style="margin-top:12px;">EDS <strong>只评纠正内容对不对，完全不管时机</strong>。时机只有 TOR 那个 −0.5s 的二值判定——没有窗口、没有分级、没有延迟惩罚。</p>
+            <p class="note" style="margin-top:12px;">→ FLEXI 测不了"该在什么时候打断"，而这正是 InterruptPO 的核心。</p>
+          </div>
+          <div class="card">
+            <span class="tag red">缺口二：没有任何负例</span>
+            <p style="margin-top:12px;">抽查 dialog_1 / 50 / 120 / 199 / 200，<strong>200 条全部含错误</strong>。没有 no-error 对照集。</p>
+            <p style="margin-top:10px;">意味着 <strong>FLEXI 无法测假阳性率</strong>——一个"逢问必打断"的模型也能刷高分。</p>
+            <p class="note" style="margin-top:12px;">→ 而假阳性正是 <span class="mono">R_cost</span> 最需要的信号。</p>
+          </div>
+        </div>
+        <div class="grid" style="margin-top:18px;">
+          <div class="card" style="min-height:auto;">
+            <p><strong>另外几个小问题</strong>：<span class="mono">:168</span> 算了 avg_delay 但从没打印（死代码）；TOR 报的是计数不是比率；<span class="mono">:54</span> API key 是 <span class="mono">"YOUR_API_KEY"</span> 占位符。</p>
+          </div>
+        </div>
+      </main>
+      <footer class="footerline"><span>FLEXI — gaps</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 9 MIB 总览 -->
+    <section class="slide">
+      <header><div class="eyebrow">Benchmark 3 / MIB</div></header>
+      <main>
+        <h2>MIB：把"实时纠错"做成<span style="color:var(--blue)">可判定的协议</span></h2>
+        <p class="lead" style="margin-top:6px;">Model Interruption Bench · <strong>Anonymous ACL submission</strong>（审稿中，无 arXiv、无代码）</p>
+        <div class="grid" style="margin-top: 22px;">
+          <div class="card">
+            <span class="tag blue">任务设定</span>
+            <p style="margin-top:10px;">用户<strong>口述一步步的数学解题过程</strong>；error 实例中某一步算错，<strong>后续步骤继续基于这个错误往下推</strong>；no-error 实例全程正确。</p>
+          </div>
+          <div class="card">
+            <span class="tag blue">数据构造</span>
+            <p style="margin-top:10px;">GSM8K + <strong>MR-GSM8K</strong>（带步级正确性标注）。取<strong>第一个错误步</strong>当 ground truth。按错误步位置 1–5 各 60 条 → <strong>300 incorrect + 300 配对 correct = 600</strong>。</p>
+          </div>
+          <div class="card">
+            <span class="tag blue">音频合成</span>
+            <p style="margin-top:10px;">GPT-5-nano 口语化改写（过自然度筛选）→ <strong>GPT-4o-mini TTS</strong> → 流式播放给模型。</p>
+          </div>
+        </div>
+        <div class="formula" style="margin-top:18px;">用户音频模板：
+"I want to solve this math question. <strong>If I make a mistake, please correct me
+immediately, even when I am still speaking.</strong> [question].
+ Here is my solution: [step-by-step solution]"</div>
+      </main>
+      <footer class="footerline"><span>MIB — overview</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 10 MIB 协议 -->
+    <section class="slide">
+      <header><div class="eyebrow">Benchmark 3 / MIB</div></header>
+      <main>
+        <h2>它的判定协议（<span class="good">这套我们可以直接抄</span>）</h2>
+        <div class="formula" style="margin-top:16px;">error window = [ t_s , t_e + Δ ]        Δ = 10s
+   t_s / t_e = 错误步被说出的起止时间（ASR 词级对齐）
+
+latency(t) = max(0, t − t_e)     仅当 t ∈ [t_s, t_user_end] 时有定义
+   → 打在错误步之内 ⇒ latency = 0；越过 t_e 越久，罚得越多</div>
+        <div class="grid four" style="margin-top: 20px;">
+          <div class="card">
+            <span class="tag">TP</span>
+            <p style="margin-top:10px;">在 error window 内正确打断 error 实例</p>
+          </div>
+          <div class="card">
+            <span class="tag">TN</span>
+            <p style="margin-top:10px;">在 no-error 实例上<strong>全程保持沉默</strong></p>
+          </div>
+          <div class="card">
+            <span class="tag red">FN</span>
+            <p style="margin-top:10px;">没打断，或窗口内打断了但<strong>没说中错误</strong></p>
+          </div>
+          <div class="card">
+            <span class="tag red">FP</span>
+            <p style="margin-top:10px;">在 no-error 实例上打断（或事后声称有错）</p>
+          </div>
+        </div>
+        <p style="margin-top:18px;color:var(--muted);">backchannel（"mm-hmm"、"right"）<strong>不算打断</strong>；judge 只看<strong>第一个非-backchannel 发声</strong>，之后的全部忽略。</p>
+      </main>
+      <footer class="footerline"><span>MIB — protocol</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 11 MIB 关键发现 -->
+    <section class="slide">
+      <header><div class="eyebrow">Benchmark 3 / MIB — 最重要的一页</div></header>
+      <main>
+        <h2><span style="color:var(--red)">detection–interruption gap</span></h2>
+        <div class="split" style="margin-top: 22px;">
+          <div>
+            <div class="table">
+              <div class="row head" style="grid-template-columns: 1.2fr 0.9fr 0.9fr;">
+                <div class="cell">模型</div><div class="cell">turn-based<br>看得出错吗</div><div class="cell">full-duplex<br>打得断吗 (TP%)</div>
+              </div>
+              <div class="row" style="grid-template-columns: 1.2fr 0.9fr 0.9fr;">
+                <div class="cell">Gemini 2.5</div><div class="cell good">66.5%</div><div class="cell bad">8.3%</div>
+              </div>
+              <div class="row" style="grid-template-columns: 1.2fr 0.9fr 0.9fr;">
+                <div class="cell">Gemini 3.1</div><div class="cell good">62.7%</div><div class="cell bad">0.3%</div>
+              </div>
+              <div class="row" style="grid-template-columns: 1.2fr 0.9fr 0.9fr;">
+                <div class="cell">GPT-4o Realtime</div><div class="cell good">59.4%</div><div class="cell bad">2.3%</div>
+              </div>
+            </div>
+            <p style="margin-top:14px;color:var(--muted);">最好的 F1 只有 <strong>11%</strong>（Gemini 2.5）；全员 TP% ≤ 8.3、FN% ≥ 91.7。</p>
+          </div>
+          <div>
+            <div class="quote">"the bottleneck is <strong>not</strong> understanding mathematical errors, but rather producing a content-aware interruption <strong>mid-utterance</strong> under full-duplex constraints."</div>
+            <div class="card" style="margin-top:16px;">
+              <span class="tag amber">对训练的含义</span>
+              <p style="margin-top:10px;"><strong>1.</strong> 不用训"检测能力"——底座已有 59–67%。要训的是<strong>把已经知道的事在正确时刻说出来</strong>。</p>
+              <p style="margin-top:8px;"><strong>2.</strong> 支持 <strong>timing / content 分离</strong>：内容能力现成，只动 timing 策略，别动 raw token。</p>
+              <p style="margin-top:8px;"><strong>3.</strong> <span class="mono">R_trigger</span> / <span class="mono">R_timing</span> 权重应远大于内容判定项。</p>
+            </div>
+          </div>
+        </div>
+      </main>
+      <footer class="footerline"><span>MIB — the key finding</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 12 MIB 假阳性证据 -->
+    <section class="slide">
+      <header><div class="eyebrow">Benchmark 3 / MIB</div></header>
+      <main>
+        <h2>"多打断"换不来"打得准"</h2>
+        <div class="split" style="margin-top: 22px;">
+          <div>
+            <div class="metric"><strong>2.0 → 98.7</strong><span>FP% 的跨度<br>而 TP% 完全不随之上升</span></div>
+            <p style="margin-top:16px;">Moshi / PersonaPlex 几乎逢音必打断（<strong>FP% &gt; 95</strong>），在真错误上并<strong>不比最保守的 Freeze-Omni</strong>（FP%=2.0, TP%=0）更强。</p>
+            <p class="note" style="margin-top:14px;">→ 这是 <span class="mono">R_cost</span> 必须存在的最硬证据。</p>
+            <p style="margin-top:14px;color:var(--muted);">延迟同样糟：即使打断了也普遍太晚——Gemini 2.5 平均 <strong>11.7s</strong>(n=90)、Gemini 3.1 8.4s(n=10)、GPT-4o 4.1s(n=36)、Moshi 4.9s(n=154)、PersonaPlex 5.8s(n=125)。</p>
+          </div>
+          <div>
+            <div class="card">
+              <span class="tag violet">三种行为原型</span>
+              <p style="margin-top:12px;"><strong>passive</strong>（Freeze-Omni）：300 个 FN 里 <strong>285 是 MISSED</strong>，基本不出声。</p>
+              <p style="margin-top:10px;"><strong>post-hoc responder</strong>（Gemini 2.5/3.1、GPT-4o）：认得出错，但只在用户说完后才说。Gemini 3.1 最极端：<strong>11 MISSED vs 180 PH_CORR</strong>。</p>
+              <p style="margin-top:10px;"><strong>aggressive</strong>（Moshi、PersonaPlex）：FN 被 TOO_EARLY(118/169) 和 WRONG_ERROR(130/104) 主导——<strong>在对韵律线索反应，不是对内容</strong>。</p>
+            </div>
+          </div>
+        </div>
+      </main>
+      <footer class="footerline"><span>MIB — false positives</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 13 MIB 子类型 -->
+    <section class="slide">
+      <header><div class="eyebrow">Benchmark 3 / MIB</div></header>
+      <main>
+        <h2>FN / FP 子类型分类学 <span style="color:var(--muted);font-size:0.6em;">— 可直接当我们的负例标签体系</span></h2>
+        <div class="grid two" style="margin-top: 20px;">
+          <div>
+            <p class="eyebrow" style="margin-bottom:8px;">FN 子类（incorrect audio 上）</p>
+            <div class="table">
+              <div class="row head" style="grid-template-columns: 0.8fr 1.6fr;"><div class="cell">子类</div><div class="cell">行为</div></div>
+              <div class="row" style="grid-template-columns: 0.8fr 1.6fr;"><div class="cell mono">TOO_EARLY</div><div class="cell">抢在错误步发生之前就打断</div></div>
+              <div class="row" style="grid-template-columns: 0.8fr 1.6fr;"><div class="cell mono">WRONG_ERROR</div><div class="cell">窗口内打断了，但没指出真正的错误</div></div>
+              <div class="row" style="grid-template-columns: 0.8fr 1.6fr;"><div class="cell mono">TOO_LATE</div><div class="cell">晚于窗口，用户还在说</div></div>
+              <div class="row" style="grid-template-columns: 0.8fr 1.6fr;"><div class="cell mono">PH_CORR</div><div class="cell">说话中沉默，等用户说完才正确指出</div></div>
+              <div class="row" style="grid-template-columns: 0.8fr 1.6fr;"><div class="cell mono">PH_OTHER</div><div class="cell">说话中沉默，事后也没指出错误</div></div>
+              <div class="row" style="grid-template-columns: 0.8fr 1.6fr;"><div class="cell mono">MISSED</div><div class="cell">从头到尾没有非 BC 发声</div></div>
+            </div>
+          </div>
+          <div>
+            <p class="eyebrow" style="margin-bottom:8px;">FP 子类（correct audio 上）</p>
+            <div class="table">
+              <div class="row head" style="grid-template-columns: 0.8fr 1.6fr;"><div class="cell">子类</div><div class="cell">行为</div></div>
+              <div class="row" style="grid-template-columns: 0.8fr 1.6fr;"><div class="cell mono">FALSE_CLAIM</div><div class="cell">打断并声称一个不存在的错误<br><span class="bad">946 个 FP 里占 588</span></div></div>
+              <div class="row" style="grid-template-columns: 0.8fr 1.6fr;"><div class="cell mono">UNRELATED</div><div class="cell">打断但离题（例如直接把题做了）</div></div>
+              <div class="row" style="grid-template-columns: 0.8fr 1.6fr;"><div class="cell mono">AFFIRM</div><div class="cell">打断只是为了肯定用户是对的</div></div>
+              <div class="row" style="grid-template-columns: 0.8fr 1.6fr;"><div class="cell mono">PH_CLAIM</div><div class="cell">说话中沉默，事后编造一个错误</div></div>
+            </div>
+            <div class="card" style="margin-top:16px;min-height:auto;">
+              <p>这套分类把"失败"拆成了<strong>可归因的模式</strong>——抢跑、说错、太晚、憋着不说。正好对应不同的 reward 项。</p>
+            </div>
+          </div>
+        </div>
+      </main>
+      <footer class="footerline"><span>MIB — failure taxonomy</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 14 ProVoice 总览 -->
+    <section class="slide">
+      <header><div class="eyebrow">Benchmark 4 / ProVoice-Bench</div></header>
+      <main>
+        <h2>ProVoice-Bench：主动性的四个面</h2>
+        <p class="lead" style="margin-top:6px;">arXiv 2604.15037 · 2026-04 · 上海交大 · 1,182 条样本 · 未开源</p>
+        <div class="grid four" style="margin-top: 22px;">
+          <div class="card">
+            <span class="tag blue">PIC</span>
+            <p style="margin-top:10px;"><strong>Proactive Intent Capture</strong></p>
+            <p style="margin-top:6px;">从犹豫等细微语言线索推断隐含意图，主动发起 tool call 并求确认。</p>
+          </div>
+          <div class="card">
+            <span class="tag blue">LTM</span>
+            <p style="margin-top:10px;"><strong>Latent Topic Monitor</strong></p>
+            <p style="margin-top:6px;">用户预先设定语义触发条件，模型保持沉默，只在触发时介入。</p>
+          </div>
+          <div class="card">
+            <span class="tag violet">CFC</span>
+            <p style="margin-top:10px;"><strong>Context Fact Checking</strong></p>
+            <p style="margin-top:6px;">口头陈述与手机端数字上下文矛盾时，<strong>主动打断纠正</strong>。← 与我们最相关</p>
+          </div>
+          <div class="card">
+            <span class="tag blue">ESS</span>
+            <p style="margin-top:10px;"><strong>Environment Sound Sensing</strong></p>
+            <p style="margin-top:6px;">识别用户预定义的声学事件（如警报、火车声）作为介入线索。</p>
+          </div>
+        </div>
+        <div class="grid two" style="margin-top:18px;">
+          <div class="card" style="min-height:auto;">
+            <p><strong>样本形式化</strong>：五元组 <span class="mono">(C_a, D_c, S_c, R_g, T_g)</span> = 对话音频 / 数字上下文 / 语义线索 / 参考回复 / 参考 tool call</p>
+          </div>
+          <div class="card" style="min-height:auto;">
+            <p><strong>指标</strong>：Acc、<strong>FPR</strong>（无有效触发时的误介入频率）、Recall，外加 Response Accuracy。<span class="note">← 有负例设计</span></p>
+          </div>
+        </div>
+      </main>
+      <footer class="footerline"><span>ProVoice-Bench — overview</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 15 ProVoice CFC 例子 -->
+    <section class="slide">
+      <header><div class="eyebrow">Benchmark 4 / ProVoice-Bench</div></header>
+      <main>
+        <h2>CFC 的真实例子：与<span style="color:var(--violet)">用户自己的数字上下文</span>矛盾</h2>
+        <div class="card" style="margin-top: 22px;">
+          <p class="eyebrow">手机 Messages（数字上下文）</p>
+          <p style="margin-top:6px;font-size:1.05em;">"Please change my ticket to the next available flight on July 6. <strong>I have a tango performance that evening and can't miss it.</strong>"</p>
+        </div>
+        <div class="card" style="margin-top: 14px;">
+          <p class="eyebrow">User 语音</p>
+          <p style="margin-top:6px;font-size:1.05em;">"I'm rescheduling my flight for the 6th, but <strong>I don't have anything planned for that night yet</strong>, so we should definitely go out for a big dinner then!"</p>
+        </div>
+        <div class="card" style="margin-top: 14px;border-left:5px solid var(--violet);">
+          <p class="eyebrow">Model 主动打断</p>
+          <p style="margin-top:6px;font-size:1.05em;">"Actually, Diego, you might want to double-check that. <strong>According to your messaging history</strong>, you explicitly mentioned that you have a tango performance on the evening of July 6th that you cannot miss."</p>
+        </div>
+        <div class="quote" style="margin-top:20px;">与 FLEXI 的关键区别：矛盾不是"与世界知识冲突"，而是<strong>与用户自己手机里的记录冲突</strong>——个人化、需要跨模态取证。FLEXI 完全没有这类触发源。</div>
+      </main>
+      <footer class="footerline"><span>ProVoice-Bench — CFC example</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 16 对比总表 -->
+    <section class="slide">
+      <header><div class="eyebrow">Synthesis</div></header>
+      <main>
+        <h2>四者对比：触发源<span class="good">互不重叠</span></h2>
+        <div class="table" style="margin-top: 20px;">
+          <div class="row head" style="grid-template-columns: 1fr 1.5fr 0.9fr 1.1fr 0.9fr;">
+            <div class="cell">Benchmark</div><div class="cell">触发源</div><div class="cell">有负例?</div><div class="cell">时机评测</div><div class="cell">拿得到?</div>
+          </div>
+          <div class="row" style="grid-template-columns: 1fr 1.5fr 0.9fr 1.1fr 0.9fr;">
+            <div class="cell"><strong>Instruct-FD</strong></div><div class="cell">外部<strong>指令</strong>条件化的轮次策略</div><div class="cell">—</div><div class="cell">—</div><div class="cell bad">未开源</div>
+          </div>
+          <div class="row" style="grid-template-columns: 1fr 1.5fr 0.9fr 1.1fr 0.9fr;">
+            <div class="cell"><strong>FLEXI</strong></div><div class="cell">世界知识错误 / 安全 / 自相矛盾</div><div class="cell bad">无</div><div class="cell">仅 −0.5s 二值</div><div class="cell good">全开源</div>
+          </div>
+          <div class="row" style="grid-template-columns: 1fr 1.5fr 0.9fr 1.1fr 0.9fr;">
+            <div class="cell"><strong>MIB</strong></div><div class="cell">数学推理链错误</div><div class="cell good">300 配对</div><div class="cell good">window + latency</div><div class="cell bad">审稿中</div>
+          </div>
+          <div class="row" style="grid-template-columns: 1fr 1.5fr 0.9fr 1.1fr 0.9fr;">
+            <div class="cell"><strong>ProVoice CFC</strong></div><div class="cell">与用户<strong>数字上下文</strong>矛盾</div><div class="cell good">FPR</div><div class="cell">弱</div><div class="cell bad">未开源</div>
+          </div>
+        </div>
+        <div class="grid" style="margin-top:20px;">
+          <div class="card" style="min-height:auto;"><p><strong>触发源</strong>互补：世界知识 / 推理链 / 个人数字上下文 / 外部指令，合起来才覆盖完整的语义触发谱系。</p></div>
+          <div class="card" style="min-height:auto;"><p><strong>负例</strong>只有 MIB 和 ProVoice 有；FLEXI 最容易拿但恰恰缺这块。</p></div>
+          <div class="card" style="min-height:auto;"><p><strong>时机</strong>只有 MIB 做对了：error window + latency 公式，其余都很粗。</p></div>
+        </div>
+      </main>
+      <footer class="footerline"><span>Synthesis — comparison</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 17 下一步 -->
+    <section class="slide">
+      <header><div class="eyebrow">Next</div></header>
+      <main>
+        <h2>这些盘点告诉我们该做什么</h2>
+        <div class="grid" style="margin-top: 24px;">
+          <div class="card">
+            <div class="agenda-num" style="margin-bottom:10px;">1</div>
+            <p><strong>训 timing，不训 detection。</strong></p>
+            <p style="margin-top:8px;">MIB 的 gap 已经证明底座有 59–67% 的检测力，卡在"实时说出来"。这支持 action-space 分离：只优化 timing 策略，不动 raw token 生成。</p>
+          </div>
+          <div class="card">
+            <div class="agenda-num" style="margin-bottom:10px;">2</div>
+            <p><strong>把 MIB 的协议实现出来，套到 FLEXI 上。</strong></p>
+            <p style="margin-top:8px;">MIB 没代码但论文写得够细：error window、latency 公式、FN/FP 子类型都可复现。套到 FLEXI 的 200 条上，就补齐了 FLEXI 缺的时机评测。</p>
+          </div>
+          <div class="card">
+            <div class="agenda-num" style="margin-bottom:10px;">3</div>
+            <p><strong>自己造负例。</strong></p>
+            <p style="margin-top:8px;">FLEXI 没有 no-error 对照集，而假阳性是 <span class="mono">R_cost</span> 的核心信号。需要合成一批"陈述完全正确"的对照音频。</p>
+          </div>
+        </div>
+        <div class="quote" style="margin-top:24px;">现成的评测基础已经够起步了——<strong>不必等 Instruct-FD 开源</strong>。</div>
+      </main>
+      <footer class="footerline"><span>Next steps</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 18 参考 -->
+    <section class="slide">
+      <header><div class="eyebrow">References</div></header>
+      <main>
+        <h2>来源</h2>
+        <div class="grid two" style="margin-top: 24px;">
+          <div class="card">
+            <p><strong>Instruct-FD</strong> — Can Your Full-Duplex Speech System Follow Turn-Taking Instructions?</p>
+            <p class="mono" style="margin-top:6px;">arXiv:2607.20460 · Boson AI · 2026-05</p>
+          </div>
+          <div class="card">
+            <p><strong>FLEXI</strong> — Benchmarking Full-duplex Human-LLM Speech Interaction</p>
+            <p class="mono" style="margin-top:6px;">arXiv:2509.22243 · 东北大学 · 2025-09</p>
+            <p class="mono">github.com/ChristineCHEN274/FLEXI</p>
+            <p class="mono">huggingface.co/datasets/qibai/FLEXI</p>
+          </div>
+          <div class="card">
+            <p><strong>MIB</strong> — Model Interruption Bench: Evaluating Real-Time Error Correction in Full-Duplex Voice Agents</p>
+            <p class="mono" style="margin-top:6px;">Anonymous ACL submission（审稿中）</p>
+          </div>
+          <div class="card">
+            <p><strong>ProVoice-Bench</strong> — From Reactive to Proactive: Assessing the Proactivity of Voice Agents</p>
+            <p class="mono" style="margin-top:6px;">arXiv:2604.15037 · 上海交大 · 2026-04</p>
+          </div>
+        </div>
+        <p style="margin-top:22px;color:var(--muted);">本 deck 中的数字均取自各论文原文与 FLEXI 代码库实测（<span class="mono">evaluate/eval_model_interrupt.py</span>、<span class="mono">data_text_json/model_interruption_text.json</span>）。</p>
+      </main>
+      <footer class="footerline"><span>References</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+  </div>
+
+  <div class="controls">
+    <button id="prev" aria-label="Previous slide">←</button>
+    <button id="next" aria-label="Next slide">→</button>
+  </div>
+
+  <script>
+    const slides = Array.from(document.querySelectorAll('.slide'));
+    const bars = Array.from(document.querySelectorAll('.bar'));
+    let index = 0;
+
+    function showSlide(nextIndex) {
+      index = Math.max(0, Math.min(slides.length - 1, nextIndex));
+      slides.forEach((slide, i) => slide.classList.toggle('active', i === index));
+      document.querySelectorAll('.counter').forEach(counter => {
+        counter.textContent = `${index + 1} / ${slides.length}`;
+      });
+      bars.forEach(bar => {
+        bar.style.width = `${((index + 1) / slides.length) * 100}%`;
+      });
+      history.replaceState(null, '', `#${index + 1}`);
+    }
+
+    document.getElementById('prev').addEventListener('click', () => showSlide(index - 1));
+    document.getElementById('next').addEventListener('click', () => showSlide(index + 1));
+    document.addEventListener('keydown', event => {
+      if (['ArrowRight', 'PageDown', ' '].includes(event.key)) {
+        event.preventDefault();
+        showSlide(index + 1);
+      }
+      if (['ArrowLeft', 'PageUp'].includes(event.key)) {
+        event.preventDefault();
+        showSlide(index - 1);
+      }
+      if (event.key === 'Home') showSlide(0);
+      if (event.key === 'End') showSlide(slides.length - 1);
+    });
+
+    const initial = Number.parseInt(location.hash.replace('#', ''), 10);
+    if (Number.isFinite(initial)) {
+      showSlide(initial - 1);
+    } else {
+      showSlide(0);
+    }
+  </script>
+</body>
+</html>
