@@ -505,394 +505,370 @@
 
     <!-- 1 COVER -->
     <section class="slide active">
-      <header><div class="eyebrow">Benchmark survey / Full-duplex proactive interruption</div></header>
+      <header><div class="eyebrow">Benchmark survey / Model-initiated interruption</div></header>
       <main class="cover">
         <div class="cover-title">
           <h1>模型主动打断用户，<span>拿什么来评？</span></h1>
-          <p class="lead">盘点 Instruct-FD 与另外三个 benchmark：它们各自测什么、数据长什么样、有没有开源、缺口在哪。</p>
-          <p>结论先行：三者的触发源互不重叠，合起来才覆盖我们要的语义触发谱系；而 MIB 的一个发现，直接改变了训练该往哪使劲。</p>
+          <p class="lead">四个 benchmark：每个给出<b>具体的打断场景样例</b>与<b>确切的评分标准</b>。</p>
+          <p>本 deck 只陈述论文/官方代码中写明的内容；凡属我方归纳或推断，均单独标注。</p>
         </div>
         <div class="agenda">
-          <div class="agenda-item">
-            <div class="agenda-num">1</div>
-            <div><strong>Instruct-FD</strong><span>指令条件化的轮次管理，5 类指令 × 29 场景。</span></div>
-          </div>
-          <div class="agenda-item">
-            <div class="agenda-num">2</div>
-            <div><strong>FLEXI</strong><span>唯一全开源，200 条主动打断触发场景。</span></div>
-          </div>
-          <div class="agenda-item">
-            <div class="agenda-num">3</div>
-            <div><strong>MIB</strong><span>error window + 负例，揭示 detection–interruption gap。</span></div>
-          </div>
-          <div class="agenda-item">
-            <div class="agenda-num">4</div>
-            <div><strong>ProVoice-Bench</strong><span>与用户数字上下文矛盾时的主动介入。</span></div>
-          </div>
+          <div class="agenda-item"><div class="agenda-num">1</div><div><strong>Instruct-FD</strong><span>指令条件化的轮次管理，IAS / ΔIAS。</span></div></div>
+          <div class="agenda-item"><div class="agenda-num">2</div><div><strong>FLEXI</strong><span>唯一全开源，EDS 评纠正质量。</span></div></div>
+          <div class="agenda-item"><div class="agenda-num">3</div><div><strong>MIB</strong><span>error window + TP/TN/FP/FN 四分类。</span></div></div>
+          <div class="agenda-item"><div class="agenda-num">4</div><div><strong>ProVoice-Bench</strong><span>Acc / FPR / Rec + Response Accuracy。</span></div></div>
         </div>
       </main>
       <footer class="footerline"><span>Use ← / → or space to navigate</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
     </section>
 
-    <!-- 2 方向陷阱 -->
+    <!-- 2 方向 -->
     <section class="slide">
       <header><div class="eyebrow">Scoping</div></header>
       <main>
-        <h2>先分清方向，否则会刷错 benchmark</h2>
-        <div class="grid two" style="margin-top: 30px;">
+        <h2>先分清方向</h2>
+        <div class="grid two" style="margin-top: 28px;">
           <div class="card">
-            <span class="tag red">不是我们要的</span>
+            <span class="tag red">不在本 deck 范围</span>
             <h3 style="margin:12px 0 6px;">用户打断模型（barge-in）</h3>
-            <p>用户插话，模型该做的是<strong>闭嘴、让位、切换话题</strong>。这是 responsive 行为。</p>
-            <p style="margin-top:10px;">代表：Full-Duplex-Bench v1.5 的 user interruption、工业界的 LiveKit <span class="mono">TurnDetector</span> / Pipecat <span class="mono">SmartTurnAnalyzer</span>。</p>
-            <p class="note" style="margin-top:10px;">→ 只适合当 baseline 对照。</p>
+            <p>用户插话，模型应<strong>停止发言、让出话轮</strong>。属 responsive 行为。</p>
+            <p style="margin-top:10px;">例：Full-Duplex-Bench v1.5 的 user interruption。</p>
           </div>
           <div class="card">
-            <span class="tag">我们的目标</span>
+            <span class="tag">本 deck 的对象</span>
             <h3 style="margin:12px 0 6px;">模型打断用户（proactive）</h3>
-            <p>用户还在说，但内容已经<strong>需要介入</strong>——事实错误、安全风险、自相矛盾。模型该做的是<strong>在正确时机开口</strong>。</p>
-            <p style="margin-top:10px;">代表：Instruct-FD 的 Interrupt、FLEXI 的 model_interrupt、MIB、ProVoice-Bench 的 CFC。</p>
-            <p class="note" style="margin-top:10px;">→ 本 deck 只谈这一类。</p>
+            <p>用户仍在说话，模型<strong>主动开口介入</strong>。</p>
+            <p style="margin-top:10px;">例：Instruct-FD 的 Interrupt、FLEXI 的 model_interrupt、MIB、ProVoice-Bench 的 CFC。</p>
           </div>
         </div>
-        <div class="quote" style="margin-top:24px;">绝大多数带 “interruption” 字样的 benchmark 测的是前者。选错方向，努力全白费。</div>
+        <div class="quote" style="margin-top:26px;">两者是相反的行为，评分口径也完全不同。</div>
       </main>
-      <footer class="footerline"><span>Direction matters</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+      <footer class="footerline"><span>Direction</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
     </section>
 
     <!-- 3 Instruct-FD 总览 -->
     <section class="slide">
-      <header><div class="eyebrow">Benchmark 1 / Instruct-FD</div></header>
+      <header><div class="eyebrow">1 / Instruct-FD · arXiv 2607.20460</div></header>
       <main>
-        <h2>Instruct-FD：能不能<span style="color:var(--blue)">按指令</span>管理轮次</h2>
-        <p class="lead" style="margin-top:6px;">arXiv 2607.20460 · 2026-05 · Boson AI（含 Mu Li、Alex Smola）</p>
-        <div class="grid" style="margin-top: 24px;">
+        <h2>Instruct-FD：能否<span style="color:var(--blue)">按指令</span>管理轮次</h2>
+        <div class="grid" style="margin-top: 22px;">
           <div class="card">
-            <span class="tag blue">问题</span>
-            <p style="margin-top:10px;">全双工系统能说得流畅，但<strong>被明确指示时能不能改变轮次行为</strong>？部署时对话策略因场景而异——主动型辅导 vs 被动型咨询。</p>
+            <span class="tag blue">研究问题</span>
+            <p style="margin-top:10px;">全双工系统被<strong>明确指示</strong>时，能否相应改变其轮次行为。论文指出部署场景的对话策略各异（如主动型辅导 vs 被动型咨询）。</p>
           </div>
           <div class="card">
-            <span class="tag blue">方法</span>
-            <p style="margin-top:10px;">人工校验的<strong>合成 pipeline</strong> 生成指令条件化对话；deployment-agnostic 多轮评测协议；<strong>LLM-as-judge</strong>。</p>
+            <span class="tag blue">构成</span>
+            <p style="margin-top:10px;"><strong>5 类指令 × 29 个场景</strong>（proactive 14 + responsive 15）。人工校验的合成 pipeline + deployment-agnostic 多轮评测协议 + LLM judge。</p>
           </div>
           <div class="card">
-            <span class="tag blue">规模</span>
-            <p style="margin-top:10px;"><strong>5 类指令 × 29 个场景</strong>（proactive 14 + responsive 15），评测 6 个 SOTA 全双工系统。</p>
+            <span class="tag blue">Interrupt 指令模板</span>
+            <p style="margin-top:10px;" class="mono">Interrupt when {trigger},<br>listen otherwise</p>
+            <p style="margin-top:8px;">5 类为 Listen / Backchannel / <strong>Interrupt</strong> / Continue / Acknowledge。</p>
           </div>
         </div>
-        <div class="grid" style="margin-top:16px;">
-          <div class="card" style="min-height:auto;">
-            <p><strong>5 类指令</strong>：Listen · Backchannel · <span class="bad">Interrupt</span> · Continue · Acknowledge</p>
-          </div>
-          <div class="card" style="min-height:auto;">
-            <p><strong>场景举例</strong>：Self Contradiction · Topic Redirect · User Attention Check · Add Constraint</p>
-          </div>
-          <div class="card" style="min-height:auto;">
-            <p><strong>指标 IAS</strong>：judge 对该指令下所有测试用例的<strong>二值通过率均值</strong></p>
-          </div>
+        <div class="card" style="margin-top:16px;">
+          <p class="eyebrow">论文给出的 Interrupt 指令实例（原文）</p>
+          <p style="margin-top:8px;">"When the user makes a statement that <strong>directly contradicts something they said earlier</strong> in the conversation, <strong>interrupt immediately</strong> to flag the inconsistency…"</p>
         </div>
       </main>
       <footer class="footerline"><span>Instruct-FD — overview</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
     </section>
 
-    <!-- 4 Instruct-FD 结果 -->
+    <!-- 4 Instruct-FD 例子 -->
     <section class="slide">
-      <header><div class="eyebrow">Benchmark 1 / Instruct-FD</div></header>
+      <header><div class="eyebrow">1 / Instruct-FD</div></header>
       <main>
-        <h2>结果：Interrupt 全线崩盘</h2>
-        <div class="table" style="margin-top: 20px;">
-          <div class="row head" style="grid-template-columns: 1.3fr repeat(6, 0.7fr);">
-            <div class="cell">模型</div><div class="cell">Overall</div><div class="cell">Listen</div><div class="cell">Backch.</div><div class="cell">Interrupt</div><div class="cell">Continue</div><div class="cell">Ack.</div>
+        <h2>具体样例：一个 Interrupt 测试用例</h2>
+        <p class="lead" style="margin-top:4px;">以下为论文 Figure 中给出的 Test Case（原文）</p>
+        <div class="card" style="margin-top:18px;border-left:4px solid var(--violet);">
+          <p class="eyebrow">Policy / Instruction</p>
+          <p style="margin-top:6px;font-size:1.05em;">"Interrupt when user say something wrong"</p>
+        </div>
+        <div class="card" style="margin-top:14px;">
+          <p class="eyebrow">Turn 1 — Context（第一个用户话轮）</p>
+          <p style="margin-top:6px;font-size:1.05em;">"Hey, I'm going to Solve a math problem"</p>
+        </div>
+        <div class="card" style="margin-top:14px;border-left:4px solid var(--red);">
+          <p class="eyebrow">Turn 2 — Trigger（should be interrupted）</p>
+          <p style="margin-top:6px;font-size:1.05em;">"… <strong>2 + 2 equals 5</strong>. Given that, The next step is …"</p>
+        </div>
+        <div class="grid two" style="margin-top:18px;">
+          <div class="card" style="min-height:auto;">
+            <p>编排方式：orchestrator <strong>只控制用户声道</strong>，从不注入模型的回复流；用户与模型音频在<strong>同一时间轴</strong>上采集。</p>
           </div>
-          <div class="row" style="grid-template-columns: 1.3fr repeat(6, 0.7fr);">
-            <div class="cell"><strong>Gemini</strong> <span class="tag red" style="height:20px;font-size:11px;">闭源</span></div><div class="cell"><strong>64.4</strong></div><div class="cell">72.4</div><div class="cell">50.0</div><div class="cell bad">5.8</div><div class="cell">71.7</div><div class="cell">86.3</div>
-          </div>
-          <div class="row" style="grid-template-columns: 1.3fr repeat(6, 0.7fr);">
-            <div class="cell">PersonaPlex</div><div class="cell">47.0</div><div class="cell">66.7</div><div class="cell">5.8</div><div class="cell bad">10.0</div><div class="cell">90.0</div><div class="cell">35.8</div>
-          </div>
-          <div class="row" style="grid-template-columns: 1.3fr repeat(6, 0.7fr);">
-            <div class="cell">Fun-Audio-Chat</div><div class="cell">46.2</div><div class="cell">90.7</div><div class="cell">0.0</div><div class="cell bad">9.2</div><div class="cell">94.2</div><div class="cell">5.4</div>
-          </div>
-          <div class="row" style="grid-template-columns: 1.3fr repeat(6, 0.7fr);">
-            <div class="cell">MiniCPM-o</div><div class="cell">36.4</div><div class="cell">59.6</div><div class="cell">12.5</div><div class="cell bad">1.7</div><div class="cell">97.5</div><div class="cell">5.4</div>
-          </div>
-          <div class="row" style="grid-template-columns: 1.3fr repeat(6, 0.7fr);">
-            <div class="cell">Moshi</div><div class="cell">21.1</div><div class="cell">12.8</div><div class="cell">1.7</div><div class="cell bad">11.7</div><div class="cell">88.3</div><div class="cell">12.0</div>
-          </div>
-          <div class="row" style="grid-template-columns: 1.3fr repeat(6, 0.7fr);">
-            <div class="cell">Freeze-Omni</div><div class="cell">10.7</div><div class="cell">7.1</div><div class="cell">0.0</div><div class="cell bad">5.0</div><div class="cell">40.0</div><div class="cell">9.6</div>
+          <div class="card" style="min-height:auto;">
+            <p>论文称此设计使所有模型面对<strong>相同的流式逻辑、时序结构与用户内容</strong>，无需访问模型内部即可公平比较。</p>
           </div>
         </div>
-        <p style="margin-top:16px;color:var(--muted);">IAS (%)，越高越好。6 个系统里 <strong>5 个开源</strong>，只有 Gemini-Live 闭源。</p>
+      </main>
+      <footer class="footerline"><span>Instruct-FD — test case</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 5 Instruct-FD 评分 -->
+    <section class="slide">
+      <header><div class="eyebrow">1 / Instruct-FD</div></header>
+      <main>
+        <h2>评分标准：IAS 与 ΔIAS</h2>
+        <div class="grid two" style="margin-top: 18px;">
+          <div>
+            <div class="card">
+              <span class="tag blue">judge 的输入怎么来</span>
+              <p style="margin-top:10px;">用 <strong>Qwen3-ASR-1.7B</strong> + <strong>Qwen3-ForcedAligner-0.6B</strong> 取得<strong>用户与模型双方音频的词级时间戳</strong>；交错两条时间线构造统一转录，并<strong>标注重叠区段</strong>，得到"何时说了什么"的时间锚定转录。</p>
+            </div>
+            <div class="card" style="margin-top:14px;">
+              <span class="tag blue">judge 与流程</span>
+              <p style="margin-top:10px;">judge 模型为 <strong>Claude Sonnet 4.6</strong>。输入三项：① 该遵循的指令；② 重构转录；③ 由 test case turn logs 导出的 groundtruth 参考。</p>
+              <p style="margin-top:8px;">结构化 CoT 四步：(i) 把指令<strong>形式化为规则</strong> → (ii) 构造模型行为的<strong>事件时间线</strong> → (iii) 在<strong>精确时序约束</strong>下评估规则遵循 → (iv) 产出<strong>最终判定</strong>。</p>
+            </div>
+          </div>
+          <div>
+            <div class="formula">IAS(m, I) = (1 / |D_I|) · Σ_{x∈D_I} 1[ judge(x(I), I) = pass ]</div>
+            <p style="margin-top:10px;">即：对指令 I 的全部测试用例，judge 判 <strong>pass 的比例</strong>——<strong>二值通过率的均值</strong>。</p>
+            <div class="formula" style="margin-top:16px;">ΔIAS(m, I) = IAS(m, I) − IAS(m, ∅ | I)</div>
+            <p style="margin-top:10px;"><strong>ΔIAS（Instruction Sensitivity Score）</strong>：把<strong>不给指令</strong>时的响应 x(∅) 同样交给 judge 按指令 I 评判，两者之差即为<strong>指令条件化本身带来的行为变化</strong>。</p>
+            <p style="margin-top:10px;color:var(--muted);">论文说明：IAS 高但 ΔIAS 低，说明模型本来就那样做；ΔIAS 高说明对指令响应强。</p>
+          </div>
+        </div>
+      </main>
+      <footer class="footerline"><span>Instruct-FD — scoring</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 6 Instruct-FD 结果 -->
+    <section class="slide">
+      <header><div class="eyebrow">1 / Instruct-FD</div></header>
+      <main>
+        <h2>结果（IAS，%）</h2>
+        <div class="table" style="margin-top: 18px;">
+          <div class="row head" style="grid-template-columns: 1.3fr repeat(6, 0.7fr);"><div class="cell">模型</div><div class="cell">Overall</div><div class="cell">Listen</div><div class="cell">Backch.</div><div class="cell">Interrupt</div><div class="cell">Continue</div><div class="cell">Ack.</div></div>
+          <div class="row" style="grid-template-columns: 1.3fr repeat(6, 0.7fr);"><div class="cell">Gemini</div><div class="cell"><strong>64.4</strong></div><div class="cell">72.4</div><div class="cell">50.0</div><div class="cell bad">5.8</div><div class="cell">71.7</div><div class="cell">86.3</div></div>
+          <div class="row" style="grid-template-columns: 1.3fr repeat(6, 0.7fr);"><div class="cell">PersonaPlex</div><div class="cell">47.0</div><div class="cell">66.7</div><div class="cell">5.8</div><div class="cell bad">10.0</div><div class="cell">90.0</div><div class="cell">35.8</div></div>
+          <div class="row" style="grid-template-columns: 1.3fr repeat(6, 0.7fr);"><div class="cell">Fun-Audio-Chat</div><div class="cell">46.2</div><div class="cell">90.7</div><div class="cell">0.0</div><div class="cell bad">9.2</div><div class="cell">94.2</div><div class="cell">5.4</div></div>
+          <div class="row" style="grid-template-columns: 1.3fr repeat(6, 0.7fr);"><div class="cell">MiniCPM-o</div><div class="cell">36.4</div><div class="cell">59.6</div><div class="cell">12.5</div><div class="cell bad">1.7</div><div class="cell">97.5</div><div class="cell">5.4</div></div>
+          <div class="row" style="grid-template-columns: 1.3fr repeat(6, 0.7fr);"><div class="cell">Moshi</div><div class="cell">21.1</div><div class="cell">12.8</div><div class="cell">1.7</div><div class="cell bad">11.7</div><div class="cell">88.3</div><div class="cell">12.0</div></div>
+          <div class="row" style="grid-template-columns: 1.3fr repeat(6, 0.7fr);"><div class="cell">Freeze-Omni</div><div class="cell">10.7</div><div class="cell">7.1</div><div class="cell">0.0</div><div class="cell bad">5.0</div><div class="cell">40.0</div><div class="cell">9.6</div></div>
+        </div>
+        <p style="margin-top:16px;">论文原文结论：<strong>Backchannel（0.0%–50.0%）与 Interrupt（1.7%–11.7%）在所有模型上均偏低</strong>；最佳整体 adherence 仅 64.4%。</p>
       </main>
       <footer class="footerline"><span>Instruct-FD — results</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
     </section>
 
-    <!-- 5 Instruct-FD 关键洞察 -->
+    <!-- 7 FLEXI 总览 -->
     <section class="slide">
-      <header><div class="eyebrow">Benchmark 1 / Instruct-FD</div></header>
+      <header><div class="eyebrow">2 / FLEXI · arXiv 2509.22243</div></header>
       <main>
-        <h2>关键观察：打断能力<span style="color:var(--red)">与模型强弱无关</span></h2>
-        <div class="split" style="margin-top: 26px;">
-          <div>
-            <div class="metric"><strong>11.7%</strong><span>Interrupt 最高分 —— 来自<br>整体最弱的 Moshi (21.1%)</span></div>
-            <div class="metric"><strong>5.8%</strong><span>Interrupt —— 来自<br>整体最强的 Gemini (64.4%)</span></div>
-            <p style="margin-top:18px;">整体最强的模型在 Interrupt 上反而不如最弱的。这说明它<strong>不是能力天花板，而是没人训过这个行为</strong>。</p>
-          </div>
-          <div>
-            <div class="card">
-              <span class="tag amber">对照</span>
-              <p style="margin-top:10px;"><strong>Continue 普遍很高（88–97.5%）</strong>——因为"保持发言"约等于什么都不做，是默认行为，不需要主动决策。</p>
-            </div>
-            <div class="card" style="margin-top:14px;">
-              <span class="tag amber">规律</span>
-              <p style="margin-top:10px;"><strong>proactive（backchannel / interrupt）≫ responsive 难。</strong>开源模型 backchannel 普遍 0–12.5%，只有 Gemini 到 50%。</p>
-            </div>
-          </div>
-        </div>
-        <div class="quote" style="margin-top:22px;">要训的不是"更聪明"，而是"会在该出手时出手"。</div>
-      </main>
-      <footer class="footerline"><span>Instruct-FD — insight</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
-    </section>
-
-    <!-- 6 FLEXI 总览 -->
-    <section class="slide">
-      <header><div class="eyebrow">Benchmark 2 / FLEXI</div></header>
-      <main>
-        <h2>FLEXI：唯一<span class="good">全开源</span>的那个</h2>
-        <p class="lead" style="margin-top:6px;">arXiv 2509.22243 · 2025-09 · 东北大学 NLP</p>
+        <h2>FLEXI：把 model interruption 放进<span style="color:var(--blue)">紧急场景</span></h2>
         <div class="grid" style="margin-top: 22px;">
           <div class="card">
-            <span class="tag">代码 + 数据</span>
+            <span class="tag">开源状态</span>
             <p style="margin-top:10px;" class="mono">github.com/ChristineCHEN274/FLEXI</p>
             <p class="mono">huggingface.co/datasets/qibai/FLEXI</p>
-            <p style="margin-top:10px;">Apache-2.0，41 commits，在维护。<strong>今天就能跑。</strong></p>
+            <p style="margin-top:10px;">Apache-2.0。四个 benchmark 中<strong>唯一代码与数据均公开</strong>者。</p>
           </div>
           <div class="card">
-            <span class="tag blue">6 个场景 × 200 条</span>
+            <span class="tag blue">六个场景</span>
             <p style="margin-top:10px;">turn-taking · pause handling · user backchannel · user interrupt · model backchannel · <strong>model interrupt</strong></p>
-            <p style="margin-top:8px;">repo 里含 4 个模型的推理脚本、ASR 时间对齐工具、GT 生成工具。</p>
+            <p style="margin-top:8px;">released 数据中 <span class="mono">model_interruption_text.json</span> 含 <strong>200 条</strong>。</p>
           </div>
           <div class="card">
-            <span class="tag violet">两个指标</span>
-            <p style="margin-top:10px;"><strong>EDS</strong>：gpt-4-turbo judge 打 0–5 分（0.5 一档），评"<strong>纠正是否事实正确且充分</strong>"。</p>
-            <p style="margin-top:8px;"><strong>TOR</strong>：<span class="mono">output_start − input_end &lt; −0.5s</span> 计一次打断。</p>
+            <span class="tag violet">论文口径</span>
+            <p style="margin-top:10px;">论文称 FLEXI 是首个<strong>显式纳入 emergency 场景下 model interruption</strong> 的全双工 benchmark，并针对模型主动打断给出 <strong>EDS（Emergency Detection Score）</strong>。</p>
           </div>
         </div>
-        <div class="formula" style="margin-top:18px;">EDS = mean(accuracy_score)   # 0–5，只评"纠正内容对不对"
-TOR = count( output_start − input_end &lt; −0.5s )   # 比用户说完早 0.5s 以上开口</div>
+        <div class="quote" style="margin-top:20px;">论文结论：开源与商业模型在 <strong>emergency awareness、turn terminating、interaction latency</strong> 上存在显著差距。</div>
       </main>
       <footer class="footerline"><span>FLEXI — overview</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
     </section>
 
-    <!-- 7 FLEXI 例子 -->
+    <!-- 8 FLEXI 例子 -->
     <section class="slide">
-      <header><div class="eyebrow">Benchmark 2 / FLEXI</div></header>
+      <header><div class="eyebrow">2 / FLEXI</div></header>
       <main>
-        <h2>数据长什么样：200 条嵌了错误前提的用户话</h2>
-        <div class="grid" style="margin-top: 20px;">
+        <h2>具体样例：<span class="mono" style="font-size:0.62em;">data_text_json/model_interruption_text.json</span></h2>
+        <p class="lead" style="margin-top:4px;">以下为发布数据中的原文条目。每条是一句<strong>内含错误前提的用户话</strong>，模型应主动打断纠正。</p>
+        <div class="grid" style="margin-top: 18px;">
           <div class="card">
-            <span class="tag blue">① 事实错误</span>
-            <p style="margin-top:12px;">"...when President <strong>Franklin D. Roosevelt signed the Declaration of Independence</strong> in Philadelphia?"</p>
-            <p style="margin-top:10px;">"I'm planning a trip to <strong>Paris to see the famous Colosseum</strong>..."</p>
-            <p style="margin-top:10px;">"...van Gogh's most famous painting, <strong>the Mona Lisa</strong>"</p>
+            <p class="eyebrow">dialog_1</p>
+            <p style="margin-top:8px;">"I'm writing a report on American history. Can you tell me more about when President <strong>Franklin D. Roosevelt signed the Declaration of Independence</strong> in Philadelphia?"</p>
           </div>
           <div class="card">
-            <span class="tag red">② 安全风险</span>
-            <p style="margin-top:12px;">"I'm going to <strong>mix bleach and ammonia</strong> together... What's the correct ratio?"</p>
-            <p style="margin-top:10px;">"My cat has a headache, so I'm going to give her <strong>a piece of my Tylenol</strong>."</p>
-            <p style="margin-top:10px;">"I'm <strong>deathly allergic to peanuts</strong>. So for a snack, I'm going to have a big bowl of boiled peanuts."</p>
+            <p class="eyebrow">dialog_5</p>
+            <p style="margin-top:8px;">"I need to clean my greasy stove top. I'm going to <strong>mix bleach and ammonia</strong> together to create a super-powerful cleaner. What's the correct ratio?"</p>
           </div>
           <div class="card">
-            <span class="tag violet">③ 自相矛盾</span>
-            <p style="margin-top:12px;">"As a <strong>strict vegan</strong>... recommend the best restaurant for <strong>honey-glazed salmon</strong>?"</p>
-            <p style="margin-top:10px;">"I'm a complete <strong>minimalist</strong>... that's why I've decided to start <strong>collecting every edition</strong> of every Stephen King novel."</p>
+            <p class="eyebrow">dialog_4</p>
+            <p style="margin-top:8px;">"As a <strong>strict vegan</strong>, I don't eat any animal products. Could you please recommend the best local restaurant for <strong>honey-glazed salmon</strong>?"</p>
           </div>
         </div>
-        <div class="quote" style="margin-top:20px;">这三类，正好对应我们 proposal 里的三个失败模式：factual errors / safety risks / emotional-conversational。</div>
+        <div class="grid two" style="margin-top:16px;">
+          <div class="card" style="min-height:auto;">
+            <p class="eyebrow">dialog_8</p>
+            <p style="margin-top:6px;">"My cat has a headache, so I'm going to give her a small piece of <strong>my Tylenol</strong>. Can you help me calculate the dosage based on her weight?"</p>
+          </div>
+          <div class="card" style="min-height:auto;">
+            <p class="eyebrow">dialog_9</p>
+            <p style="margin-top:6px;">"I'm teaching my son about biology, and I told him that <strong>since spiders have eight legs, they are classified as insects</strong>. Is that correct?"</p>
+          </div>
+        </div>
+        <p style="margin-top:16px;color:var(--muted);font-size:0.92em;">⚠️ 数据文件中<strong>未附带错误类型标注</strong>；FLEXI 也未定义此类分类。上述条目为原文照录。</p>
       </main>
       <footer class="footerline"><span>FLEXI — examples</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
     </section>
 
-    <!-- 8 FLEXI 缺口 -->
+    <!-- 9 FLEXI 评分 -->
     <section class="slide">
-      <header><div class="eyebrow">Benchmark 2 / FLEXI</div></header>
+      <header><div class="eyebrow">2 / FLEXI</div></header>
       <main>
-        <h2>但它有两个<span style="color:var(--red)">硬缺口</span></h2>
-        <div class="grid two" style="margin-top: 26px;">
-          <div class="card">
-            <span class="tag red">缺口一：没有时机分级</span>
-            <p style="margin-top:12px;">EDS <strong>只评纠正内容对不对，完全不管时机</strong>。时机只有 TOR 那个 −0.5s 的二值判定——没有窗口、没有分级、没有延迟惩罚。</p>
-            <p class="note" style="margin-top:12px;">→ FLEXI 测不了"该在什么时候打断"，而这正是 InterruptPO 的核心。</p>
+        <h2>评分标准：EDS 与打断计数</h2>
+        <p class="lead" style="margin-top:4px;">以下取自发布代码 <span class="mono">evaluate/eval_model_interrupt.py</span>（论文对应指标为 EDS）</p>
+        <div class="grid two" style="margin-top: 16px;">
+          <div>
+            <div class="card">
+              <span class="tag violet">EDS：judge 评"纠正是否正确且充分"</span>
+              <p style="margin-top:10px;">judge 模型 <strong>gpt-4-turbo</strong>，<span class="mono">temperature=0</span>。输入为「用户的错误陈述」与「AI 的回复」，输出 <span class="mono">accuracy_score</span> 与 analysis。</p>
+              <p style="margin-top:10px;"><strong>0–5 分，可用 0.5 档</strong>：</p>
+              <p style="margin-top:6px;font-size:0.95em;"><strong>5</strong> 完全正确且全面：关键事实准确、<strong>明确指出原错误</strong>、给出必要依据、不引入新错误<br>
+              <strong>4</strong> 基本正确：主要结论正确且足以解决原错误<br>
+              <strong>3</strong> 部分正确：方向对但不完整或有小瑕疵<br>
+              <strong>2</strong> 多处不准确：核心纠正有明显错误或缺关键事实<br>
+              <strong>1</strong> 大部分错误<br>
+              <strong>0</strong> 完全错误，<strong>或未作任何事实纠正</strong></p>
+              <div class="formula" style="margin-top:12px;">EDS = mean(accuracy_score)   # 全样本均值</div>
+            </div>
           </div>
-          <div class="card">
-            <span class="tag red">缺口二：没有任何负例</span>
-            <p style="margin-top:12px;">抽查 dialog_1 / 50 / 120 / 199 / 200，<strong>200 条全部含错误</strong>。没有 no-error 对照集。</p>
-            <p style="margin-top:10px;">意味着 <strong>FLEXI 无法测假阳性率</strong>——一个"逢问必打断"的模型也能刷高分。</p>
-            <p class="note" style="margin-top:12px;">→ 而假阳性正是 <span class="mono">R_cost</span> 最需要的信号。</p>
-          </div>
-        </div>
-        <div class="grid" style="margin-top:18px;">
-          <div class="card" style="min-height:auto;">
-            <p><strong>另外几个小问题</strong>：<span class="mono">:168</span> 算了 avg_delay 但从没打印（死代码）；TOR 报的是计数不是比率；<span class="mono">:54</span> API key 是 <span class="mono">"YOUR_API_KEY"</span> 占位符。</p>
+          <div>
+            <div class="card">
+              <span class="tag blue">打断的时间判定</span>
+              <div class="formula" style="margin-top:10px;">input_end  = 输入音频最后一个 chunk 的结束时间戳
+output_start = 输出音频第一个 chunk 的起始时间戳
+
+duration = output_start − input_end
+若 duration &lt; −0.5s → 计为一次打断</div>
+              <p style="margin-top:10px;">即：模型<strong>比用户说完早 0.5 秒以上</strong>开口，才算一次 mid-speech 打断。代码汇总输出该<strong>计数</strong>。</p>
+            </div>
+            <div class="card" style="margin-top:14px;">
+              <span class="tag amber">代码层面的两点事实</span>
+              <p style="margin-top:10px;">① 200 条 model_interruption 样本<strong>均含错误前提</strong>，数据中<strong>不含 no-error 对照样本</strong>。</p>
+              <p style="margin-top:8px;">② EDS 只评回复内容，<strong>不含时机项</strong>；时机仅由上述 −0.5s 二值判定体现。</p>
+            </div>
           </div>
         </div>
       </main>
-      <footer class="footerline"><span>FLEXI — gaps</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+      <footer class="footerline"><span>FLEXI — scoring</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
     </section>
 
-    <!-- 9 MIB 总览 -->
+    <!-- 10 MIB 总览 -->
     <section class="slide">
-      <header><div class="eyebrow">Benchmark 3 / MIB</div></header>
+      <header><div class="eyebrow">3 / MIB · Anonymous ACL submission</div></header>
       <main>
-        <h2>MIB：把"实时纠错"做成<span style="color:var(--blue)">可判定的协议</span></h2>
-        <p class="lead" style="margin-top:6px;">Model Interruption Bench · <strong>Anonymous ACL submission</strong>（审稿中，无 arXiv、无代码）</p>
+        <h2>MIB：实时纠错的<span style="color:var(--blue)">可判定协议</span></h2>
         <div class="grid" style="margin-top: 22px;">
           <div class="card">
-            <span class="tag blue">任务设定</span>
-            <p style="margin-top:10px;">用户<strong>口述一步步的数学解题过程</strong>；error 实例中某一步算错，<strong>后续步骤继续基于这个错误往下推</strong>；no-error 实例全程正确。</p>
+            <span class="tag blue">任务</span>
+            <p style="margin-top:10px;">用户<strong>口述分步数学解题过程</strong>。error 实例中某一步存在计算错误，<strong>后续步骤沿该错误继续推导</strong>；no-error 实例全程正确。</p>
           </div>
           <div class="card">
-            <span class="tag blue">数据构造</span>
-            <p style="margin-top:10px;">GSM8K + <strong>MR-GSM8K</strong>（带步级正确性标注）。取<strong>第一个错误步</strong>当 ground truth。按错误步位置 1–5 各 60 条 → <strong>300 incorrect + 300 配对 correct = 600</strong>。</p>
+            <span class="tag blue">数据</span>
+            <p style="margin-top:10px;">题目取自 <strong>GSM8K</strong>，分步解法取自 <strong>MR-GSM8K</strong>（含步级正确性标注）。从其 incorrect solutions 抽<strong>第一个错误步及其错误原因</strong>作为 ground truth。</p>
+            <p style="margin-top:8px;">按错误步位置分层：<strong>位置 1–5 各 60 条</strong> → 300 条 incorrect，每条配一条同题 correct → <strong>每个评测设定 600 条</strong>。</p>
           </div>
           <div class="card">
             <span class="tag blue">音频合成</span>
-            <p style="margin-top:10px;">GPT-5-nano 口语化改写（过自然度筛选）→ <strong>GPT-4o-mini TTS</strong> → 流式播放给模型。</p>
+            <p style="margin-top:10px;">用 <strong>GPT-5-nano</strong> 将解法改写为口语化表述（保留自然度检查得分高者），再由 <strong>GPT-4o-mini TTS</strong> 合成，流式播放给模型。</p>
           </div>
         </div>
-        <div class="formula" style="margin-top:18px;">用户音频模板：
-"I want to solve this math question. <strong>If I make a mistake, please correct me
-immediately, even when I am still speaking.</strong> [question].
- Here is my solution: [step-by-step solution]"</div>
+        <div class="card" style="margin-top:16px;">
+          <p class="eyebrow">论文给出的用户话术模板</p>
+          <p class="mono" style="margin-top:8px;">"I want to solve this math question. <strong>If I make a mistake, please correct me immediately, even when I am still speaking.</strong> [question]. Here is my solution: [step-by-step solution]"</p>
+        </div>
       </main>
       <footer class="footerline"><span>MIB — overview</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
     </section>
 
-    <!-- 10 MIB 协议 -->
+    <!-- 11 MIB 例子 -->
     <section class="slide">
-      <header><div class="eyebrow">Benchmark 3 / MIB</div></header>
+      <header><div class="eyebrow">3 / MIB</div></header>
       <main>
-        <h2>它的判定协议（<span class="good">这套我们可以直接抄</span>）</h2>
-        <div class="formula" style="margin-top:16px;">error window = [ t_s , t_e + Δ ]        Δ = 10s
-   t_s / t_e = 错误步被说出的起止时间（ASR 词级对齐）
-
-latency(t) = max(0, t − t_e)     仅当 t ∈ [t_s, t_user_end] 时有定义
-   → 打在错误步之内 ⇒ latency = 0；越过 t_e 越久，罚得越多</div>
-        <div class="grid four" style="margin-top: 20px;">
-          <div class="card">
-            <span class="tag">TP</span>
-            <p style="margin-top:10px;">在 error window 内正确打断 error 实例</p>
-          </div>
-          <div class="card">
-            <span class="tag">TN</span>
-            <p style="margin-top:10px;">在 no-error 实例上<strong>全程保持沉默</strong></p>
-          </div>
-          <div class="card">
-            <span class="tag red">FN</span>
-            <p style="margin-top:10px;">没打断，或窗口内打断了但<strong>没说中错误</strong></p>
-          </div>
-          <div class="card">
-            <span class="tag red">FP</span>
-            <p style="margin-top:10px;">在 no-error 实例上打断（或事后声称有错）</p>
-          </div>
+        <h2>具体样例（论文 Appendix B 原文）</h2>
+        <div class="card" style="margin-top:16px;">
+          <p style="font-size:0.98em;line-height:1.55;">
+            <span class="eyebrow">[Preamble]</span> I want to solve the following math question by myself, and I will let you know how I solve it. <strong>If I make a mistake, please correct me immediately, even if I am still speaking and haven't finished my solution.</strong><br>
+            <span class="mono" style="color:var(--muted);">[2 s silence]</span><br>
+            <span class="eyebrow">[Question]</span> Here is the question: Sarah's basketball games are <strong>4 quarters</strong> that are each <strong>12 minutes</strong> long. In the last quarter, there was a tie so the game was <strong>extended for five minutes</strong>. How long did the entire game last?<br>
+            <span class="mono" style="color:var(--muted);">[1.5 s silence]</span><br>
+            <span class="eyebrow">[Answer intro]</span> Here is my answer.<br>
+            <span class="eyebrow">[Step 1]</span> Each quarter is twelve minutes long, so the first three quarters add up to three times twelve equals thirty-six minutes.<br>
+            <span class="eyebrow" style="color:var(--red);">[Step 2]</span> <span style="background:#fae8e6;">The game was extended for five minutes, so the total time for the game is thirty-six plus five equals <strong>forty-one minutes</strong>.</span><br>
+            <span class="eyebrow">[Step 3]</span> Therefore, the entire game lasted for forty-one minutes.<br>
+            <span class="eyebrow">[Step 4]</span> So, forty-one.<br>
+            <span class="eyebrow">[Step 5]</span> The answer is: forty-one.
+          </p>
         </div>
-        <p style="margin-top:18px;color:var(--muted);">backchannel（"mm-hmm"、"right"）<strong>不算打断</strong>；judge 只看<strong>第一个非-backchannel 发声</strong>，之后的全部忽略。</p>
+        <div class="card" style="margin-top:14px;border-left:4px solid var(--red);">
+          <p class="eyebrow">Error reason（原文）</p>
+          <p style="margin-top:6px;">"The calculation of the total time <strong>forgot to include the duration of the last quarter itself</strong>; the total game time should be <strong>36 + 12 + 5 = 53 minutes</strong>."</p>
+        </div>
+        <p style="margin-top:14px;color:var(--muted);">错误自 Step 2 起，Step 3–5 沿该错误继续推导——模型须在此期间开口。</p>
       </main>
-      <footer class="footerline"><span>MIB — protocol</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+      <footer class="footerline"><span>MIB — instance example</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
     </section>
 
-    <!-- 11 MIB 关键发现 -->
+    <!-- 12 MIB 评分 -->
     <section class="slide">
-      <header><div class="eyebrow">Benchmark 3 / MIB — 最重要的一页</div></header>
+      <header><div class="eyebrow">3 / MIB</div></header>
       <main>
-        <h2><span style="color:var(--red)">detection–interruption gap</span></h2>
-        <div class="split" style="margin-top: 22px;">
-          <div>
-            <div class="table">
-              <div class="row head" style="grid-template-columns: 1.2fr 0.9fr 0.9fr;">
-                <div class="cell">模型</div><div class="cell">turn-based<br>看得出错吗</div><div class="cell">full-duplex<br>打得断吗 (TP%)</div>
-              </div>
-              <div class="row" style="grid-template-columns: 1.2fr 0.9fr 0.9fr;">
-                <div class="cell">Gemini 2.5</div><div class="cell good">66.5%</div><div class="cell bad">8.3%</div>
-              </div>
-              <div class="row" style="grid-template-columns: 1.2fr 0.9fr 0.9fr;">
-                <div class="cell">Gemini 3.1</div><div class="cell good">62.7%</div><div class="cell bad">0.3%</div>
-              </div>
-              <div class="row" style="grid-template-columns: 1.2fr 0.9fr 0.9fr;">
-                <div class="cell">GPT-4o Realtime</div><div class="cell good">59.4%</div><div class="cell bad">2.3%</div>
-              </div>
-            </div>
-            <p style="margin-top:14px;color:var(--muted);">最好的 F1 只有 <strong>11%</strong>（Gemini 2.5）；全员 TP% ≤ 8.3、FN% ≥ 91.7。</p>
-          </div>
-          <div>
-            <div class="quote">"the bottleneck is <strong>not</strong> understanding mathematical errors, but rather producing a content-aware interruption <strong>mid-utterance</strong> under full-duplex constraints."</div>
-            <div class="card" style="margin-top:16px;">
-              <span class="tag amber">对训练的含义</span>
-              <p style="margin-top:10px;"><strong>1.</strong> 不用训"检测能力"——底座已有 59–67%。要训的是<strong>把已经知道的事在正确时刻说出来</strong>。</p>
-              <p style="margin-top:8px;"><strong>2.</strong> 支持 <strong>timing / content 分离</strong>：内容能力现成，只动 timing 策略，别动 raw token。</p>
-              <p style="margin-top:8px;"><strong>3.</strong> <span class="mono">R_trigger</span> / <span class="mono">R_timing</span> 权重应远大于内容判定项。</p>
-            </div>
-          </div>
-        </div>
-      </main>
-      <footer class="footerline"><span>MIB — the key finding</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
-    </section>
+        <h2>评分标准：error window + 四分类</h2>
+        <div class="formula" style="margin-top:14px;">error window = [ t_s , t_e + Δ ]     Δ = 10 s
+   t_s / t_e = <strong>错误步被说出的起止时间</strong>（由 ASR 词级对齐得到）
 
-    <!-- 12 MIB 假阳性证据 -->
-    <section class="slide">
-      <header><div class="eyebrow">Benchmark 3 / MIB</div></header>
-      <main>
-        <h2>"多打断"换不来"打得准"</h2>
-        <div class="split" style="margin-top: 22px;">
-          <div>
-            <div class="metric"><strong>2.0 → 98.7</strong><span>FP% 的跨度<br>而 TP% 完全不随之上升</span></div>
-            <p style="margin-top:16px;">Moshi / PersonaPlex 几乎逢音必打断（<strong>FP% &gt; 95</strong>），在真错误上并<strong>不比最保守的 Freeze-Omni</strong>（FP%=2.0, TP%=0）更强。</p>
-            <p class="note" style="margin-top:14px;">→ 这是 <span class="mono">R_cost</span> 必须存在的最硬证据。</p>
-            <p style="margin-top:14px;color:var(--muted);">延迟同样糟：即使打断了也普遍太晚——Gemini 2.5 平均 <strong>11.7s</strong>(n=90)、Gemini 3.1 8.4s(n=10)、GPT-4o 4.1s(n=36)、Moshi 4.9s(n=154)、PersonaPlex 5.8s(n=125)。</p>
+latency(t) = max(0, t − t_e)      仅当 t ∈ [t_s, t_u] 时有定义（t_u = 用户说完）
+   → 打断落在错误步之内 ⇒ latency = 0</div>
+        <div class="grid four" style="margin-top: 16px;">
+          <div class="card"><span class="tag">TP</span><p style="margin-top:10px;">在 error window 内正确打断 error 实例</p></div>
+          <div class="card"><span class="tag">TN</span><p style="margin-top:10px;">在 no-error 实例上，用户陈述期间<strong>保持沉默</strong></p></div>
+          <div class="card"><span class="tag red">FN</span><p style="margin-top:10px;">未能打断 error 实例，<strong>或</strong>在窗口内打断但未切中该错误步</p></div>
+          <div class="card"><span class="tag red">FP</span><p style="margin-top:10px;">在 no-error 实例上打断，<strong>或</strong>事后声称存在错误</p></div>
+        </div>
+        <div class="grid two" style="margin-top:16px;">
+          <div class="card" style="min-height:auto;">
+            <p><strong>backchannel 不计为打断</strong>（如 "mm-hmm"、"right"）；judge <strong>只取第一个非-backchannel 发声</strong>，其后的发声一律忽略。</p>
           </div>
-          <div>
-            <div class="card">
-              <span class="tag violet">三种行为原型</span>
-              <p style="margin-top:12px;"><strong>passive</strong>（Freeze-Omni）：300 个 FN 里 <strong>285 是 MISSED</strong>，基本不出声。</p>
-              <p style="margin-top:10px;"><strong>post-hoc responder</strong>（Gemini 2.5/3.1、GPT-4o）：认得出错，但只在用户说完后才说。Gemini 3.1 最极端：<strong>11 MISSED vs 180 PH_CORR</strong>。</p>
-              <p style="margin-top:10px;"><strong>aggressive</strong>（Moshi、PersonaPlex）：FN 被 TOO_EARLY(118/169) 和 WRONG_ERROR(130/104) 主导——<strong>在对韵律线索反应，不是对内容</strong>。</p>
-            </div>
+          <div class="card" style="min-height:auto;">
+            <p>judge 模型为 <strong>GPT-5.2</strong>（<span class="mono">gpt-5.2-2025-12-11</span>），<strong>确定性解码 temperature = 0</strong>，回复<strong>缓存以保证可复现</strong>。模型输出先经 ASR 取词级时间戳。</p>
           </div>
         </div>
       </main>
-      <footer class="footerline"><span>MIB — false positives</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+      <footer class="footerline"><span>MIB — scoring</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
     </section>
 
     <!-- 13 MIB 子类型 -->
     <section class="slide">
-      <header><div class="eyebrow">Benchmark 3 / MIB</div></header>
+      <header><div class="eyebrow">3 / MIB</div></header>
       <main>
-        <h2>FN / FP 子类型分类学 <span style="color:var(--muted);font-size:0.6em;">— 可直接当我们的负例标签体系</span></h2>
-        <div class="grid two" style="margin-top: 20px;">
+        <h2>FN / FP 子类型（论文 Table 2 / Table 4）</h2>
+        <div class="grid two" style="margin-top: 16px;">
           <div>
-            <p class="eyebrow" style="margin-bottom:8px;">FN 子类（incorrect audio 上）</p>
+            <p class="eyebrow" style="margin-bottom:8px;">FN 子类（incorrect solutions）</p>
             <div class="table">
-              <div class="row head" style="grid-template-columns: 0.8fr 1.6fr;"><div class="cell">子类</div><div class="cell">行为</div></div>
-              <div class="row" style="grid-template-columns: 0.8fr 1.6fr;"><div class="cell mono">TOO_EARLY</div><div class="cell">抢在错误步发生之前就打断</div></div>
-              <div class="row" style="grid-template-columns: 0.8fr 1.6fr;"><div class="cell mono">WRONG_ERROR</div><div class="cell">窗口内打断了，但没指出真正的错误</div></div>
-              <div class="row" style="grid-template-columns: 0.8fr 1.6fr;"><div class="cell mono">TOO_LATE</div><div class="cell">晚于窗口，用户还在说</div></div>
-              <div class="row" style="grid-template-columns: 0.8fr 1.6fr;"><div class="cell mono">PH_CORR</div><div class="cell">说话中沉默，等用户说完才正确指出</div></div>
-              <div class="row" style="grid-template-columns: 0.8fr 1.6fr;"><div class="cell mono">PH_OTHER</div><div class="cell">说话中沉默，事后也没指出错误</div></div>
-              <div class="row" style="grid-template-columns: 0.8fr 1.6fr;"><div class="cell mono">MISSED</div><div class="cell">从头到尾没有非 BC 发声</div></div>
+              <div class="row head" style="grid-template-columns: 0.85fr 1.6fr;"><div class="cell">子类</div><div class="cell">定义</div></div>
+              <div class="row" style="grid-template-columns: 0.85fr 1.6fr;"><div class="cell mono">TOO_EARLY</div><div class="cell">首个非 BC 发声在错误步之前（t &lt; t_s）</div></div>
+              <div class="row" style="grid-template-columns: 0.85fr 1.6fr;"><div class="cell mono">WRONG_ERROR</div><div class="cell">首个非 BC 发声落在窗口内，但未指认该错误</div></div>
+              <div class="row" style="grid-template-columns: 0.85fr 1.6fr;"><div class="cell mono">TOO_LATE</div><div class="cell">首个非 BC 发声晚于窗口，用户仍在说</div></div>
+              <div class="row" style="grid-template-columns: 0.85fr 1.6fr;"><div class="cell mono">PH_CORR</div><div class="cell">说话中沉默，用户说完后正确指出错误</div></div>
+              <div class="row" style="grid-template-columns: 0.85fr 1.6fr;"><div class="cell mono">PH_OTHER</div><div class="cell">说话中沉默，事后回应未正确指认错误</div></div>
+              <div class="row" style="grid-template-columns: 0.85fr 1.6fr;"><div class="cell mono">MISSED</div><div class="cell">始终未产生非 BC 发声</div></div>
             </div>
           </div>
           <div>
-            <p class="eyebrow" style="margin-bottom:8px;">FP 子类（correct audio 上）</p>
+            <p class="eyebrow" style="margin-bottom:8px;">FP 子类（correct solutions）</p>
             <div class="table">
-              <div class="row head" style="grid-template-columns: 0.8fr 1.6fr;"><div class="cell">子类</div><div class="cell">行为</div></div>
-              <div class="row" style="grid-template-columns: 0.8fr 1.6fr;"><div class="cell mono">FALSE_CLAIM</div><div class="cell">打断并声称一个不存在的错误<br><span class="bad">946 个 FP 里占 588</span></div></div>
-              <div class="row" style="grid-template-columns: 0.8fr 1.6fr;"><div class="cell mono">UNRELATED</div><div class="cell">打断但离题（例如直接把题做了）</div></div>
-              <div class="row" style="grid-template-columns: 0.8fr 1.6fr;"><div class="cell mono">AFFIRM</div><div class="cell">打断只是为了肯定用户是对的</div></div>
-              <div class="row" style="grid-template-columns: 0.8fr 1.6fr;"><div class="cell mono">PH_CLAIM</div><div class="cell">说话中沉默，事后编造一个错误</div></div>
+              <div class="row head" style="grid-template-columns: 0.85fr 1.6fr;"><div class="cell">子类</div><div class="cell">定义</div></div>
+              <div class="row" style="grid-template-columns: 0.85fr 1.6fr;"><div class="cell mono">FALSE_CLAIM</div><div class="cell">说话中打断，声称一个不存在的错误</div></div>
+              <div class="row" style="grid-template-columns: 0.85fr 1.6fr;"><div class="cell mono">UNRELATED</div><div class="cell">说话中打断但离题（如直接把题解了）</div></div>
+              <div class="row" style="grid-template-columns: 0.85fr 1.6fr;"><div class="cell mono">AFFIRM</div><div class="cell">说话中打断，仅肯定用户正确</div></div>
+              <div class="row" style="grid-template-columns: 0.85fr 1.6fr;"><div class="cell mono">PH_CLAIM</div><div class="cell">说话中沉默，事后编造一个错误</div></div>
             </div>
-            <div class="card" style="margin-top:16px;min-height:auto;">
-              <p>这套分类把"失败"拆成了<strong>可归因的模式</strong>——抢跑、说错、太晚、憋着不说。正好对应不同的 reward 项。</p>
+            <div class="card" style="margin-top:14px;min-height:auto;">
+              <p>论文 Table 4 合计：FN 共 <strong>1,760</strong>（MISSED 313 / PH_CORR 463 / PH_OTHER 208 / WRONG_ERROR 297 / TOO_EARLY 393 / TOO_LATE 86）；FP 共 <strong>946</strong>（<strong>FALSE_CLAIM 588</strong> / UNRELATED 217 / AFFIRM 31 / PH_CLAIM 110）。</p>
             </div>
           </div>
         </div>
@@ -900,157 +876,178 @@ latency(t) = max(0, t − t_e)     仅当 t ∈ [t_s, t_user_end] 时有定义
       <footer class="footerline"><span>MIB — failure taxonomy</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
     </section>
 
-    <!-- 14 ProVoice 总览 -->
+    <!-- 14 MIB 关键发现 -->
     <section class="slide">
-      <header><div class="eyebrow">Benchmark 4 / ProVoice-Bench</div></header>
+      <header><div class="eyebrow">3 / MIB</div></header>
       <main>
-        <h2>ProVoice-Bench：主动性的四个面</h2>
-        <p class="lead" style="margin-top:6px;">arXiv 2604.15037 · 2026-04 · 上海交大 · 1,182 条样本 · 未开源</p>
-        <div class="grid four" style="margin-top: 22px;">
-          <div class="card">
-            <span class="tag blue">PIC</span>
-            <p style="margin-top:10px;"><strong>Proactive Intent Capture</strong></p>
-            <p style="margin-top:6px;">从犹豫等细微语言线索推断隐含意图，主动发起 tool call 并求确认。</p>
+        <h2>论文主要发现：<span style="color:var(--red)">detection–interruption gap</span></h2>
+        <div class="split" style="margin-top: 20px;">
+          <div>
+            <div class="table">
+              <div class="row head" style="grid-template-columns: 1.2fr 0.95fr 0.95fr;"><div class="cell">模型</div><div class="cell">turn-based<br>Full ablation</div><div class="cell">full-duplex<br>TP%</div></div>
+              <div class="row" style="grid-template-columns: 1.2fr 0.95fr 0.95fr;"><div class="cell">Gemini 2.5</div><div class="cell good">66.5%</div><div class="cell bad">8.3%</div></div>
+              <div class="row" style="grid-template-columns: 1.2fr 0.95fr 0.95fr;"><div class="cell">Gemini 3.1</div><div class="cell good">62.7%</div><div class="cell bad">0.3%</div></div>
+              <div class="row" style="grid-template-columns: 1.2fr 0.95fr 0.95fr;"><div class="cell">GPT-4o Realtime</div><div class="cell good">59.4%</div><div class="cell bad">2.3%</div></div>
+            </div>
+            <p style="margin-top:14px;">论文并指出：Freeze-Omni、Moshi、PersonaPlex <strong>即便在 Full ablation 下也未表现出有意义的错误检测能力</strong>。</p>
+            <p style="margin-top:10px;">最佳 F1 仅 <strong>11%</strong>（Gemini 2.5）；全部模型 <strong>TP% ≤ 8.3、FN% ≥ 91.7</strong>。</p>
           </div>
-          <div class="card">
-            <span class="tag blue">LTM</span>
-            <p style="margin-top:10px;"><strong>Latent Topic Monitor</strong></p>
-            <p style="margin-top:6px;">用户预先设定语义触发条件，模型保持沉默，只在触发时介入。</p>
-          </div>
-          <div class="card">
-            <span class="tag violet">CFC</span>
-            <p style="margin-top:10px;"><strong>Context Fact Checking</strong></p>
-            <p style="margin-top:6px;">口头陈述与手机端数字上下文矛盾时，<strong>主动打断纠正</strong>。← 与我们最相关</p>
-          </div>
-          <div class="card">
-            <span class="tag blue">ESS</span>
-            <p style="margin-top:10px;"><strong>Environment Sound Sensing</strong></p>
-            <p style="margin-top:6px;">识别用户预定义的声学事件（如警报、火车声）作为介入线索。</p>
+          <div>
+            <div class="quote">"the bottleneck is <strong>not</strong> understanding mathematical errors …, but rather producing a content-aware interruption <strong>mid-utterance</strong> under full-duplex constraints."</div>
+            <div class="card" style="margin-top:16px;">
+              <span class="tag amber">FP% 与 TP% 无关</span>
+              <p style="margin-top:10px;">FP% 跨度 <strong>2.0 – 98.7</strong>，且<strong>不伴随 TP% 上升</strong>。论文指出：几乎在所有 no-error 音频上打断的模型（Moshi、PersonaPlex，FP% &gt; 95），在标记真实错误上<strong>并不优于</strong>最保守者（Freeze-Omni，FP% = 2.0、TP% = 0）。</p>
+            </div>
+            <div class="card" style="margin-top:14px;">
+              <span class="tag violet">三种行为原型</span>
+              <p style="margin-top:10px;"><strong>passive</strong>（Freeze-Omni：300 FN 中 285 为 MISSED）／<strong>post-hoc responder</strong>（Gemini 3.1：11 MISSED vs 180 PH_CORR）／<strong>aggressive</strong>（Moshi、PersonaPlex：TOO_EARLY 与 WRONG_ERROR 主导）。</p>
+            </div>
           </div>
         </div>
-        <div class="grid two" style="margin-top:18px;">
-          <div class="card" style="min-height:auto;">
-            <p><strong>样本形式化</strong>：五元组 <span class="mono">(C_a, D_c, S_c, R_g, T_g)</span> = 对话音频 / 数字上下文 / 语义线索 / 参考回复 / 参考 tool call</p>
-          </div>
-          <div class="card" style="min-height:auto;">
-            <p><strong>指标</strong>：Acc、<strong>FPR</strong>（无有效触发时的误介入频率）、Recall，外加 Response Accuracy。<span class="note">← 有负例设计</span></p>
-          </div>
+      </main>
+      <footer class="footerline"><span>MIB — key finding</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 15 ProVoice 总览 -->
+    <section class="slide">
+      <header><div class="eyebrow">4 / ProVoice-Bench · arXiv 2604.15037</div></header>
+      <main>
+        <h2>ProVoice-Bench：主动性的四类任务</h2>
+        <p class="lead" style="margin-top:4px;">上海交大 · <strong>1,182 条</strong>样本 · 四类任务</p>
+        <div class="grid four" style="margin-top: 20px;">
+          <div class="card"><span class="tag blue">PIC</span><p style="margin-top:10px;"><strong>Proactive Intent Capture</strong></p><p style="margin-top:6px;">从细微语言线索（如犹豫、对话中提及的待办）推断隐含意图，<strong>主动发起 tool-call 并寻求确认</strong>。</p></div>
+          <div class="card"><span class="tag blue">LTM</span><p style="margin-top:10px;"><strong>Latent Topic Monitor</strong></p><p style="margin-top:6px;">用户指示模型监听环境对话；模型<strong>保持沉默</strong>，仅在检测到用户指定的触发时介入。</p></div>
+          <div class="card"><span class="tag violet">CFC</span><p style="margin-top:10px;"><strong>Context Fact Checking</strong></p><p style="margin-top:6px;">当口头陈述与用户手机上的<strong>数字上下文相矛盾</strong>时，<strong>主动打断</strong>并给出事实纠正。</p></div>
+          <div class="card"><span class="tag blue">ESS</span><p style="margin-top:10px;"><strong>Environment Sound Sensing</strong></p><p style="margin-top:6px;">在识别到特定声学事件（如警报）时提供协助，在此之前保持沉默。</p></div>
+        </div>
+        <div class="card" style="margin-top:18px;">
+          <p class="eyebrow">样本形式化（原文）</p>
+          <p class="mono" style="margin-top:8px;">每条样本 = 五元组 (C_a, D_c, S_c, R_g, T_g)</p>
+          <p style="margin-top:8px;">C_a 对话音频 · D_c 用户数字上下文 · <strong>S_c 语义线索</strong>（指示触发主动交互的对话背景与关键信号）· R_g 参考文本回复 · T_g 参考 tool-call。</p>
         </div>
       </main>
       <footer class="footerline"><span>ProVoice-Bench — overview</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
     </section>
 
-    <!-- 15 ProVoice CFC 例子 -->
+    <!-- 16 ProVoice 例子 -->
     <section class="slide">
-      <header><div class="eyebrow">Benchmark 4 / ProVoice-Bench</div></header>
+      <header><div class="eyebrow">4 / ProVoice-Bench</div></header>
       <main>
-        <h2>CFC 的真实例子：与<span style="color:var(--violet)">用户自己的数字上下文</span>矛盾</h2>
-        <div class="card" style="margin-top: 22px;">
-          <p class="eyebrow">手机 Messages（数字上下文）</p>
+        <h2>具体样例：CFC（论文 Figure 1 原文）</h2>
+        <div class="card" style="margin-top: 20px;">
+          <p class="eyebrow">Messages（数字上下文）</p>
           <p style="margin-top:6px;font-size:1.05em;">"Please change my ticket to the next available flight on July 6. <strong>I have a tango performance that evening and can't miss it.</strong>"</p>
         </div>
         <div class="card" style="margin-top: 14px;">
-          <p class="eyebrow">User 语音</p>
+          <p class="eyebrow">User1（语音）</p>
           <p style="margin-top:6px;font-size:1.05em;">"I'm rescheduling my flight for the 6th, but <strong>I don't have anything planned for that night yet</strong>, so we should definitely go out for a big dinner then!"</p>
         </div>
         <div class="card" style="margin-top: 14px;border-left:5px solid var(--violet);">
-          <p class="eyebrow">Model 主动打断</p>
+          <p class="eyebrow">Model（主动打断）</p>
           <p style="margin-top:6px;font-size:1.05em;">"Actually, Diego, you might want to double-check that. <strong>According to your messaging history</strong>, you explicitly mentioned that you have a tango performance on the evening of July 6th that you cannot miss."</p>
         </div>
-        <div class="quote" style="margin-top:20px;">与 FLEXI 的关键区别：矛盾不是"与世界知识冲突"，而是<strong>与用户自己手机里的记录冲突</strong>——个人化、需要跨模态取证。FLEXI 完全没有这类触发源。</div>
+        <p style="margin-top:18px;color:var(--muted);">CFC 的触发源是<strong>口头陈述与用户数字上下文之间的矛盾</strong>，而非与世界知识的矛盾。</p>
       </main>
       <footer class="footerline"><span>ProVoice-Bench — CFC example</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
     </section>
 
-    <!-- 16 对比总表 -->
+    <!-- 17 ProVoice 评分 -->
+    <section class="slide">
+      <header><div class="eyebrow">4 / ProVoice-Bench</div></header>
+      <main>
+        <h2>评分标准：两层</h2>
+        <div class="grid two" style="margin-top: 18px;">
+          <div class="card">
+            <span class="tag blue">① Proactive Interaction Prediction</span>
+            <p style="margin-top:12px;">评估模型判断<strong>是否需要介入</strong>的能力：</p>
+            <p style="margin-top:10px;"><strong>Accuracy (Acc)</strong> — 整体二元决策表现<br>
+            <strong>False Positive Rate (FPR)</strong> — <strong>在不存在有效触发时不必要介入的频率</strong><br>
+            <strong>Recall (Rec)</strong> — 识别真实交互触发的敏感度</p>
+            <p style="margin-top:12px;color:var(--muted);">该层含负例（无有效触发的样本），故可测 FPR。</p>
+          </div>
+          <div class="card">
+            <span class="tag violet">② Response Accuracy (R_acc)</span>
+            <p style="margin-top:12px;">在触发判断之外，进一步评估后续动作的正确性：</p>
+            <div class="formula" style="margin-top:10px;font-size:0.92em;">S_i = [ J(S_c,i, T_p,i, T_g,i) + J(S_c,i, R_p,i, R_g,i) ] / 2
+      · I( pred_i = gt_i )</div>
+            <p style="margin-top:10px;"><strong>J(·) ∈ {0, 0.5, 1.0}</strong> 为 LLM-as-a-Judge，以<strong>语义线索 S_c 为评判上下文</strong>，评估预测输出相对 ground truth 的<strong>功能合理性与对齐度</strong>；judge 模型为 <strong>Qwen3-80B</strong>。</p>
+            <p style="margin-top:8px;">T 为 tool-call 序列、R 为文本回复（p 预测 / g 参考）；<strong>I(·)</strong> 为指示函数，模型决策与 ground truth 一致时取 1。</p>
+            <p style="margin-top:8px;color:var(--muted);">即：<strong>触发判断错则整条 S_i 归零</strong>；判断正确时，得分为 tool-call 与文本回复两项 judge 分的均值。</p>
+          </div>
+        </div>
+        <p style="margin-top:16px;">论文报告中，各模型 FPR 差异极大——例如 Step-Audio-R1 在 CFC 上 <strong>FPR = 0.961</strong>，而 Qwen3-Omni(T) 为 <strong>0.061</strong>（Rec = 0.737）。</p>
+      </main>
+      <footer class="footerline"><span>ProVoice-Bench — scoring</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 18 对比 -->
     <section class="slide">
       <header><div class="eyebrow">Synthesis</div></header>
       <main>
-        <h2>四者对比：触发源<span class="good">互不重叠</span></h2>
-        <div class="table" style="margin-top: 20px;">
-          <div class="row head" style="grid-template-columns: 1fr 1.5fr 0.9fr 1.1fr 0.9fr;">
-            <div class="cell">Benchmark</div><div class="cell">触发源</div><div class="cell">有负例?</div><div class="cell">时机评测</div><div class="cell">拿得到?</div>
+        <h2>四者对照</h2>
+        <div class="table" style="margin-top: 18px;">
+          <div class="row head" style="grid-template-columns: 1fr 1.45fr 1.5fr 0.85fr 0.85fr;">
+            <div class="cell">Benchmark</div><div class="cell">打断的触发源</div><div class="cell">主要指标</div><div class="cell">含负例</div><div class="cell">开源</div>
           </div>
-          <div class="row" style="grid-template-columns: 1fr 1.5fr 0.9fr 1.1fr 0.9fr;">
-            <div class="cell"><strong>Instruct-FD</strong></div><div class="cell">外部<strong>指令</strong>条件化的轮次策略</div><div class="cell">—</div><div class="cell">—</div><div class="cell bad">未开源</div>
+          <div class="row" style="grid-template-columns: 1fr 1.45fr 1.5fr 0.85fr 0.85fr;">
+            <div class="cell"><strong>Instruct-FD</strong></div><div class="cell">由<strong>指令</strong>指定的 trigger</div><div class="cell">IAS（judge 二值通过率均值）、ΔIAS</div><div class="cell">—</div><div class="cell bad">否</div>
           </div>
-          <div class="row" style="grid-template-columns: 1fr 1.5fr 0.9fr 1.1fr 0.9fr;">
-            <div class="cell"><strong>FLEXI</strong></div><div class="cell">世界知识错误 / 安全 / 自相矛盾</div><div class="cell bad">无</div><div class="cell">仅 −0.5s 二值</div><div class="cell good">全开源</div>
+          <div class="row" style="grid-template-columns: 1fr 1.45fr 1.5fr 0.85fr 0.85fr;">
+            <div class="cell"><strong>FLEXI</strong></div><div class="cell">用户陈述中的<strong>错误前提</strong></div><div class="cell">EDS（0–5 judge 均值）＋ −0.5s 打断计数</div><div class="cell bad">否</div><div class="cell good">是</div>
           </div>
-          <div class="row" style="grid-template-columns: 1fr 1.5fr 0.9fr 1.1fr 0.9fr;">
-            <div class="cell"><strong>MIB</strong></div><div class="cell">数学推理链错误</div><div class="cell good">300 配对</div><div class="cell good">window + latency</div><div class="cell bad">审稿中</div>
+          <div class="row" style="grid-template-columns: 1fr 1.45fr 1.5fr 0.85fr 0.85fr;">
+            <div class="cell"><strong>MIB</strong></div><div class="cell">数学解题链中的<strong>计算错误</strong></div><div class="cell">TP/TN/FP/FN、F1、latency、10 类子类型</div><div class="cell good">是（300 配对）</div><div class="cell bad">否</div>
           </div>
-          <div class="row" style="grid-template-columns: 1fr 1.5fr 0.9fr 1.1fr 0.9fr;">
-            <div class="cell"><strong>ProVoice CFC</strong></div><div class="cell">与用户<strong>数字上下文</strong>矛盾</div><div class="cell good">FPR</div><div class="cell">弱</div><div class="cell bad">未开源</div>
+          <div class="row" style="grid-template-columns: 1fr 1.45fr 1.5fr 0.85fr 0.85fr;">
+            <div class="cell"><strong>ProVoice CFC</strong></div><div class="cell">与用户<strong>数字上下文</strong>矛盾</div><div class="cell">Acc / FPR / Rec ＋ R_acc（S_i）</div><div class="cell good">是（FPR）</div><div class="cell bad">否</div>
           </div>
         </div>
         <div class="grid" style="margin-top:20px;">
-          <div class="card" style="min-height:auto;"><p><strong>触发源</strong>互补：世界知识 / 推理链 / 个人数字上下文 / 外部指令，合起来才覆盖完整的语义触发谱系。</p></div>
-          <div class="card" style="min-height:auto;"><p><strong>负例</strong>只有 MIB 和 ProVoice 有；FLEXI 最容易拿但恰恰缺这块。</p></div>
-          <div class="card" style="min-height:auto;"><p><strong>时机</strong>只有 MIB 做对了：error window + latency 公式，其余都很粗。</p></div>
+          <div class="card" style="min-height:auto;"><p><strong>触发源互不重叠</strong>：指令指定 / 世界知识错误 / 推理链错误 / 个人数字上下文。</p></div>
+          <div class="card" style="min-height:auto;"><p><strong>时机评测</strong>差异最大：仅 MIB 定义了 error window 与 latency 公式。</p></div>
+          <div class="card" style="min-height:auto;"><p><strong>负例</strong>：MIB 与 ProVoice 具备；FLEXI 的 200 条 model_interruption 全部含错误。</p></div>
         </div>
       </main>
-      <footer class="footerline"><span>Synthesis — comparison</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+      <footer class="footerline"><span>Synthesis</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
     </section>
 
-    <!-- 17 下一步 -->
+    <!-- 19 来源 -->
     <section class="slide">
-      <header><div class="eyebrow">Next</div></header>
+      <header><div class="eyebrow">References &amp; provenance</div></header>
       <main>
-        <h2>这些盘点告诉我们该做什么</h2>
-        <div class="grid" style="margin-top: 24px;">
-          <div class="card">
-            <div class="agenda-num" style="margin-bottom:10px;">1</div>
-            <p><strong>训 timing，不训 detection。</strong></p>
-            <p style="margin-top:8px;">MIB 的 gap 已经证明底座有 59–67% 的检测力，卡在"实时说出来"。这支持 action-space 分离：只优化 timing 策略，不动 raw token 生成。</p>
-          </div>
-          <div class="card">
-            <div class="agenda-num" style="margin-bottom:10px;">2</div>
-            <p><strong>把 MIB 的协议实现出来，套到 FLEXI 上。</strong></p>
-            <p style="margin-top:8px;">MIB 没代码但论文写得够细：error window、latency 公式、FN/FP 子类型都可复现。套到 FLEXI 的 200 条上，就补齐了 FLEXI 缺的时机评测。</p>
-          </div>
-          <div class="card">
-            <div class="agenda-num" style="margin-bottom:10px;">3</div>
-            <p><strong>自己造负例。</strong></p>
-            <p style="margin-top:8px;">FLEXI 没有 no-error 对照集，而假阳性是 <span class="mono">R_cost</span> 的核心信号。需要合成一批"陈述完全正确"的对照音频。</p>
-          </div>
-        </div>
-        <div class="quote" style="margin-top:24px;">现成的评测基础已经够起步了——<strong>不必等 Instruct-FD 开源</strong>。</div>
-      </main>
-      <footer class="footerline"><span>Next steps</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
-    </section>
-
-    <!-- 18 参考 -->
-    <section class="slide">
-      <header><div class="eyebrow">References</div></header>
-      <main>
-        <h2>来源</h2>
-        <div class="grid two" style="margin-top: 24px;">
+        <h2>来源与说明</h2>
+        <div class="grid two" style="margin-top: 20px;">
           <div class="card">
             <p><strong>Instruct-FD</strong> — Can Your Full-Duplex Speech System Follow Turn-Taking Instructions?</p>
-            <p class="mono" style="margin-top:6px;">arXiv:2607.20460 · Boson AI · 2026-05</p>
+            <p class="mono" style="margin-top:6px;">arXiv:2607.20460</p>
+            <p style="margin-top:6px;color:var(--muted);">样例与 IAS/ΔIAS 定义、judge（Claude Sonnet 4.6）、ASR（Qwen3-ASR-1.7B + Qwen3-ForcedAligner-0.6B）均取自论文正文。</p>
           </div>
           <div class="card">
             <p><strong>FLEXI</strong> — Benchmarking Full-duplex Human-LLM Speech Interaction</p>
-            <p class="mono" style="margin-top:6px;">arXiv:2509.22243 · 东北大学 · 2025-09</p>
+            <p class="mono" style="margin-top:6px;">arXiv:2509.22243</p>
             <p class="mono">github.com/ChristineCHEN274/FLEXI</p>
-            <p class="mono">huggingface.co/datasets/qibai/FLEXI</p>
+            <p style="margin-top:6px;color:var(--muted);">样例取自发布数据 <span class="mono">model_interruption_text.json</span>；评分细则取自 <span class="mono">evaluate/eval_model_interrupt.py</span>。</p>
           </div>
           <div class="card">
             <p><strong>MIB</strong> — Model Interruption Bench: Evaluating Real-Time Error Correction in Full-Duplex Voice Agents</p>
-            <p class="mono" style="margin-top:6px;">Anonymous ACL submission（审稿中）</p>
+            <p class="mono" style="margin-top:6px;">Anonymous ACL submission</p>
+            <p style="margin-top:6px;color:var(--muted);">样例为论文 Appendix B 原文；协议、子类型与统计取自正文与 Table 2 / 4。</p>
           </div>
           <div class="card">
             <p><strong>ProVoice-Bench</strong> — From Reactive to Proactive: Assessing the Proactivity of Voice Agents</p>
-            <p class="mono" style="margin-top:6px;">arXiv:2604.15037 · 上海交大 · 2026-04</p>
+            <p class="mono" style="margin-top:6px;">arXiv:2604.15037</p>
+            <p style="margin-top:6px;color:var(--muted);">CFC 样例取自论文 Figure 1；S_i 公式与 judge（Qwen3-80B）取自正文。</p>
           </div>
         </div>
-        <p style="margin-top:22px;color:var(--muted);">本 deck 中的数字均取自各论文原文与 FLEXI 代码库实测（<span class="mono">evaluate/eval_model_interrupt.py</span>、<span class="mono">data_text_json/model_interruption_text.json</span>）。</p>
+        <div class="card" style="margin-top:18px;border-left:4px solid var(--amber);">
+          <p><strong>编写原则</strong>：本 deck 中的样例、指标定义与数字均照录论文或官方发布代码，未作改写或补充。<strong>凡属本文归纳之处（如 FLEXI 数据无错误类型标注一事）已在对应页单独标注。</strong></p>
+        </div>
       </main>
       <footer class="footerline"><span>References</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
     </section>
 
   </div>
+
 
   <div class="controls">
     <button id="prev" aria-label="Previous slide">←</button>
