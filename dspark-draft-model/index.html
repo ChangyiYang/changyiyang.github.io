@@ -729,6 +729,14 @@
           <div class="row" style="grid-template-columns: 1fr 1fr 1.1fr 1fr;"><div class="cell"><strong>v2 5L</strong></div><div class="cell">4.60 <span style="color:var(--muted)">(+0.13)</span></div><div class="cell"><strong>3.707</strong></div><div class="cell"><strong>943s</strong></div></div>
         </div>
         <p style="margin-top:16px">tau 只差 <b>+0.13</b>，当时读作"+42% 参数换 +0.13，深度不划算"。<span class="note">但服务端 5L 是我们最好的 drafter，端到端也最快。tau 是训练进度信号，不能用来给 drafter 排序。</span></p>
+        <div class="card" style="margin-top:18px; border-left:4px solid var(--blue)">
+          <h3>和 DSpark 官方结果比，我们还有 <strong>约 1</strong> 的上升空间</h3>
+          <p>官方按 draft 层数做的对比（下图）显示，同一族方法在层数/容量上还能继续往上走。<span class="note">对照我们目前的 accept length（rollout 3.707、并发 1 下 4.52），感觉还有 1 左右的空间没吃到。</span></p>
+          <figure style="margin:14px 0 0">
+            <img src="https://arxiv.org/html/2607.05147v1/layer_comparison.svg" alt="DSpark 官方：按 draft 层数的 accept length 对比" style="width:100%; max-height:340px; object-fit:contain; border:1px solid var(--line); border-radius:8px; background:#fff; padding:8px" />
+            <figcaption style="color:var(--muted); font-size:13px; margin-top:8px">来源：DSpark 官方论文 layer comparison。我们的 3L/5L 还在这条曲线的偏低位置——继续加容量、或改进训练配方，都还有空间。</figcaption>
+          </figure>
+        </div>
         <div class="card" style="margin-top:18px; border-left:4px solid var(--violet)">
           <h3>checkpoint 选择：我们没在选，而且 ep13 之后也不用选</h3>
           <p>ep13 / 15 / 17 / 19 / 20 = <strong>4.39 / 4.58 / 4.41 / 4.49 / 4.40</strong>，单点 sem 0.12-0.29 —— <strong>统计上无法区分</strong>。</p>
