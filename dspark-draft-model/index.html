@@ -527,9 +527,9 @@
         <h2>我们在<span style="color:var(--blue)">三个层级</span>上量，越往下越贵、也越接近真实</h2>
         <div class="table" style="margin-top: 18px;">
           <div class="row head" style="grid-template-columns: 0.9fr 1.5fr 1.1fr;"><div class="cell">层级</div><div class="cell">拿到什么</div><div class="cell">能回答什么</div></div>
-          <div class="row" style="grid-template-columns: 0.9fr 1.5fr 1.1fr;"><div class="cell"><strong>① 训练侧</strong><br><span style="color:var(--muted);font-size:13px">teacher-forced，免费</span></div><div class="cell"><code>dspark_tau</code>、<code>acc_p0..p6</code>（逐位置一致率）、<code>ar_p0..p6</code>、<code>tv</code></div><div class="cell">只能看<strong>训练进度</strong></div></div>
-          <div class="row" style="grid-template-columns: 0.9fr 1.5fr 1.1fr;"><div class="cell"><strong>② sglang e2e</strong><br><span style="color:var(--muted);font-size:13px">单机 server，并发 1</span></div><div class="cell">每请求 accept length、每请求 tok/s → <strong>加速比</strong>；贪心下输出一致性校验</div><div class="cell">能测<strong>加速比</strong>，是上界场景</div></div>
-          <div class="row" style="grid-template-columns: 0.9fr 1.5fr 1.1fr;"><div class="cell"><strong>③ verl e2e</strong><br><span style="color:var(--muted);font-size:13px">真实 rollout，配对 on/off</span></div><div class="cell">稳态 accept length、生成吞吐、墙钟</div><div class="cell"><strong>决策依据</strong></div></div>
+          <div class="row" style="grid-template-columns: 0.9fr 1.5fr 1.1fr;"><div class="cell"><strong>① 训练侧</strong></div><div class="cell"><code>dspark_tau</code>、<code>acc_p0..p6</code>（逐位置一致率）、<code>ar_p0..p6</code>、<code>tv</code></div><div class="cell">只能看<strong>训练进度</strong></div></div>
+          <div class="row" style="grid-template-columns: 0.9fr 1.5fr 1.1fr;"><div class="cell"><strong>② sglang e2e</strong></div><div class="cell">每请求 accept length、每请求 tok/s → <strong>加速比</strong>；贪心下输出一致性校验</div><div class="cell">能测<strong>加速比</strong>，是上界场景</div></div>
+          <div class="row" style="grid-template-columns: 0.9fr 1.5fr 1.1fr;"><div class="cell"><strong>③ verl e2e</strong></div><div class="cell">稳态 accept length、生成吞吐、墙钟</div><div class="cell"><strong>决策依据</strong></div></div>
         </div>
         <p style="margin-top:20px"><span class="note">三层之间会打架，而打架的地方就是信息量所在</span>：训练侧 tau <b>4.47 / 4.60</b> vs rollout 实测 <b>3.374 / 3.707</b>（teacher-forced 的乐观偏差）；sglang <b>4.67</b> vs rollout <b>3.37</b>（<b>不是并发，是流量形态</b>）。</p>
       </main>
@@ -553,7 +553,7 @@
           <div class="card">
             <h3>接受判据（读源码核对过）</h3>
             <p>draft 一次提 <code>block_size=7</code> 个 token，target <strong>一次前向</strong>验证 8 个位置。</p>
-            <p style="margin-top:10px">接受判据是标准 rejection sampling <code>coin·q &lt; p</code>，即 <strong>min(1, p/q)</strong>；p 与 q 索引对齐，温度两边同源且各只应用一次。</p>
+            <p style="margin-top:10px">接受判据是标准 rejection sampling <code>coin·q &lt; p</code> = <strong>min(1, p/q)</strong>。源码核对过：p/q 索引对齐，温度同源且各只应用一次。</p>
           </div>
         </div>
         <div class="card" style="margin-top:18px; border-left:4px solid var(--amber)">
@@ -640,7 +640,7 @@
           <div class="row" style="grid-template-columns: 0.7fr 0.9fr 0.9fr 0.9fr;"><div class="cell">2048</div><div class="cell">289.6</div><div class="cell"><strong>0/29</strong></div><div class="cell"><strong>4.40</strong></div></div>
         </div>
         <p style="margin-top:18px">固定 prompt、只扫截断长度：<span class="note">把所有请求强制截到 64，accept length 反而更低</span>。所以那个负相关是<strong>选择效应</strong>——难的请求天然生成得长、且全程接受率低；截断一个难请求不会让它变简单。</p>
-        <p style="margin-top:10px; color:var(--muted)">设计局限（如实说）：cap 超过 256 就不起作用了，模型自己在约 290 token 停，所以我们其实<b>没测到真正的长生成</b>。</p>
+        <p style="margin-top:10px; color:var(--muted)">局限：cap 超过 256 就不起作用（模型约 290 token 自停），真正的长生成没测到。</p>
       </main>
       <footer class="footerline"><span>分析 · 生成长度</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
     </section>
@@ -654,7 +654,7 @@
           <div class="card">
             <h3>vs 轮次深度</h3>
             <p>turn01 <strong>4.58</strong> · turn03 4.18 · turn06 4.23 · turn10 4.18</p>
-            <p style="margin-top:10px">第一轮最容易，之后基本平。<span style="color:var(--muted)">混淆要说明：轮次越深上下文也越长（16k → 35k token），两者没拆开。</span></p>
+            <p style="margin-top:10px">第一轮最容易，之后基本平。<span style="color:var(--muted)">注意与上下文长度混淆（16k → 35k）。</span></p>
           </div>
           <div class="card">
             <h3>vs 并发（同一 run 内部相关）</h3>
@@ -725,7 +725,7 @@
         <div class="table" style="margin-top: 18px;">
           <div class="row head" style="grid-template-columns: 1fr 1fr 1.1fr 1fr;"><div class="cell"></div><div class="cell">tau（训练侧）</div><div class="cell">rollout accept length</div><div class="cell">128 条墙钟</div></div>
           <div class="row" style="grid-template-columns: 1fr 1fr 1.1fr 1fr;"><div class="cell">v2 3L</div><div class="cell">4.47</div><div class="cell">3.374</div><div class="cell">1060s</div></div>
-          <div class="row" style="grid-template-columns: 1fr 1fr 1.1fr 1fr;"><div class="cell"><strong>v2 5L</strong></div><div class="cell">4.60 <span style="color:var(--muted)">(+0.13)</span></div><div class="cell"><strong>3.707</strong></div><div class="cell"><strong>943s</strong></div></div>
+          <div class="row" style="grid-template-columns: 1fr 1fr 1.1fr 1fr;"><div class="cell"><strong>v2 5L</strong></div><div class="cell">4.60</div><div class="cell"><strong>3.707</strong></div><div class="cell"><strong>943s</strong></div></div>
         </div>
         <p style="margin-top:16px">tau 只差 <b>+0.13</b>，当时读作"+42% 参数换 +0.13，深度不划算"。<span class="note">但服务端 5L 是我们最好的 drafter，端到端也最快。tau 是训练进度信号，不能用来给 drafter 排序。</span></p>
         <div class="card" style="margin-top:18px; border-left:4px solid var(--blue)">
@@ -733,7 +733,7 @@
           <p>官方按 draft 层数做的对比（下图）显示，同一族方法在层数/容量上还能继续往上走。<span class="note">对照我们目前的 accept length（rollout 3.707、并发 1 下 4.52），感觉还有 1 左右的空间没吃到。</span></p>
           <figure style="margin:14px 0 0">
             <img src="https://arxiv.org/html/2607.05147v1/layer_comparison.svg" alt="DSpark 官方：按 draft 层数的 accept length 对比" style="width:100%; max-height:340px; object-fit:contain; border:1px solid var(--line); border-radius:8px; background:#fff; padding:8px" />
-            <figcaption style="color:var(--muted); font-size:13px; margin-top:8px">来源：DSpark 官方论文 layer comparison。我们的 3L/5L 还在这条曲线的偏低位置——继续加容量、或改进训练配方，都还有空间。</figcaption>
+            <figcaption style="color:var(--muted); font-size:13px; margin-top:8px">DSpark 官方 layer comparison。我们的 3L/5L 还在曲线偏低位置。</figcaption>
           </figure>
         </div>
         <div class="card" style="margin-top:18px; border-left:4px solid var(--violet)">
@@ -775,12 +775,12 @@
         </div>
         <div class="card" style="margin-top:16px; border-left:4px solid var(--amber)">
           <h3>为什么高并发不赚？<strong>按主流说法它本不该这样</strong></h3>
-          <p>机械上：一个 DSpark step 吐 accept_len 个 token，但要花 draft 的 7 次串行前向 + target 对 8 个位置的一次前向。低并发时 target 前向被显存带宽卡住，验 8 个位置几乎白送；高并发时算力饱和，就是实打实约 8 倍。</p>
+          <p>一个 DSpark step 吐 accept_len 个 token，但要花 draft 的 7 次串行前向 + target 对 8 个位置的一次前向。低并发时被显存带宽卡住，验 8 个位置几乎白送；高并发时算力饱和，就要花约 8 倍。</p>
           <p style="margin-top:10px"><span class="note">但这套说法解释不了 DSpark 本身</span>——按目前比较 common 的认知，<b>DSpark 在大 batch 下也不该掉 throughput</b>（见下图 lmsys 的对比）。所以我们在 rollout 上测不出收益，<b>更可能是 AMD 上的 DSpark 实现还不够好</b>，而不是这个技术的固有性质。<b>Piotr 正在看这件事。</b></p>
-          <p style="margin-top:10px">我们目前只有两个端点——并发 1（赚 1.11-1.33×）和 rollout 并发（不赚），<b>中间的曲线还没测</b>。后续会对<b>线上真实流量</b>做 bsz 相关的 profile，把这条曲线补上。</p>
+          <p style="margin-top:10px">我们目前<b>只有两个端点</b>：并发 1（赚 1.11-1.33×）、rollout 并发（不赚）。<b>中间没测</b>，后续对线上流量做 bsz profile 补上。</p>
           <figure style="margin:16px 0 0">
             <img src="https://www.lmsys.org/images/blog/dspark-sglang/perf-compare.png" alt="DSpark on SGLang — throughput vs batch size" style="width:100%; border:1px solid var(--line); border-radius:8px; background:#fff" />
-            <figcaption style="color:var(--muted); font-size:13px; margin-top:8px">来源：lmsys DSpark on SGLang 官方对比图 —— 大 batch 下 DSpark 仍保持 throughput。这与我们 AMD 上的观测不一致，是待查项而非结论。</figcaption>
+            <figcaption style="color:var(--muted); font-size:13px; margin-top:8px">lmsys 官方图：大 batch 下 DSpark 仍保持 throughput。与我们 AMD 上的观测不一致，待查。</figcaption>
           </figure>
         </div>
       </main>
