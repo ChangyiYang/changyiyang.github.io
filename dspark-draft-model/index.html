@@ -1,0 +1,947 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>面向 agentic 流量的 in-domain draft model — DSpark / DFlash</title>
+  <style>
+
+    :root {
+      --bg: #f7f4ee;
+      --ink: #1f2933;
+      --muted: #667085;
+      --line: #d8d2c5;
+      --panel: #fffdfa;
+      --blue: #245f73;
+      --green: #2f6b55;
+      --red: #a13c35;
+      --amber: #b76b1f;
+      --violet: #6a4c93;
+      --shadow: 0 10px 34px rgba(38, 34, 28, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background:
+        radial-gradient(circle at 18% 0%, rgba(36, 95, 115, 0.06), transparent 30%),
+        linear-gradient(180deg, #fbf9f5 0%, var(--bg) 100%);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
+    }
+
+    body {
+      overflow: hidden;
+    }
+
+    .deck {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+    }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      display: none;
+      padding: clamp(28px, 4vw, 56px);
+      overflow: hidden;
+    }
+
+    .slide.active {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 18px;
+    }
+
+    header, main, footer {
+      position: relative;
+      z-index: 1;
+    }
+
+    .eyebrow {
+      color: var(--blue);
+      font-weight: 720;
+      font-size: clamp(11px, 0.9vw, 14px);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    h1, h2 {
+      margin: 0;
+      letter-spacing: 0;
+      line-height: 1.12;
+      text-wrap: balance;
+    }
+
+    h1 {
+      max-width: 860px;
+      font-size: clamp(34px, 4.2vw, 58px);
+    }
+
+    h2 {
+      font-size: clamp(28px, 3.4vw, 46px);
+      max-width: 980px;
+    }
+
+    h3 {
+      margin: 0 0 10px;
+      font-size: clamp(18px, 1.55vw, 24px);
+      line-height: 1.15;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 0;
+      color: var(--muted);
+      font-size: clamp(16px, 1.3vw, 22px);
+      line-height: 1.45;
+      max-width: 980px;
+    }
+
+    .lead {
+      color: #334155;
+      font-size: clamp(18px, 1.7vw, 26px);
+      line-height: 1.35;
+      max-width: 1080px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      align-items: stretch;
+    }
+
+    .grid.two {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .grid.four {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .card {
+      background: rgba(255, 253, 250, 0.9);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      box-shadow: var(--shadow);
+      min-height: 138px;
+    }
+
+    .card p, li {
+      font-size: clamp(14px, 1.05vw, 18px);
+      line-height: 1.45;
+      color: #4b5563;
+    }
+
+    ul {
+      margin: 0;
+      padding-left: 1.15em;
+    }
+
+    li + li { margin-top: 8px; }
+
+    .metric {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      margin: 8px 0 4px;
+    }
+
+    .metric strong {
+      font-size: clamp(30px, 3.5vw, 52px);
+      line-height: 1;
+      color: var(--red);
+      letter-spacing: 0;
+    }
+
+    .metric span {
+      color: var(--muted);
+      font-size: clamp(14px, 1.1vw, 18px);
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      height: 28px;
+      padding: 0 10px;
+      border-radius: 999px;
+      background: #e9f2ef;
+      color: var(--green);
+      font-size: 13px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .tag.red { background: #fae8e6; color: var(--red); }
+    .tag.amber { background: #fff2dc; color: var(--amber); }
+    .tag.blue { background: #e6f1f5; color: var(--blue); }
+    .tag.violet { background: #eee9f6; color: var(--violet); }
+
+    .table {
+      display: grid;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1.35fr repeat(4, 0.75fr);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .row:last-child { border-bottom: 0; }
+
+    .cell {
+      padding: 12px 14px;
+      font-size: clamp(13px, 1.05vw, 17px);
+      color: #475467;
+      border-right: 1px solid var(--line);
+    }
+
+    .cell:last-child { border-right: 0; }
+
+    .head .cell {
+      background: #efe9dd;
+      color: #1f2933;
+      font-weight: 760;
+    }
+
+    .gap-table .row {
+      grid-template-columns: 0.66fr 1.08fr 1fr 1.35fr 0.76fr;
+    }
+
+    .gap-table .cell {
+      font-size: clamp(12px, 0.9vw, 15px);
+      line-height: 1.42;
+      padding: 11px 12px;
+    }
+
+    .bad { color: var(--red); font-weight: 800; }
+    .good { color: var(--green); font-weight: 800; }
+    .note { color: var(--blue); font-weight: 760; }
+
+    .timeline {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr auto 1fr;
+      gap: 12px;
+      align-items: center;
+      margin-top: 18px;
+    }
+
+    .node {
+      min-height: 128px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    .arrow {
+      width: 46px;
+      height: 2px;
+      background: var(--blue);
+      position: relative;
+    }
+
+    .arrow::after {
+      content: "";
+      position: absolute;
+      right: -1px;
+      top: -5px;
+      border-left: 9px solid var(--blue);
+      border-top: 6px solid transparent;
+      border-bottom: 6px solid transparent;
+    }
+
+    .formula {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      white-space: pre-wrap;
+      font-size: clamp(15px, 1.3vw, 21px);
+      color: #25303b;
+      background: #f3efe7;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      line-height: 1.55;
+      box-shadow: var(--shadow);
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: 0.95fr 1.05fr;
+      gap: 22px;
+      align-items: center;
+    }
+
+    .quote {
+      border-left: 5px solid var(--blue);
+      padding: 18px 22px;
+      background: rgba(255, 253, 250, 0.75);
+      border-radius: 0 8px 8px 0;
+      color: #334155;
+      font-size: clamp(18px, 1.7vw, 26px);
+      line-height: 1.35;
+      box-shadow: var(--shadow);
+    }
+
+    .cover {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+      gap: 34px;
+      align-items: center;
+    }
+
+    .cover-title {
+      display: grid;
+      gap: 18px;
+      align-content: start;
+    }
+
+    .cover-title h1 span {
+      color: var(--blue);
+    }
+
+    .agenda {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      padding: 22px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .agenda-item {
+      display: grid;
+      grid-template-columns: 34px 1fr;
+      gap: 12px;
+      align-items: start;
+    }
+
+    .agenda-num {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: #e6f1f5;
+      color: var(--blue);
+      font-weight: 800;
+      font-size: 14px;
+    }
+
+    .agenda-item strong {
+      display: block;
+      font-size: clamp(16px, 1.25vw, 20px);
+      margin-bottom: 4px;
+    }
+
+    .agenda-item span {
+      display: block;
+      color: var(--muted);
+      font-size: clamp(13px, 1vw, 16px);
+      line-height: 1.45;
+    }
+
+    .footerline {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .progress {
+      height: 6px;
+      width: min(420px, 44vw);
+      background: #e4ded3;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .bar {
+      height: 100%;
+      width: 0;
+      background: linear-gradient(90deg, var(--blue), var(--green));
+      transition: width 180ms ease;
+    }
+
+    .controls {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      z-index: 10;
+      display: flex;
+      gap: 8px;
+    }
+
+    button {
+      width: 42px;
+      height: 42px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255, 253, 250, 0.95);
+      color: var(--ink);
+      font-size: 22px;
+      cursor: pointer;
+      box-shadow: 0 8px 26px rgba(38, 34, 28, 0.14);
+    }
+
+    a { color: var(--blue); text-decoration: none; border-bottom: 1px solid rgba(36, 95, 115, 0.35); }
+
+    .refs {
+      columns: 2;
+      column-gap: 28px;
+      font-size: clamp(13px, 1.05vw, 17px);
+      line-height: 1.5;
+      color: #475467;
+    }
+
+    .refs div { break-inside: avoid; margin-bottom: 10px; }
+
+    .script-card {
+      display: grid;
+      gap: 10px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      box-shadow: var(--shadow);
+    }
+
+    .turn {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: clamp(13px, 1.05vw, 17px);
+      line-height: 1.5;
+      color: #344054;
+      background: #f3efe7;
+      border-radius: 6px;
+      padding: 12px;
+    }
+
+    .case-table {
+      display: grid;
+      grid-template-columns: 0.72fr 1fr 1.05fr;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      margin-top: 24px;
+    }
+
+    .case-table > div {
+      padding: 14px 16px;
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      color: #475467;
+      font-size: clamp(14px, 1.05vw, 18px);
+      line-height: 1.45;
+    }
+
+    .case-table > div:nth-child(3n) { border-right: 0; }
+    .case-table > div:nth-last-child(-n + 3) { border-bottom: 0; }
+
+    .case-head {
+      background: #efe9dd;
+      color: #1f2933 !important;
+      font-weight: 780;
+    }
+
+    .mono {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      color: #344054;
+      background: #f3efe7;
+      border-radius: 6px;
+      padding: 2px 5px;
+    }
+
+    @media (max-width: 880px) {
+      body { overflow: auto; }
+      .deck { height: auto; min-height: 100vh; }
+      .slide {
+        position: relative;
+        min-height: 100vh;
+        display: none;
+        overflow: visible;
+      }
+      .slide.active { display: grid; }
+      .grid, .grid.two, .grid.four, .split, .timeline {
+        grid-template-columns: 1fr;
+      }
+      .arrow { width: 2px; height: 34px; justify-self: center; }
+      .arrow::after {
+        right: -5px;
+        top: auto;
+        bottom: -1px;
+        border-left: 6px solid transparent;
+        border-right: 6px solid transparent;
+        border-top: 9px solid var(--blue);
+        border-bottom: 0;
+      }
+      .row {
+        grid-template-columns: 1.2fr repeat(4, 0.75fr);
+      }
+      .cell { padding: 9px; }
+      .refs { columns: 1; }
+      .controls { position: fixed; }
+    }
+  
+  </style>
+</head><body>
+  <div class="deck">
+
+    <!-- 1 COVER -->
+    <section class="slide active">
+      <header><div class="eyebrow">Speculative decoding / in-domain draft model</div></header>
+      <main class="cover">
+        <div class="cover-title">
+          <h1>用自己的 agentic rollout 训 draft model，<span>到底赚不赚？</span></h1>
+          <p class="lead">Target 是冻结的 <b>24B MoE</b>，draft 是 <b>3-5 层 DSpark</b>，领域是 clawenv <b>多轮工具调用</b>流量。</p>
+          <p>本 deck 只放<b>我们自己量到的数</b>；每个数字都带口径（温度 / 并发 / 样本数）。凡是推断或未测的，单独标注。</p>
+        </div>
+        <div class="agenda">
+          <div class="agenda-item"><div class="agenda-num">1</div><div><strong>我们量什么</strong><span>三层度量：训练 tau / sglang e2e / verl e2e。</span></div></div>
+          <div class="agenda-item"><div class="agenda-num">2</div><div><strong>什么决定 accept length</strong><span>位置、长度、轮次、并发——四个都测了。</span></div></div>
+          <div class="agenda-item"><div class="agenda-num">3</div><div><strong>结果</strong><span>语料 +72%；加速分场景。</span></div></div>
+          <div class="agenda-item"><div class="agenda-num">4</div><div><strong>DFlash 对照</strong><span>Markov 头买到了什么。</span></div></div>
+        </div>
+      </main>
+      <footer class="footerline"><span>← / → 或空格翻页</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 2 度量口径 -->
+    <section class="slide">
+      <header><div class="eyebrow">Methodology</div></header>
+      <main>
+        <h2>我们在<span style="color:var(--blue)">三个层级</span>上量，越往下越贵、也越接近真实</h2>
+        <div class="table" style="margin-top: 18px;">
+          <div class="row head" style="grid-template-columns: 0.9fr 1.5fr 1.1fr;"><div class="cell">层级</div><div class="cell">拿到什么</div><div class="cell">能回答什么</div></div>
+          <div class="row" style="grid-template-columns: 0.9fr 1.5fr 1.1fr;"><div class="cell"><strong>① 训练侧</strong><br><span style="color:var(--muted);font-size:13px">teacher-forced，免费</span></div><div class="cell"><code>dspark_tau</code>、<code>acc_p0..p6</code>（逐位置一致率）、<code>ar_p0..p6</code>、<code>tv</code></div><div class="cell">只能看<strong>训练进度</strong></div></div>
+          <div class="row" style="grid-template-columns: 0.9fr 1.5fr 1.1fr;"><div class="cell"><strong>② sglang e2e</strong><br><span style="color:var(--muted);font-size:13px">单机 server，并发 1</span></div><div class="cell">每请求 accept length、每请求 tok/s → <strong>加速比</strong>；贪心下输出一致性校验</div><div class="cell">能测<strong>加速比</strong>，是上界场景</div></div>
+          <div class="row" style="grid-template-columns: 0.9fr 1.5fr 1.1fr;"><div class="cell"><strong>③ verl e2e</strong><br><span style="color:var(--muted);font-size:13px">真实 rollout，配对 on/off</span></div><div class="cell">稳态 accept length、生成吞吐、墙钟</div><div class="cell"><strong>决策依据</strong></div></div>
+        </div>
+        <p style="margin-top:20px"><span class="note">三层之间会打架，而打架的地方就是信息量所在</span>：训练侧 tau <b>4.47 / 4.60</b> vs rollout 实测 <b>3.374 / 3.707</b>（teacher-forced 的乐观偏差）；sglang <b>4.67</b> vs rollout <b>3.37</b>（<b>不是并发，是流量形态</b>）。</p>
+      </main>
+      <footer class="footerline"><span>三层度量</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 3 drafter 结构 -->
+    <section class="slide">
+      <header><div class="eyebrow">Architecture</div></header>
+      <main>
+        <h2>drafter 长什么样，<span style="color:var(--blue)">以及我们关掉的那个头</span></h2>
+        <div class="grid two" style="margin-top: 22px;">
+          <div class="card">
+            <h3>参数分布（3L 共 231.2M）</h3>
+            <p>backbone（3 层）<strong>144.7M / 63%</strong><br>
+            <span class="note">Markov 转移头 65.5M / 28%</span><br>
+            输入 fc 21.0M / 9%<br>
+            confidence 头 2,305</p>
+            <p style="margin-top:10px">没有 embedding / lm_head，直接共用 target 的。纯 full-attention。</p>
+          </div>
+          <div class="card">
+            <h3>接受判据（读源码核对过）</h3>
+            <p>draft 一次提 <code>block_size=7</code> 个 token，target <strong>一次前向</strong>验证 8 个位置。</p>
+            <p style="margin-top:10px">接受判据是标准 rejection sampling <code>coin·q &lt; p</code>，即 <strong>min(1, p/q)</strong>；p 与 q 索引对齐，温度两边同源且各只应用一次。</p>
+          </div>
+        </div>
+        <div class="card" style="margin-top:18px; border-left:4px solid var(--amber)">
+          <h3>⚠️ 我们没有训 confidence head</h3>
+          <p><b>它本来干嘛的</b>：预测每个 draft token 会不会被接受，让服务端在没把握时提前终止整个 block。<br>
+          <b>代价</b>：<code>compact</code> / <code>cap-accept</code> 两种 verify 模式会从 checkpoint 加载它，所以我们<strong>只能跑 <code>static</code></strong>——而 clawenv harness 默认就是 <code>compact</code>，第一次跑 verl 时就是这么崩的。<br>
+          <b>但实测没吃亏</b>：同权重 static vs compact，accept length 只差 <strong>−0.18</strong>，而 compact 吞吐明显更差（77 vs 126 tok/s）、端到端更慢。<span class="note">static 本来就是该用的模式。</span><br>
+          <b>唯一真损失</b>：serving 侧"每步接受几个 token"的直方图被同一个开关挡住了，而那正是定 <code>block_size</code> 的直接依据。</p>
+        </div>
+      </main>
+      <footer class="footerline"><span>drafter 结构</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 4 语料与训练 -->
+    <section class="slide">
+      <header><div class="eyebrow">Data & training</div></header>
+      <main>
+        <h2>语料、配方，<span style="color:var(--blue)">和两个反直觉的地方</span></h2>
+        <div class="grid two" style="margin-top: 20px;">
+          <div class="card">
+            <h3>语料</h3>
+            <p>harvest-1 <strong>22.4M</strong> 监督 token（2,824 条）→ v2 <strong>117M</strong>（14,838 条），扩了 <strong>5.2×</strong>。</p>
+            <p style="margin-top:10px">但<strong>监督密度只有 12.8%</strong>（公开参考语料 81.4%）——agentic 轨迹里大部分是工具返回。<span class="note">比语料要比"监督 token"，不是"记录条数"。</span></p>
+          </div>
+          <div class="card">
+            <h3>配方</h3>
+            <p>eff_bs 128 · lr <strong>4.243e-4</strong> · 20 epoch · block 7 · 每条 record 每 epoch 采 512 个 anchor。</p>
+            <p style="margin-top:10px">W&amp;B：<code>liquid-lfm-dspark/runs/gxlzenul</code>（3L）、<code>9run8fc4</code>（5L）、<code>liquid-lfm-dflash/runs/xo3kthsv</code>（DFlash）。</p>
+          </div>
+        </div>
+        <div class="grid two" style="margin-top: 18px;">
+          <div class="card" style="border-left:4px solid var(--red)">
+            <h3>反直觉 ①：旧版 lr 高了 2.8×</h3>
+            <p>规则是 <code>lr = 6e-4·sqrt(eff_bs/256)</code>。旧版直接用 6e-4，但它的 eff_bs 只有 32——按规则应是 2.1e-4。</p>
+            <p style="margin-top:10px"><span class="note">所以旧 baseline 的 tau 3.71 里，多少是语料、多少是被 lr 拖累的，其实分不清。</span></p>
+          </div>
+          <div class="card" style="border-left:4px solid var(--red)">
+            <h3>反直觉 ②："训了 20 epoch" ≠ "记住了"</h3>
+            <p>每条 record 约 7,910 个可监督位置，每 epoch 只采 512 个 anchor：</p>
+            <p style="margin-top:8px"><code>(1 − 512/7910)<sup>20</sup> = 0.262</code></p>
+            <p style="margin-top:8px"><span class="note">"见过"的样本里 26% 的位置从没被训练过</span>，中位数位置只被监督约 1.3 次。</p>
+          </div>
+        </div>
+      </main>
+      <footer class="footerline"><span>语料与训练</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 5 逐位置衰减 -->
+    <section class="slide">
+      <header><div class="eyebrow">Analysis 1/4</div></header>
+      <main>
+        <h2>逐位置接受率：<span style="color:var(--blue)">衰减曲线就是 drafter 的指纹</span></h2>
+        <div class="table" style="margin-top: 18px;">
+          <div class="row head" style="grid-template-columns: 1.4fr repeat(7, 0.6fr) 0.8fr;"><div class="cell">drafter</div><div class="cell">p0</div><div class="cell">p1</div><div class="cell">p2</div><div class="cell">p3</div><div class="cell">p4</div><div class="cell">p5</div><div class="cell">p6</div><div class="cell">尾/头</div></div>
+          <div class="row" style="grid-template-columns: 1.4fr repeat(7, 0.6fr) 0.8fr;"><div class="cell"><strong>DSpark 3L（v2）</strong></div><div class="cell">0.749</div><div class="cell">0.718</div><div class="cell">0.683</div><div class="cell">0.655</div><div class="cell">0.634</div><div class="cell">0.610</div><div class="cell"><strong>0.582</strong></div><div class="cell"><strong>0.81</strong></div></div>
+          <div class="row" style="grid-template-columns: 1.4fr repeat(7, 0.6fr) 0.8fr;"><div class="cell">老 drafter（harvest-1）</div><div class="cell">0.767</div><div class="cell">—</div><div class="cell">—</div><div class="cell">—</div><div class="cell">—</div><div class="cell">—</div><div class="cell">0.524</div><div class="cell">0.68</div></div>
+        </div>
+        <div class="grid two" style="margin-top: 20px;">
+          <div class="card">
+            <h3>为什么尾部比看起来重要</h3>
+            <p>accept length 是<strong>累乘</strong>：<code>1 + Σ cumprod(acc_pk)</code>。所以尾部塌一点，整条乘积就塌下去。</p>
+            <p style="margin-top:10px">DSpark 3L 里<span class="note">位置 4-6 贡献了 0.40</span>——接近总量的三分之一。</p>
+          </div>
+          <div class="card">
+            <h3>tau 的两个陷阱</h3>
+            <p>① tau 是<strong>逐 block 算完再平均</strong>，所以 <code>1 + Σ mean(ar_pk)</code> 复现不出来（E[Πx] ≠ ΠE[x]）——我们踩过：反推 2.339，真实 1.801。</p>
+            <p style="margin-top:10px">② tau 是 <strong>teacher-forced</strong> 的，<span class="note">结构性地看不见只在服务时发生的问题</span>（如 rope_theta 不匹配）。</p>
+          </div>
+        </div>
+      </main>
+      <footer class="footerline"><span>分析 · 逐位置</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 6 生成长度 -->
+    <section class="slide">
+      <header><div class="eyebrow">Analysis 2/4</div></header>
+      <main>
+        <h2>accept length vs 生成长度：<span style="color:var(--red)">相关是真的，因果是假的</span></h2>
+        <p class="lead" style="margin-top:12px">跨请求相关系数 <strong>−0.519</strong>：生成越长、接受率越低。很容易讲成"越往后越难预测"——<b>但这是错的</b>。</p>
+        <div class="table" style="margin-top: 16px;">
+          <div class="row head" style="grid-template-columns: 0.7fr 0.9fr 0.9fr 0.9fr;"><div class="cell">max_new_tokens</div><div class="cell">实际生成</div><div class="cell">打到上限</div><div class="cell">accept length</div></div>
+          <div class="row" style="grid-template-columns: 0.7fr 0.9fr 0.9fr 0.9fr;"><div class="cell">64</div><div class="cell">61.6</div><div class="cell">25/29</div><div class="cell"><strong>4.13</strong></div></div>
+          <div class="row" style="grid-template-columns: 0.7fr 0.9fr 0.9fr 0.9fr;"><div class="cell">256</div><div class="cell">149.0</div><div class="cell">7/29</div><div class="cell">4.56</div></div>
+          <div class="row" style="grid-template-columns: 0.7fr 0.9fr 0.9fr 0.9fr;"><div class="cell">2048</div><div class="cell">289.6</div><div class="cell"><strong>0/29</strong></div><div class="cell"><strong>4.40</strong></div></div>
+        </div>
+        <p style="margin-top:18px">固定 prompt、只扫截断长度：<span class="note">把所有请求强制截到 64，accept length 反而更低</span>。所以那个负相关是<strong>选择效应</strong>——难的请求天然生成得长、且全程接受率低；截断一个难请求不会让它变简单。</p>
+        <p style="margin-top:10px; color:var(--muted)">设计局限（如实说）：cap 超过 256 就不起作用了，模型自己在约 290 token 停，所以我们其实<b>没测到真正的长生成</b>。</p>
+      </main>
+      <footer class="footerline"><span>分析 · 生成长度</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 7 轮次与并发 -->
+    <section class="slide">
+      <header><div class="eyebrow">Analysis 3/4</div></header>
+      <main>
+        <h2>轮次深度有一点影响，<span style="color:var(--blue)">并发几乎没有</span></h2>
+        <div class="grid two" style="margin-top: 20px;">
+          <div class="card">
+            <h3>vs 轮次深度</h3>
+            <p>turn01 <strong>4.58</strong> · turn03 4.18 · turn06 4.23 · turn10 4.18</p>
+            <p style="margin-top:10px">第一轮最容易，之后基本平。<span style="color:var(--muted)">混淆要说明：轮次越深上下文也越长（16k → 35k token），两者没拆开。</span></p>
+          </div>
+          <div class="card">
+            <h3>vs 并发（同一 run 内部相关）</h3>
+            <p>3L <strong>−0.033</strong> · 5L <strong>−0.123</strong> · 老 drafter <strong>+0.091</strong></p>
+            <p style="margin-top:10px">基本是 0，方向还不一致。<span class="note">理论上也该如此</span>——<code>coin·q &lt; p</code> 是逐 token、逐请求算的，batch 里有几个请求根本不进这个式子。</p>
+          </div>
+        </div>
+        <div class="card" style="margin-top:18px; border-left:4px solid var(--green)">
+          <h3>推论：sglang 4.67 vs rollout 3.37 的差距是<strong>流量</strong>，不是并发</h3>
+          <p>决定性证据：在 verl <strong>内部、并发同样等于 1</strong> 的 105 个采样点上，同一个 drafter 也只有 <strong>3.364</strong>。并发一样，数不一样 → 差异只能来自"在生成什么"。</p>
+          <p style="margin-top:10px"><span class="note">所以想提升 rollout 的 accept length，得让训练数据贴近模型自己漂移后的状态</span>（Draft-OPD 路线），调并发没用。</p>
+        </div>
+      </main>
+      <footer class="footerline"><span>分析 · 轮次与并发</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 8 分布 -->
+    <section class="slide">
+      <header><div class="eyebrow">Analysis 4/4</div></header>
+      <main>
+        <h2>看分布，<span style="color:var(--blue)">不要只看均值</span></h2>
+        <div class="table" style="margin-top: 18px;">
+          <div class="row head" style="grid-template-columns: 1.2fr repeat(5, 0.7fr);"><div class="cell">每个 decode step（稳态）</div><div class="cell">均值</div><div class="cell">p10</div><div class="cell">中位</div><div class="cell">p90</div><div class="cell">max</div></div>
+          <div class="row" style="grid-template-columns: 1.2fr repeat(5, 0.7fr);"><div class="cell"><strong>DSpark 5L</strong></div><div class="cell"><strong>3.71</strong></div><div class="cell">2.47</div><div class="cell">3.58</div><div class="cell">4.75</div><div class="cell">7.90</div></div>
+          <div class="row" style="grid-template-columns: 1.2fr repeat(5, 0.7fr);"><div class="cell"><strong>DSpark 3L</strong></div><div class="cell">3.37</div><div class="cell">2.27</div><div class="cell">3.24</div><div class="cell">4.49</div><div class="cell">7.75</div></div>
+          <div class="row" style="grid-template-columns: 1.2fr repeat(5, 0.7fr);"><div class="cell">老 drafter</div><div class="cell">2.16</div><div class="cell">1.45</div><div class="cell">2.10</div><div class="cell">2.89</div><div class="cell">3.88</div></div>
+        </div>
+        <div class="card" style="margin-top:20px; border-left:4px solid var(--amber)">
+          <h3>我们还看不到什么</h3>
+          <p>每一步"7 个里接受了几个"的<strong>直方图</strong>。sglang 内部算了 <code>num_correct_drafts</code>，但统计代码被 confidence head 的开关挡住，而我们的 drafter 是 headless。</p>
+          <p style="margin-top:10px"><span class="note">而这个直方图正是该拿来定 block_size 的东西</span>——如果大部分 step 只接受 2-3 个，那位置 4-6 就是纯成本。约 15 行改动可以暴露出来。</p>
+        </div>
+      </main>
+      <footer class="footerline"><span>分析 · 分布</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 9 结果：语料 -->
+    <section class="slide">
+      <header><div class="eyebrow">Results 1/3</div></header>
+      <main>
+        <h2>新语料成功了：<span style="color:var(--green)">+56% / +72%</span></h2>
+        <p class="lead" style="margin-top:10px">verl rollout，128 条 record，同 shard，单节点，temp 1.0，<b>统一 static verify</b>，取稳态（后 3/4）。</p>
+        <div class="table" style="margin-top: 16px;">
+          <div class="row head" style="grid-template-columns: 1.3fr 1fr 0.9fr 0.8fr;"><div class="cell">drafter</div><div class="cell">训练语料</div><div class="cell">accept length</div><div class="cell">vs 老</div></div>
+          <div class="row" style="grid-template-columns: 1.3fr 1fr 0.9fr 0.8fr;"><div class="cell">harvest-1</div><div class="cell">22.4M token</div><div class="cell">2.158</div><div class="cell">—</div></div>
+          <div class="row" style="grid-template-columns: 1.3fr 1fr 0.9fr 0.8fr;"><div class="cell"><strong>v2 3L</strong></div><div class="cell">117M</div><div class="cell"><strong>3.374</strong></div><div class="cell"><strong>+56%</strong></div></div>
+          <div class="row" style="grid-template-columns: 1.3fr 1fr 0.9fr 0.8fr;"><div class="cell"><strong>v2 5L</strong></div><div class="cell">117M</div><div class="cell"><strong>3.707</strong></div><div class="cell"><strong>+72%</strong></div></div>
+        </div>
+        <div class="grid two" style="margin-top: 20px;">
+          <div class="card">
+            <h3>协议可复现</h3>
+            <p>老 drafter 在 compact 下这次量到 <strong>2.337</strong>，历史值 <strong>2.349</strong>——几乎完全复现。所以上面的对比可信。</p>
+          </div>
+          <div class="card" style="border-left:4px solid var(--red)">
+            <h3>一个被推翻的早期结论</h3>
+            <p>更早用 16 条手工 prompt 测时，这个差距只有约 1σ，我当时写的是"语料扩容<b>没有</b>可测提升"。<span class="note">那个结论是错的——harness 分辨力不够，不是模型的问题。</span></p>
+          </div>
+        </div>
+      </main>
+      <footer class="footerline"><span>结果 · 语料</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 10 结果：深度 + epoch -->
+    <section class="slide">
+      <header><div class="eyebrow">Results 2/3</div></header>
+      <main>
+        <h2>深度有用，<span style="color:var(--red)">而 tau 预测不了这件事</span></h2>
+        <div class="table" style="margin-top: 18px;">
+          <div class="row head" style="grid-template-columns: 1fr 1fr 1.1fr 1fr;"><div class="cell"></div><div class="cell">tau（训练侧）</div><div class="cell">rollout accept length</div><div class="cell">128 条墙钟</div></div>
+          <div class="row" style="grid-template-columns: 1fr 1fr 1.1fr 1fr;"><div class="cell">v2 3L</div><div class="cell">4.47</div><div class="cell">3.374</div><div class="cell">1060s</div></div>
+          <div class="row" style="grid-template-columns: 1fr 1fr 1.1fr 1fr;"><div class="cell"><strong>v2 5L</strong></div><div class="cell">4.60 <span style="color:var(--muted)">(+0.13)</span></div><div class="cell"><strong>3.707</strong></div><div class="cell"><strong>943s</strong></div></div>
+        </div>
+        <p style="margin-top:16px">tau 只差 <b>+0.13</b>，当时读作"+42% 参数换 +0.13，深度不划算"。<span class="note">但服务端 5L 是我们最好的 drafter，端到端也最快。tau 是训练进度信号，不能用来给 drafter 排序。</span></p>
+        <div class="card" style="margin-top:18px; border-left:4px solid var(--violet)">
+          <h3>checkpoint 选择：我们没在选，而且 ep13 之后也不用选</h3>
+          <p>ep13 / 15 / 17 / 19 / 20 = <strong>4.39 / 4.58 / 4.41 / 4.49 / 4.40</strong>，单点 sem 0.12-0.29 —— <strong>统计上无法区分</strong>。</p>
+          <p style="margin-top:10px">导出脚本无条件取最后一个 epoch。<span class="note">也就是说 20 个 epoch 里最后 7 个没换来任何可测量的收益</span>（约 5.5 小时卡时）。</p>
+        </div>
+      </main>
+      <footer class="footerline"><span>结果 · 深度与 epoch</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 11 结果：加速比 -->
+    <section class="slide">
+      <header><div class="eyebrow">Results 3/3 · 最可执行的一页</div></header>
+      <main>
+        <h2>加速比<span style="color:var(--blue)">分场景</span>：低并发赚，rollout 不赚</h2>
+        <div class="grid two" style="margin-top: 18px;">
+          <div class="card">
+            <h3>① sglang e2e（并发 1，per-request tok/s）</h3>
+            <div class="table" style="margin-top: 10px;">
+              <div class="row head" style="grid-template-columns: 0.9fr 0.8fr 0.8fr;"><div class="cell">arm</div><div class="cell">temp 1.0</div><div class="cell">temp 0</div></div>
+              <div class="row" style="grid-template-columns: 0.9fr 0.8fr 0.8fr;"><div class="cell">不开投机</div><div class="cell">166.7</div><div class="cell">170.3</div></div>
+              <div class="row" style="grid-template-columns: 0.9fr 0.8fr 0.8fr;"><div class="cell"><strong>3L</strong></div><div class="cell"><strong>1.11×</strong></div><div class="cell"><strong>1.33×</strong></div></div>
+              <div class="row" style="grid-template-columns: 0.9fr 0.8fr 0.8fr;"><div class="cell"><strong>5L</strong></div><div class="cell">1.09×</div><div class="cell">1.23×</div></div>
+            </div>
+            <p style="margin-top:10px"><span class="note">3L 和 5L 速度一样</span>——5L accept length 更高，但更大的 draft 每步更贵，正好抵消。并发 1 下多出的 42% 参数没换回速度。</p>
+          </div>
+          <div class="card">
+            <h3>② verl e2e（真实 rollout）</h3>
+            <div class="table" style="margin-top: 10px;">
+              <div class="row head" style="grid-template-columns: 1fr 0.9fr 0.8fr;"><div class="cell">arm</div><div class="cell">accept len</div><div class="cell">墙钟</div></div>
+              <div class="row" style="grid-template-columns: 1fr 0.9fr 0.8fr;"><div class="cell">不开投机</div><div class="cell">—</div><div class="cell"><strong>777s</strong></div></div>
+              <div class="row" style="grid-template-columns: 1fr 0.9fr 0.8fr;"><div class="cell">老 (static)</div><div class="cell">2.158</div><div class="cell">1097s</div></div>
+              <div class="row" style="grid-template-columns: 1fr 0.9fr 0.8fr;"><div class="cell"><strong>3L</strong></div><div class="cell"><strong>3.374</strong></div><div class="cell">1060s</div></div>
+              <div class="row" style="grid-template-columns: 1fr 0.9fr 0.8fr;"><div class="cell"><strong>5L</strong></div><div class="cell"><strong>3.707</strong></div><div class="cell">943s</div></div>
+            </div>
+            <p style="margin-top:10px; color:var(--muted)"><b>这层的吞吐读不出来</b>：各 arm 生成量差 25%，固定 record 数的墙钟把"速度"和"内容多少"混在一起，按 token 归一后排序还和 accept length 矛盾。</p>
+          </div>
+        </div>
+        <div class="card" style="margin-top:16px; border-left:4px solid var(--amber)">
+          <h3>为什么高并发不赚？<strong>按主流说法它本不该这样</strong></h3>
+          <p>机械上：一个 DSpark step 吐 accept_len 个 token，但要花 draft 的 7 次串行前向 + target 对 8 个位置的一次前向。低并发时 target 前向被显存带宽卡住，验 8 个位置几乎白送；高并发时算力饱和，就是实打实约 8 倍。</p>
+          <p style="margin-top:10px"><span class="note">但这套说法解释不了 DSpark 本身</span>——按目前比较 common 的认知，<b>DSpark 在大 batch 下也不该掉 throughput</b>（见下图 lmsys 的对比）。所以我们在 rollout 上测不出收益，<b>更可能是 AMD 上的 DSpark 实现还不够好</b>，而不是这个技术的固有性质。<b>Piotr 正在看这件事。</b></p>
+          <p style="margin-top:10px">我们目前只有两个端点——并发 1（赚 1.11-1.33×）和 rollout 并发（不赚），<b>中间的曲线还没测</b>。后续会对<b>线上真实流量</b>做 bsz 相关的 profile，把这条曲线补上。</p>
+          <figure style="margin:16px 0 0">
+            <img src="https://www.lmsys.org/images/blog/dspark-sglang/perf-compare.png" alt="DSpark on SGLang — throughput vs batch size" style="width:100%; border:1px solid var(--line); border-radius:8px; background:#fff" />
+            <figcaption style="color:var(--muted); font-size:13px; margin-top:8px">来源：lmsys DSpark on SGLang 官方对比图 —— 大 batch 下 DSpark 仍保持 throughput。这与我们 AMD 上的观测不一致，是待查项而非结论。</figcaption>
+          </figure>
+        </div>
+      </main>
+      <footer class="footerline"><span>结果 · 加速比</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 12 服务栈审计 -->
+    <section class="slide">
+      <header><div class="eyebrow">Serving stack</div></header>
+      <main>
+        <h2>服务栈审计：<span style="color:var(--green)">通过</span></h2>
+        <div class="grid two" style="margin-top: 20px;">
+          <div class="card">
+            <h3>接受判据正确</h3>
+            <p>确认是标准 <code>min(1, p/q)</code>；p 与 q 索引对齐，block 7 / 8 token 没有越界；温度两边同源、各只应用一次。</p>
+          </div>
+          <div class="card">
+            <h3>verify mode 影响极小</h3>
+            <p>static vs compact 只差 <strong>−0.18</strong>，而 compact 吞吐明显更差（77 vs 126 tok/s）、端到端更慢。<span class="note">static 才是该用的模式。</span></p>
+          </div>
+        </div>
+        <div class="card" style="margin-top:18px; border-left:4px solid var(--red)">
+          <h3>rope_theta：机制是真的，幅度被我高估了</h3>
+          <p>draft 的 <code>rope_theta</code> 必须等于 target 的。<b>训练侧看不见</b>——draft 自己建 KV，两边自洽，tau 完全正常；<b>服务时</b> draft 复用 target 的 KV，不匹配才暴露。</p>
+          <p style="margin-top:10px">同权重 A/B 实测：匹配比不匹配高 <strong>+0.46（约 1.4σ）</strong>，而且另一个 arm 反而略低。<span class="note">最初报的 "+75%" 是在一套有缺陷的 prompt 上量的，已收回。</span></p>
+        </div>
+      </main>
+      <footer class="footerline"><span>服务栈</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 13 DFlash 对照 -->
+    <section class="slide">
+      <header><div class="eyebrow">DFlash vs DSpark</div></header>
+      <main>
+        <h2>Markov 头那 <span style="color:var(--blue)">28% 参数</span>买到了什么</h2>
+        <div class="card" style="margin-top:16px">
+          <h3>机制差异</h3>
+          <p>DSpark = DFlash backbone + <strong>Markov 转移头</strong> + confidence 头。损失：DFlash 是<strong>纯 block-parallel CE</strong>；DSpark 是 CE 0.1 + <strong>TV/L1 0.9</strong> + conf 1.0。</p>
+          <p style="margin-top:10px"><span class="note">DSpark 的主导项 TV 就是接受判据本身</span>（接受率 ≈ 1 − TV），而 CE 只是代理。</p>
+        </div>
+        <div class="table" style="margin-top: 18px;">
+          <div class="row head" style="grid-template-columns: 1.1fr repeat(6, 0.55fr) 0.7fr 0.9fr;"><div class="cell">同语料/taps/batch/lr</div><div class="cell">p1</div><div class="cell">p2</div><div class="cell">p3</div><div class="cell">p4</div><div class="cell">p5</div><div class="cell">p6</div><div class="cell">尾/头</div><div class="cell">implied AL</div></div>
+          <div class="row" style="grid-template-columns: 1.1fr repeat(6, 0.55fr) 0.7fr 0.9fr;"><div class="cell">DFlash 3L</div><div class="cell">0.70</div><div class="cell">0.56</div><div class="cell">0.46</div><div class="cell">0.38</div><div class="cell">0.31</div><div class="cell">0.27</div><div class="cell">0.38</div><div class="cell">~2.4</div></div>
+          <div class="row" style="grid-template-columns: 1.1fr repeat(6, 0.55fr) 0.7fr 0.9fr;"><div class="cell"><strong>DSpark 3L</strong></div><div class="cell">0.72</div><div class="cell">0.68</div><div class="cell">0.66</div><div class="cell">0.63</div><div class="cell">0.61</div><div class="cell"><strong>0.58</strong></div><div class="cell"><strong>0.81</strong></div><div class="cell"><strong>2.93</strong></div></div>
+        </div>
+        <p style="margin-top:18px"><span class="note">DFlash 第一个位置追平，尾部塌掉</span>：位置 4-6 贡献 <strong>0.14 vs 0.40</strong>。这正是 Markov 头在撑住块的后半段——它建模块内相邻位置的依赖，误差不会沿块快速累积。</p>
+        <div class="card" style="margin-top:16px; border-left:4px solid var(--green)">
+          <h3>服务侧实测（sglang，并发 1，temp 1.0，刚跑出来）</h3>
+          <div class="table" style="margin-top: 10px;">
+            <div class="row head" style="grid-template-columns: 1fr 0.9fr 0.9fr;"><div class="cell">arm</div><div class="cell">accept length</div><div class="cell">tok/s/请求</div></div>
+            <div class="row" style="grid-template-columns: 1fr 0.9fr 0.9fr;"><div class="cell"><strong>DSpark 5L</strong></div><div class="cell"><strong>4.52</strong></div><div class="cell">192.0</div></div>
+            <div class="row" style="grid-template-columns: 1fr 0.9fr 0.9fr;"><div class="cell"><strong>DSpark 3L</strong></div><div class="cell">4.50</div><div class="cell"><strong>210.7</strong></div></div>
+            <div class="row" style="grid-template-columns: 1fr 0.9fr 0.9fr;"><div class="cell">DFlash 3L</div><div class="cell">4.15</div><div class="cell">194.9</div></div>
+          </div>
+          <p style="margin-top:10px">服务侧 DFlash <strong>4.15</strong> vs DSpark 3L <strong>4.50</strong>，<span class="note">同参数量下 DSpark 领先约 8%</span>，方向和训练侧一致（训练侧差距更大，因为 teacher-forced 会放大尾部差异）。</p>
+          <p style="margin-top:8px; color:var(--muted)"><b>口径提醒</b>：这一轮的 no-spec baseline arm 启动失败（Slurm 控制面抖动），所以<b>这三个数之间可比，但算不出对 baseline 的加速比</b>。补测中。</p>
+        </div>
+        <p style="margin-top:14px; color:var(--muted)">注意：DFlash 与 DSpark 的 <b>loss 不在同一量纲</b>（纯 CE vs CE+TV 加权），两条 loss 曲线不能画在同一张图上；比较只能用逐位置准确率或服务侧 accept length。</p>
+      </main>
+      <footer class="footerline"><span>DFlash 对照</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 14 方法论 -->
+    <section class="slide">
+      <header><div class="eyebrow">Lessons</div></header>
+      <main>
+        <h2>四个<span style="color:var(--red)">发出去又收回</span>的结论，全是口径问题</h2>
+        <div class="grid two" style="margin-top: 20px;">
+          <div class="card" style="border-left:4px solid var(--red)">
+            <h3>prompt 切在 JSON 中间</h3>
+            <p>按固定 token 偏移切 prompt，切点落在 <code>"author": "j</code> 这种地方，模型接的是被截断的乱码。<span class="note">造出一个假的性能回退：1.3 vs 2.44。</span></p>
+            <p style="margin-top:8px">修法：用 supervision mask 的 0→非零跳变，切在 assistant 轮次开头。</p>
+          </div>
+          <div class="card" style="border-left:4px solid var(--red)">
+            <h3>spec 环境变量泄漏给 baseline</h3>
+            <p>把 <code>SGLANG_RAGGED_VERIFY_MODE</code> 等写在共享的 <code>--export</code> 里，不开投机的 baseline 也吃到了，结果它吐出 <code>&lt;think&gt;</code> + 512 个换行、永不终止。</p>
+            <p style="margin-top:8px"><span class="note">分母被污染，造出一个假的 1.79× 加速。</span>对照臂复现后确认：24/24 全部跑飞。</p>
+          </div>
+          <div class="card" style="border-left:4px solid var(--red)">
+            <h3>固定 record 数当吞吐测</h3>
+            <p>各 arm 生成量差 25%，墙钟同时混进"速度"和"内容多少"。<span class="note">我据此报过 1.21× 慢，后来收回。</span></p>
+          </div>
+          <div class="card" style="border-left:4px solid var(--red)">
+            <h3>rope_theta "+75%"</h3>
+            <p>在有缺陷的 prompt 集上量的，真实只有 +0.46（约 1.4σ）。机制成立，幅度不成立。</p>
+          </div>
+        </div>
+        <p style="margin-top:20px"><span class="note">两条可迁移的规矩</span>：① 报数字必须带口径（温度 / 并发 / 截断长度 / 样本数）；② 花卡之前先确认"这个判据真的能被观测到"——我们有五次 e2e 跑完 exit 0 却什么都没测到。</p>
+      </main>
+      <footer class="footerline"><span>方法论</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 15 下一步 -->
+    <section class="slide">
+      <header><div class="eyebrow">Next</div></header>
+      <main>
+        <h2>下一步，<span style="color:var(--blue)">按性价比排序</span></h2>
+        <div class="grid two" style="margin-top: 20px;">
+          <div class="card" style="border-left:4px solid var(--green)">
+            <h3>1 · 并发扫描（1/2/4/8/16/32）</h3>
+            <p>把"随并发失效"从两个端点补成完整曲线，并直接读出<strong>我们自己 target 上的收支平衡并发</strong>。不用重训，约 40 分钟。</p>
+          </div>
+          <div class="card" style="border-left:4px solid var(--green)">
+            <h3>2 · block_size 扫描 7 → 4/3/2</h3>
+            <p>压每步成本最直接的抓手。逐位置曲线显示位置 4-6 只贡献 0.40，砍短很可能划算。不用重训。</p>
+          </div>
+          <div class="card">
+            <h3>3 · 暴露 num_correct_drafts 直方图</h3>
+            <p>约 15 行改动，补上"每步接受几个"的分布——定 block_size 的直接依据。</p>
+          </div>
+          <div class="card">
+            <h3>4 · 用漂移后的 rollout 状态训练</h3>
+            <p>按并发分析，这是提升 rollout accept length 唯一的抓手（Draft-OPD 路线）。</p>
+          </div>
+        </div>
+        <div class="card" style="margin-top:18px">
+          <h3>一句话总结</h3>
+          <p><span class="note">drafter 不是瓶颈</span>——同栈可比参照的 accept length 是 3.65-3.99，我们 5L 是 3.707（rollout）/ 4.79（并发 1），持平甚至略高。<br>
+          <strong>瓶颈是高并发下每个 DSpark step 的成本</strong>。所以下一步该压成本（并发扫描、block_size），而不是继续堆 drafter。</p>
+        </div>
+      </main>
+      <footer class="footerline"><span>下一步</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+  </div>
+
+  <div class="nav">
+    <button id="prev" aria-label="上一页">←</button>
+    <button id="next" aria-label="下一页">→</button>
+  </div>
+  <script>
+    const slides = Array.from(document.querySelectorAll('.slide'));
+    const bars = Array.from(document.querySelectorAll('.bar'));
+    let index = 0;
+
+    function showSlide(nextIndex) {
+      index = Math.max(0, Math.min(slides.length - 1, nextIndex));
+      slides.forEach((slide, i) => slide.classList.toggle('active', i === index));
+      document.querySelectorAll('.counter').forEach(counter => {
+        counter.textContent = `${index + 1} / ${slides.length}`;
+      });
+      bars.forEach(bar => {
+        bar.style.width = `${((index + 1) / slides.length) * 100}%`;
+      });
+      history.replaceState(null, '', `#${index + 1}`);
+    }
+
+    document.getElementById('prev').addEventListener('click', () => showSlide(index - 1));
+    document.getElementById('next').addEventListener('click', () => showSlide(index + 1));
+    document.addEventListener('keydown', event => {
+      if (['ArrowRight', 'PageDown', ' '].includes(event.key)) {
+        event.preventDefault();
+        showSlide(index + 1);
+      }
+      if (['ArrowLeft', 'PageUp'].includes(event.key)) {
+        event.preventDefault();
+        showSlide(index - 1);
+      }
+      if (event.key === 'Home') showSlide(0);
+      if (event.key === 'End') showSlide(slides.length - 1);
+    });
+
+    const initial = Number.parseInt(location.hash.replace('#', ''), 10);
+    if (Number.isFinite(initial)) {
+      showSlide(initial - 1);
+    } else {
+      showSlide(0);
+    }
+  </script>
+</body>
+</html>
