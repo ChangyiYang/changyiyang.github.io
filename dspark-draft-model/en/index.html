@@ -1,0 +1,767 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>In-domain draft model for agentic traffic — DSpark / DFlash</title>
+  <style>
+
+    :root {
+      --bg: #f7f4ee;
+      --ink: #1f2933;
+      --muted: #667085;
+      --line: #d8d2c5;
+      --panel: #fffdfa;
+      --blue: #245f73;
+      --green: #2f6b55;
+      --red: #a13c35;
+      --amber: #b76b1f;
+      --violet: #6a4c93;
+      --shadow: 0 10px 34px rgba(38, 34, 28, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background:
+        radial-gradient(circle at 18% 0%, rgba(36, 95, 115, 0.06), transparent 30%),
+        linear-gradient(180deg, #fbf9f5 0%, var(--bg) 100%);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
+    }
+
+    body {
+      overflow: hidden;
+    }
+
+    .deck {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+    }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      display: none;
+      padding: clamp(28px, 4vw, 56px);
+      overflow: hidden;
+    }
+
+    .slide.active {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 18px;
+    }
+
+    header, main, footer {
+      position: relative;
+      z-index: 1;
+    }
+
+    .eyebrow {
+      color: var(--blue);
+      font-weight: 720;
+      font-size: clamp(11px, 0.9vw, 14px);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    h1, h2 {
+      margin: 0;
+      letter-spacing: 0;
+      line-height: 1.12;
+      text-wrap: balance;
+    }
+
+    h1 {
+      max-width: 860px;
+      font-size: clamp(34px, 4.2vw, 58px);
+    }
+
+    h2 {
+      font-size: clamp(28px, 3.4vw, 46px);
+      max-width: 980px;
+    }
+
+    h3 {
+      margin: 0 0 10px;
+      font-size: clamp(18px, 1.55vw, 24px);
+      line-height: 1.15;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 0;
+      color: var(--muted);
+      font-size: clamp(16px, 1.3vw, 22px);
+      line-height: 1.45;
+      max-width: 980px;
+    }
+
+    .lead {
+      color: #334155;
+      font-size: clamp(18px, 1.7vw, 26px);
+      line-height: 1.35;
+      max-width: 1080px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      align-items: stretch;
+    }
+
+    .grid.two {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .grid.four {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .card {
+      background: rgba(255, 253, 250, 0.9);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      box-shadow: var(--shadow);
+      min-height: 138px;
+    }
+
+    .card p, li {
+      font-size: clamp(14px, 1.05vw, 18px);
+      line-height: 1.45;
+      color: #4b5563;
+    }
+
+    ul {
+      margin: 0;
+      padding-left: 1.15em;
+    }
+
+    li + li { margin-top: 8px; }
+
+    .metric {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      margin: 8px 0 4px;
+    }
+
+    .metric strong {
+      font-size: clamp(30px, 3.5vw, 52px);
+      line-height: 1;
+      color: var(--red);
+      letter-spacing: 0;
+    }
+
+    .metric span {
+      color: var(--muted);
+      font-size: clamp(14px, 1.1vw, 18px);
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      height: 28px;
+      padding: 0 10px;
+      border-radius: 999px;
+      background: #e9f2ef;
+      color: var(--green);
+      font-size: 13px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .tag.red { background: #fae8e6; color: var(--red); }
+    .tag.amber { background: #fff2dc; color: var(--amber); }
+    .tag.blue { background: #e6f1f5; color: var(--blue); }
+    .tag.violet { background: #eee9f6; color: var(--violet); }
+
+    .table {
+      display: grid;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1.35fr repeat(4, 0.75fr);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .row:last-child { border-bottom: 0; }
+
+    .cell {
+      padding: 12px 14px;
+      font-size: clamp(13px, 1.05vw, 17px);
+      color: #475467;
+      border-right: 1px solid var(--line);
+    }
+
+    .cell:last-child { border-right: 0; }
+
+    .head .cell {
+      background: #efe9dd;
+      color: #1f2933;
+      font-weight: 760;
+    }
+
+    .gap-table .row {
+      grid-template-columns: 0.66fr 1.08fr 1fr 1.35fr 0.76fr;
+    }
+
+    .gap-table .cell {
+      font-size: clamp(12px, 0.9vw, 15px);
+      line-height: 1.42;
+      padding: 11px 12px;
+    }
+
+    .bad { color: var(--red); font-weight: 800; }
+    .good { color: var(--green); font-weight: 800; }
+    .note { color: var(--blue); font-weight: 760; }
+
+    .timeline {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr auto 1fr;
+      gap: 12px;
+      align-items: center;
+      margin-top: 18px;
+    }
+
+    .node {
+      min-height: 128px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    .arrow {
+      width: 46px;
+      height: 2px;
+      background: var(--blue);
+      position: relative;
+    }
+
+    .arrow::after {
+      content: "";
+      position: absolute;
+      right: -1px;
+      top: -5px;
+      border-left: 9px solid var(--blue);
+      border-top: 6px solid transparent;
+      border-bottom: 6px solid transparent;
+    }
+
+    .formula {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      white-space: pre-wrap;
+      font-size: clamp(15px, 1.3vw, 21px);
+      color: #25303b;
+      background: #f3efe7;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      line-height: 1.55;
+      box-shadow: var(--shadow);
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: 0.95fr 1.05fr;
+      gap: 22px;
+      align-items: center;
+    }
+
+    .quote {
+      border-left: 5px solid var(--blue);
+      padding: 18px 22px;
+      background: rgba(255, 253, 250, 0.75);
+      border-radius: 0 8px 8px 0;
+      color: #334155;
+      font-size: clamp(18px, 1.7vw, 26px);
+      line-height: 1.35;
+      box-shadow: var(--shadow);
+    }
+
+    .cover {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+      gap: 34px;
+      align-items: center;
+    }
+
+    .cover-title {
+      display: grid;
+      gap: 18px;
+      align-content: start;
+    }
+
+    .cover-title h1 span {
+      color: var(--blue);
+    }
+
+    .agenda {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      padding: 22px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .agenda-item {
+      display: grid;
+      grid-template-columns: 34px 1fr;
+      gap: 12px;
+      align-items: start;
+    }
+
+    .agenda-num {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: #e6f1f5;
+      color: var(--blue);
+      font-weight: 800;
+      font-size: 14px;
+    }
+
+    .agenda-item strong {
+      display: block;
+      font-size: clamp(16px, 1.25vw, 20px);
+      margin-bottom: 4px;
+    }
+
+    .agenda-item span {
+      display: block;
+      color: var(--muted);
+      font-size: clamp(13px, 1vw, 16px);
+      line-height: 1.45;
+    }
+
+    .footerline {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .progress {
+      height: 6px;
+      width: min(420px, 44vw);
+      background: #e4ded3;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .bar {
+      height: 100%;
+      width: 0;
+      background: linear-gradient(90deg, var(--blue), var(--green));
+      transition: width 180ms ease;
+    }
+
+    .controls {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      z-index: 10;
+      display: flex;
+      gap: 8px;
+    }
+
+    button {
+      width: 42px;
+      height: 42px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255, 253, 250, 0.95);
+      color: var(--ink);
+      font-size: 22px;
+      cursor: pointer;
+      box-shadow: 0 8px 26px rgba(38, 34, 28, 0.14);
+    }
+
+    a { color: var(--blue); text-decoration: none; border-bottom: 1px solid rgba(36, 95, 115, 0.35); }
+
+    .refs {
+      columns: 2;
+      column-gap: 28px;
+      font-size: clamp(13px, 1.05vw, 17px);
+      line-height: 1.5;
+      color: #475467;
+    }
+
+    .refs div { break-inside: avoid; margin-bottom: 10px; }
+
+    .script-card {
+      display: grid;
+      gap: 10px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      box-shadow: var(--shadow);
+    }
+
+    .turn {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: clamp(13px, 1.05vw, 17px);
+      line-height: 1.5;
+      color: #344054;
+      background: #f3efe7;
+      border-radius: 6px;
+      padding: 12px;
+    }
+
+    .case-table {
+      display: grid;
+      grid-template-columns: 0.72fr 1fr 1.05fr;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      margin-top: 24px;
+    }
+
+    .case-table > div {
+      padding: 14px 16px;
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      color: #475467;
+      font-size: clamp(14px, 1.05vw, 18px);
+      line-height: 1.45;
+    }
+
+    .case-table > div:nth-child(3n) { border-right: 0; }
+    .case-table > div:nth-last-child(-n + 3) { border-bottom: 0; }
+
+    .case-head {
+      background: #efe9dd;
+      color: #1f2933 !important;
+      font-weight: 780;
+    }
+
+    .mono {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      color: #344054;
+      background: #f3efe7;
+      border-radius: 6px;
+      padding: 2px 5px;
+    }
+
+    @media (max-width: 880px) {
+      body { overflow: auto; }
+      .deck { height: auto; min-height: 100vh; }
+      .slide {
+        position: relative;
+        min-height: 100vh;
+        display: none;
+        overflow: visible;
+      }
+      .slide.active { display: grid; }
+      .grid, .grid.two, .grid.four, .split, .timeline {
+        grid-template-columns: 1fr;
+      }
+      .arrow { width: 2px; height: 34px; justify-self: center; }
+      .arrow::after {
+        right: -5px;
+        top: auto;
+        bottom: -1px;
+        border-left: 6px solid transparent;
+        border-right: 6px solid transparent;
+        border-top: 9px solid var(--blue);
+        border-bottom: 0;
+      }
+      .row {
+        grid-template-columns: 1.2fr repeat(4, 0.75fr);
+      }
+      .cell { padding: 9px; }
+      .refs { columns: 1; }
+      .controls { position: fixed; }
+    }
+  
+  </style>
+</head><body>
+  <div class="deck">
+
+    <!-- 1 COVER -->
+    <section class="slide active">
+      <header><div class="eyebrow">Speculative decoding</div></header>
+      <main class="cover">
+        <div class="cover-title">
+          <h1>An <span>in-domain draft model</span> for agentic traffic</h1>
+          <p class="lead">Target: frozen 24B MoE · Draft: 3–5 layer DSpark · Data: clawenv multi-turn tool-calling rollouts</p>
+        </div>
+        <div class="agenda">
+          <div class="agenda-item"><div class="agenda-num">1</div><div><strong>Training</strong><span>Corpus &amp; tau curve</span></div></div>
+          <div class="agenda-item"><div class="agenda-num">2</div><div><strong>Results</strong><span>Corpus, depth, speedup</span></div></div>
+          <div class="agenda-item"><div class="agenda-num">3</div><div><strong>Comparison</strong><span>DFlash / official</span></div></div>
+          <div class="agenda-item"><div class="agenda-num">4</div><div><strong>Next</strong><span>Concurrency &amp; block_size</span></div></div>
+        </div>
+      </main>
+      <footer class="footerline"><span>← / → to navigate</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 2 训练语料 + tau 曲线 -->
+    <section class="slide">
+      <header><div class="eyebrow">Training</div></header>
+      <main>
+        <h2>Training corpus and tau curve</h2>
+        <div class="grid two" style="margin-top: 24px;">
+          <div class="card">
+            <h3>Corpus</h3>
+            <p>clawenv agentic rollouts, <strong>117M</strong> supervised tokens (14,838 packed records).</p>
+            <p style="margin-top:12px"><strong>5.2×</strong> larger than the previous version (22.4M).</p>
+            <p style="margin-top:12px">Supervision density <strong>12.8%</strong> — most of an agentic trajectory is tool output.</p>
+          </div>
+          <div class="card">
+            <h3>Recipe</h3>
+            <p>3L / 5L DSpark · block_size 7 · 20 epochs<br>eff_bs 128 · lr 4.243e-4 · 512 anchors/record/epoch</p>
+            <p style="margin-top:12px">Final <code>dspark_tau</code>: <strong>3L 4.47</strong> · <strong>5L 4.60</strong> (ceiling 8)</p>
+          </div>
+        </div>
+        <div class="card" style="margin-top:18px">
+          <svg viewBox="0 0 980 360" width="100%" role="img" aria-label="Training tau vs step: 3L ends at 4.47, 5L at 4.60">
+  <title>dspark_tau vs training step</title>
+  <line x1="56" y1="320.0" x2="850" y2="320.0" stroke="#d8d2c5" stroke-width="1"/><text x="46" y="324.0" text-anchor="end" fill="#667085" font-size="13">1</text><line x1="56" y1="245.0" x2="850" y2="245.0" stroke="#d8d2c5" stroke-width="1"/><text x="46" y="249.0" text-anchor="end" fill="#667085" font-size="13">2</text><line x1="56" y1="170.0" x2="850" y2="170.0" stroke="#d8d2c5" stroke-width="1"/><text x="46" y="174.0" text-anchor="end" fill="#667085" font-size="13">3</text><line x1="56" y1="95.0" x2="850" y2="95.0" stroke="#d8d2c5" stroke-width="1"/><text x="46" y="99.0" text-anchor="end" fill="#667085" font-size="13">4</text><line x1="56" y1="20.0" x2="850" y2="20.0" stroke="#d8d2c5" stroke-width="1"/><text x="46" y="24.0" text-anchor="end" fill="#667085" font-size="13">5</text>
+  <line x1="56" y1="320" x2="850" y2="320" stroke="#d8d2c5" stroke-width="1"/>
+  <path d="M56.0,317.8 L70.4,302.3 L84.9,280.4 L99.3,260.1 L113.7,223.2 L128.2,215.6 L142.6,188.4 L157.1,176.2 L171.5,158.3 L185.9,166.6 L200.4,145.2 L214.8,136.0 L229.2,144.7 L243.7,137.6 L258.1,145.4 L272.5,135.3 L287.0,130.6 L301.4,144.9 L315.9,106.9 L330.3,125.0 L344.7,101.8 L359.2,118.6 L373.6,95.7 L388.0,107.5 L402.5,100.4 L416.9,102.5 L431.3,112.8 L445.8,87.0 L460.2,99.3 L474.7,86.6 L489.1,86.5 L503.5,87.8 L518.0,82.6 L532.4,89.3 L546.8,78.5 L561.3,78.2 L575.7,76.3 L590.1,81.6 L604.6,70.0 L619.0,75.5 L633.5,76.3 L647.9,60.2 L662.3,70.6 L676.8,80.1 L691.2,60.6 L705.6,72.6 L720.1,70.4 L734.5,66.8 L748.9,75.7 L763.4,69.2 L777.8,68.2 L792.3,76.2 L806.7,58.8 L821.1,52.9 L835.6,54.2 L850.0,69.9" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M56.0,317.8 L70.4,305.3 L84.9,284.3 L99.3,267.2 L113.7,230.3 L128.2,220.3 L142.6,190.1 L157.1,173.3 L171.5,170.2 L185.9,158.3 L200.4,148.0 L214.8,135.8 L229.2,133.3 L243.7,134.1 L258.1,129.7 L272.5,137.8 L287.0,112.5 L301.4,107.0 L315.9,103.4 L330.3,103.0 L344.7,107.4 L359.2,91.7 L373.6,100.0 L388.0,90.9 L402.5,98.4 L416.9,100.8 L431.3,84.1 L445.8,91.5 L460.2,77.6 L474.7,73.1 L489.1,79.6 L503.5,73.7 L518.0,79.9 L532.4,64.3 L546.8,75.5 L561.3,60.2 L575.7,60.1 L590.1,68.4 L604.6,66.2 L619.0,52.2 L633.5,59.7 L647.9,74.9 L662.3,56.2 L676.8,53.4 L691.2,55.7 L705.6,55.3 L720.1,68.3 L734.5,55.9 L748.9,61.8 L763.4,64.4 L777.8,52.9 L792.3,45.2 L806.7,43.0 L821.1,51.7 L835.6,54.6 L850.0,46.3" fill="none" stroke="#b76b1f" stroke-width="2" stroke-linejoin="round"/>
+  <circle cx="850" cy="46.3" r="4.5" fill="#b76b1f" stroke="#fffdfa" stroke-width="2"/>
+  <circle cx="850" cy="69.9" r="4.5" fill="#2a78d6" stroke="#fffdfa" stroke-width="2"/>
+  <text x="862" y="50.3" fill="#1f2933" font-size="15" font-weight="700">5L · tau 4.60</text>
+  <text x="862" y="73.9" fill="#1f2933" font-size="15" font-weight="700">3L · tau 4.47</text>
+  <text x="56" y="348" fill="#667085" font-size="13">training step (20 epochs)</text>
+  <text x="16" y="24" fill="#667085" font-size="13">tau</text>
+</svg>
+          <p style="margin-top:6px; color:var(--muted)">W&amp;B: <code>liquid-lfm-dspark/runs/gxlzenul</code> (3L) · <code>9run8fc4</code> (5L)</p>
+        </div>
+      </main>
+      <footer class="footerline"><span>Training</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 3 逐位置接受率 -->
+    <section class="slide">
+      <header><div class="eyebrow">Analysis</div></header>
+      <main>
+        <h2>Per-position acceptance rate</h2>
+        <svg viewBox="0 0 980 350" width="100%" role="img" aria-label="Per-position top-1 acceptance: v2 3L falls from 0.749 to 0.582; previous version measured only at both ends, 0.767 and 0.524">
+  <title>Per-position top-1 acceptance rate</title>
+  <line x1="56" y1="265.1" x2="830" y2="265.1" stroke="#d8d2c5" stroke-width="1"/><text x="46" y="269.1" text-anchor="end" fill="#667085" font-size="13">0.5</text><line x1="56" y1="183.4" x2="830" y2="183.4" stroke="#d8d2c5" stroke-width="1"/><text x="46" y="187.4" text-anchor="end" fill="#667085" font-size="13">0.6</text><line x1="56" y1="101.7" x2="830" y2="101.7" stroke="#d8d2c5" stroke-width="1"/><text x="46" y="105.7" text-anchor="end" fill="#667085" font-size="13">0.7</text><line x1="56" y1="20.0" x2="830" y2="20.0" stroke="#d8d2c5" stroke-width="1"/><text x="46" y="24.0" text-anchor="end" fill="#667085" font-size="13">0.8</text><text x="56.0" y="334" text-anchor="middle" fill="#667085" font-size="13">p0</text><text x="185.0" y="334" text-anchor="middle" fill="#667085" font-size="13">p1</text><text x="314.0" y="334" text-anchor="middle" fill="#667085" font-size="13">p2</text><text x="443.0" y="334" text-anchor="middle" fill="#667085" font-size="13">p3</text><text x="572.0" y="334" text-anchor="middle" fill="#667085" font-size="13">p4</text><text x="701.0" y="334" text-anchor="middle" fill="#667085" font-size="13">p5</text><text x="830.0" y="334" text-anchor="middle" fill="#667085" font-size="13">p6</text>
+  <line x1="56" y1="306" x2="830" y2="306" stroke="#d8d2c5" stroke-width="1"/>
+  <path d="M56.0,61.7 L185.0,87.0 L314.0,115.6 L443.0,138.5 L572.0,155.6 L701.0,175.3 L830.0,198.1" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round"/><circle cx="56.0" cy="61.7" r="4.5" fill="#2a78d6" stroke="#fffdfa" stroke-width="2"/><circle cx="185.0" cy="87.0" r="4.5" fill="#2a78d6" stroke="#fffdfa" stroke-width="2"/><circle cx="314.0" cy="115.6" r="4.5" fill="#2a78d6" stroke="#fffdfa" stroke-width="2"/><circle cx="443.0" cy="138.5" r="4.5" fill="#2a78d6" stroke="#fffdfa" stroke-width="2"/><circle cx="572.0" cy="155.6" r="4.5" fill="#2a78d6" stroke="#fffdfa" stroke-width="2"/><circle cx="701.0" cy="175.3" r="4.5" fill="#2a78d6" stroke="#fffdfa" stroke-width="2"/><circle cx="830.0" cy="198.1" r="4.5" fill="#2a78d6" stroke="#fffdfa" stroke-width="2"/><circle cx="56.0" cy="47.0" r="5" fill="none" stroke="#b76b1f" stroke-width="2.5"/><circle cx="830.0" cy="245.5" r="5" fill="none" stroke="#b76b1f" stroke-width="2.5"/>
+  <text x="842.0" y="202.1" fill="#1f2933" font-size="15" font-weight="700">v2 3L · 0.582</text>
+  <text x="842.0" y="249.5" fill="#1f2933" font-size="15" font-weight="700">previous · 0.524</text>
+  <text x="16" y="24" fill="#667085" font-size="13">acc</text>
+  <g transform="translate(56,22)">
+    <circle cx="6" cy="6" r="4.5" fill="#2a78d6"/><text x="18" y="10" fill="#667085" font-size="13">v2 3L (7 measured points)</text>
+    <circle cx="150" cy="6" r="5" fill="none" stroke="#b76b1f" stroke-width="2.5"/><text x="164" y="10" fill="#667085" font-size="13">previous (only p0 / p6 measured, no data in between)</text>
+  </g>
+</svg>
+        <p style="margin-top:28px; font-size:20px">accept length = <code>1 + Σ cumprod(acc_pk)</code>，<span class="note">the tail enters via the cumulative product</span> — positions 4–6 contribute 0.40, nearly a third of the total.</p>
+      </main>
+      <footer class="footerline"><span>Per-position</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 4 语料规模 -->
+    <section class="slide">
+      <header><div class="eyebrow">Results</div></header>
+      <main>
+        <h2>Effect of corpus size</h2>
+        <div class="table" style="margin-top: 28px;">
+          <div class="row head" style="grid-template-columns: 1.2fr 1fr 1fr 0.8fr;"><div class="cell">drafter</div><div class="cell">corpus</div><div class="cell">accept length</div><div class="cell"></div></div>
+          <div class="row" style="grid-template-columns: 1.2fr 1fr 1fr 0.8fr;"><div class="cell">previous</div><div class="cell">22.4M</div><div class="cell">2.158</div><div class="cell">—</div></div>
+          <div class="row" style="grid-template-columns: 1.2fr 1fr 1fr 0.8fr;"><div class="cell"><strong>v2 3L</strong></div><div class="cell">117M</div><div class="cell"><strong>3.374</strong></div><div class="cell"><strong>+56%</strong></div></div>
+          <div class="row" style="grid-template-columns: 1.2fr 1fr 1fr 0.8fr;"><div class="cell"><strong>v2 5L</strong></div><div class="cell">117M</div><div class="cell"><strong>3.707</strong></div><div class="cell"><strong>+72%</strong></div></div>
+        </div>
+        <p style="margin-top:28px; font-size:20px">verl rollout, 128 records, temp 1.0, static verify, steady state.</p>
+      </main>
+      <footer class="footerline"><span>Corpus</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 5 深度 + tau 失效 -->
+    <section class="slide">
+      <header><div class="eyebrow">Results</div></header>
+      <main>
+        <h2>Effect of draft depth</h2>
+        <div class="table" style="margin-top: 28px;">
+          <div class="row head" style="grid-template-columns: 1fr 1fr 1.2fr 1fr;"><div class="cell"></div><div class="cell">tau (training)</div><div class="cell">accept length (rollout)</div><div class="cell">wall clock, 128 records</div></div>
+          <div class="row" style="grid-template-columns: 1fr 1fr 1.2fr 1fr;"><div class="cell">3L</div><div class="cell">4.47</div><div class="cell">3.374</div><div class="cell">1060s</div></div>
+          <div class="row" style="grid-template-columns: 1fr 1fr 1.2fr 1fr;"><div class="cell"><strong>5L</strong></div><div class="cell">4.60</div><div class="cell"><strong>3.707</strong></div><div class="cell"><strong>943s</strong></div></div>
+        </div>
+        <p style="margin-top:28px; font-size:20px"><span class="note">tau differs by only +0.13, but serving differs by +0.33</span> — tau is teacher-forced and cannot be used to rank drafters.</p>
+      </main>
+      <footer class="footerline"><span>Depth</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 6 加速比 -->
+    <section class="slide">
+      <header><div class="eyebrow">Results</div></header>
+      <main>
+        <h2>End-to-end speedup</h2>
+        <div class="grid two" style="margin-top: 24px;">
+          <div class="card">
+            <h3>sglang · concurrency 1</h3>
+            <div class="table" style="margin-top: 12px;">
+              <div class="row head" style="grid-template-columns: 0.8fr 0.8fr 0.8fr;"><div class="cell"></div><div class="cell">temp 1</div><div class="cell">temp 0</div></div>
+              <div class="row" style="grid-template-columns: 0.8fr 0.8fr 0.8fr;"><div class="cell">3L</div><div class="cell"><strong>1.11×</strong></div><div class="cell"><strong>1.33×</strong></div></div>
+              <div class="row" style="grid-template-columns: 0.8fr 0.8fr 0.8fr;"><div class="cell">5L</div><div class="cell">1.09×</div><div class="cell">1.23×</div></div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>verl rollout · production concurrency</h3>
+            <div class="table" style="margin-top: 12px;">
+              <div class="row head" style="grid-template-columns: 0.9fr 0.8fr 0.8fr;"><div class="cell"></div><div class="cell">accept len</div><div class="cell">wall clock, 128 rec.</div></div>
+              <div class="row" style="grid-template-columns: 0.9fr 0.8fr 0.8fr;"><div class="cell">no spec</div><div class="cell">—</div><div class="cell"><strong>777s</strong></div></div>
+              <div class="row" style="grid-template-columns: 0.9fr 0.8fr 0.8fr;"><div class="cell">previous</div><div class="cell">2.158</div><div class="cell">1097s</div></div>
+              <div class="row" style="grid-template-columns: 0.9fr 0.8fr 0.8fr;"><div class="cell"><strong>3L</strong></div><div class="cell"><strong>3.374</strong></div><div class="cell">1060s</div></div>
+              <div class="row" style="grid-template-columns: 0.9fr 0.8fr 0.8fr;"><div class="cell"><strong>5L</strong></div><div class="cell"><strong>3.707</strong></div><div class="cell"><strong>943s</strong></div></div>
+            </div>
+            <p style="margin-top:10px; color:var(--muted)">Wall clock is not throughput: generated volume differs by 25% across arms.</p>
+          </div>
+        </div>
+        <p style="margin-top:24px; font-size:20px"><span class="note">Gains at low concurrency, none at rollout concurrency</span>; the middle range is unmeasured.</p>
+      </main>
+      <footer class="footerline"><span>Speedup</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 7 高并发原因 -->
+    <section class="slide">
+      <header><div class="eyebrow">Open question</div></header>
+      <main>
+        <h2>Why no gain at high concurrency</h2>
+        <p style="font-size:21px; margin-top:20px">Each DSpark step yields accept_len tokens at the cost of 7 sequential draft forwards + one target forward over 8 positions. At low concurrency we are memory-bandwidth bound and verifying 8 positions is nearly free; at high concurrency compute saturates and the cost is ~8×.</p>
+        <p style="font-size:21px; margin-top:18px"><span class="note">But by current common understanding, DSpark should not lose throughput at large batch</span> — so this is more likely an <strong>implementation issue on AMD</strong> rather than inherent to the method. Piotr is investigating; we will also profile batch sizes on production traffic.</p>
+        <figure style="margin:20px 0 0">
+          <img src="https://www.lmsys.org/images/blog/dspark-sglang/perf-compare.png" alt="DSpark on SGLang throughput vs batch size" style="width:100%; max-height:300px; object-fit:contain; border:1px solid var(--line); border-radius:8px; background:#fff; padding:6px" />
+        </figure>
+      </main>
+      <footer class="footerline"><span>Open question</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 8 DFlash 对比 -->
+    <section class="slide">
+      <header><div class="eyebrow">Comparison</div></header>
+      <main>
+        <h2>DFlash vs DSpark</h2>
+        <svg viewBox="0 0 980 350" width="100%" role="img" aria-label="DFlash vs DSpark per-position acceptance: similar at the first position, DFlash tail drops to 0.27, DSpark 0.58">
+  <title>DFlash vs DSpark per-position acceptance rate</title>
+  <line x1="56" y1="306.0" x2="820" y2="306.0" stroke="#d8d2c5" stroke-width="1"/><text x="46" y="310.0" text-anchor="end" fill="#667085" font-size="13">0.2</text><line x1="56" y1="212.0" x2="820" y2="212.0" stroke="#d8d2c5" stroke-width="1"/><text x="46" y="216.0" text-anchor="end" fill="#667085" font-size="13">0.4</text><line x1="56" y1="118.0" x2="820" y2="118.0" stroke="#d8d2c5" stroke-width="1"/><text x="46" y="122.0" text-anchor="end" fill="#667085" font-size="13">0.6</text><line x1="56" y1="24.0" x2="820" y2="24.0" stroke="#d8d2c5" stroke-width="1"/><text x="46" y="28.0" text-anchor="end" fill="#667085" font-size="13">0.8</text><text x="56.0" y="334" text-anchor="middle" fill="#667085" font-size="13">p1</text><text x="208.8" y="334" text-anchor="middle" fill="#667085" font-size="13">p2</text><text x="361.6" y="334" text-anchor="middle" fill="#667085" font-size="13">p3</text><text x="514.4" y="334" text-anchor="middle" fill="#667085" font-size="13">p4</text><text x="667.2" y="334" text-anchor="middle" fill="#667085" font-size="13">p5</text><text x="820.0" y="334" text-anchor="middle" fill="#667085" font-size="13">p6</text>
+  <line x1="56" y1="306" x2="820" y2="306" stroke="#d8d2c5" stroke-width="1"/>
+  <path d="M56.0,71.0 L208.8,136.8 L361.6,183.8 L514.4,221.4 L667.2,254.3 L820.0,273.1" fill="none" stroke="#b76b1f" stroke-width="2" stroke-linejoin="round"/><circle cx="56.0" cy="71.0" r="4.5" fill="#b76b1f" stroke="#fffdfa" stroke-width="2"/><circle cx="208.8" cy="136.8" r="4.5" fill="#b76b1f" stroke="#fffdfa" stroke-width="2"/><circle cx="361.6" cy="183.8" r="4.5" fill="#b76b1f" stroke="#fffdfa" stroke-width="2"/><circle cx="514.4" cy="221.4" r="4.5" fill="#b76b1f" stroke="#fffdfa" stroke-width="2"/><circle cx="667.2" cy="254.3" r="4.5" fill="#b76b1f" stroke="#fffdfa" stroke-width="2"/><circle cx="820.0" cy="273.1" r="4.5" fill="#b76b1f" stroke="#fffdfa" stroke-width="2"/><path d="M56.0,61.6 L208.8,80.4 L361.6,89.8 L514.4,103.9 L667.2,113.3 L820.0,127.4" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round"/><circle cx="56.0" cy="61.6" r="4.5" fill="#2a78d6" stroke="#fffdfa" stroke-width="2"/><circle cx="208.8" cy="80.4" r="4.5" fill="#2a78d6" stroke="#fffdfa" stroke-width="2"/><circle cx="361.6" cy="89.8" r="4.5" fill="#2a78d6" stroke="#fffdfa" stroke-width="2"/><circle cx="514.4" cy="103.9" r="4.5" fill="#2a78d6" stroke="#fffdfa" stroke-width="2"/><circle cx="667.2" cy="113.3" r="4.5" fill="#2a78d6" stroke="#fffdfa" stroke-width="2"/><circle cx="820.0" cy="127.4" r="4.5" fill="#2a78d6" stroke="#fffdfa" stroke-width="2"/>
+  <text x="832.0" y="131.4" fill="#1f2933" font-size="15" font-weight="700">DSpark · 0.58</text>
+  <text x="832.0" y="277.1" fill="#1f2933" font-size="15" font-weight="700">DFlash · 0.27</text>
+  <text x="16" y="28" fill="#667085" font-size="13">acc</text>
+</svg>
+        <p style="margin-top:24px; font-size:20px">Same corpus, taps, batch and lr. <span class="note">DFlash matches at the first position but collapses in the tail</span> — DSpark's Markov head models dependencies between adjacent positions within a block, so error does not accumulate along the block.</p>
+        <p style="margin-top:14px; font-size:20px">Loss: DFlash is pure CE; DSpark is CE 0.1 + <strong>TV 0.9</strong> + conf 1.0, <span class="note">and TV is exactly the acceptance criterion</span>.</p>
+      </main>
+      <footer class="footerline"><span>DFlash comparison</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 9 与官方差距 -->
+    <section class="slide">
+      <header><div class="eyebrow">Positioning</div></header>
+      <main>
+        <h2>Gap to official DSpark results</h2>
+        <p style="font-size:21px; margin-top:18px">Our current accept length: <strong>3.707</strong> in rollout, <strong>4.52</strong> at concurrency 1. Against the official curve by draft depth, <span class="note">there is still roughly 1 of headroom</span>.</p>
+        <figure style="margin:18px 0 0">
+          <img src="https://arxiv.org/html/2607.05147v1/layer_comparison.svg" alt="DSpark layer comparison" style="width:100%; max-height:360px; object-fit:contain; border:1px solid var(--line); border-radius:8px; background:#fff; padding:8px" />
+        </figure>
+      </main>
+      <footer class="footerline"><span>Positioning</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+    <!-- 10 后续 -->
+    <section class="slide">
+      <header><div class="eyebrow">Next</div></header>
+      <main>
+        <h2>Next steps</h2>
+        <div class="grid two" style="margin-top: 24px;">
+          <div class="card">
+            <h3>1 · Concurrency sweep</h3>
+            <p>Concurrency 1/2/4/8/16/32 to fill in the middle range and locate the break-even point. No retraining needed.</p>
+          </div>
+          <div class="card">
+            <h3>2 · block_size sweep</h3>
+            <p>7 → 4/3/2. Positions 4–6 contribute only 0.40; a shorter block may cut per-step cost. No retraining needed.</p>
+          </div>
+          <div class="card">
+            <h3>3 · Bigger draft</h3>
+            <p>~1 of headroom against the official curve; 3L → 5L already gave +0.33.</p>
+          </div>
+          <div class="card">
+            <h3>4 · On-policy data</h3>
+            <p>Rollout accept length is set by the traffic distribution; train on the model's own drifted state (Draft-OPD).</p>
+          </div>
+        </div>
+        <p style="margin-top:24px; font-size:20px"><span class="note">The drafter is not the bottleneck</span> — same-stack references are 3.65–3.99, we are at 3.707. The bottleneck is per-step cost at high concurrency.</p>
+      </main>
+      <footer class="footerline"><span>Next</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
+    </section>
+
+  </div>
+
+  <div class="nav">
+    <button id="prev" aria-label="Previous">←</button>
+    <button id="next" aria-label="Next">→</button>
+  </div>
+  <script>
+    const slides = Array.from(document.querySelectorAll('.slide'));
+    const bars = Array.from(document.querySelectorAll('.bar'));
+    let index = 0;
+
+    function showSlide(nextIndex) {
+      index = Math.max(0, Math.min(slides.length - 1, nextIndex));
+      slides.forEach((slide, i) => slide.classList.toggle('active', i === index));
+      document.querySelectorAll('.counter').forEach(counter => {
+        counter.textContent = `${index + 1} / ${slides.length}`;
+      });
+      bars.forEach(bar => {
+        bar.style.width = `${((index + 1) / slides.length) * 100}%`;
+      });
+      history.replaceState(null, '', `#${index + 1}`);
+    }
+
+    document.getElementById('prev').addEventListener('click', () => showSlide(index - 1));
+    document.getElementById('next').addEventListener('click', () => showSlide(index + 1));
+    document.addEventListener('keydown', event => {
+      if (['ArrowRight', 'PageDown', ' '].includes(event.key)) {
+        event.preventDefault();
+        showSlide(index + 1);
+      }
+      if (['ArrowLeft', 'PageUp'].includes(event.key)) {
+        event.preventDefault();
+        showSlide(index - 1);
+      }
+      if (event.key === 'Home') showSlide(0);
+      if (event.key === 'End') showSlide(slides.length - 1);
+    });
+
+    const initial = Number.parseInt(location.hash.replace('#', ''), 10);
+    if (Number.isFinite(initial)) {
+      showSlide(initial - 1);
+    } else {
+      showSlide(0);
+    }
+  </script>
+</body>
+</html>
