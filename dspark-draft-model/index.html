@@ -507,8 +507,8 @@
       <header><div class="eyebrow">Speculative decoding / in-domain draft model</div></header>
       <main class="cover">
         <div class="cover-title">
-          <h1>用自己的 agentic rollout 训 draft model，<span>到底赚不赚？</span></h1>
-          <p class="lead">Target 是冻结的 <b>24B MoE</b>，draft 是 <b>3-5 层 DSpark</b>，领域是 clawenv <b>多轮工具调用</b>流量。</p>
+          <h1>面向 agentic 流量的 <span>in-domain draft model</span></h1>
+          <p class="lead">Target：冻结的 24B MoE · Draft：3-5 层 DSpark · 领域：clawenv 多轮工具调用流量</p>
         </div>
         <div class="agenda">
           <div class="agenda-item"><div class="agenda-num">1</div><div><strong>我们量什么</strong><span>三层度量：训练 tau / sglang e2e / verl e2e。</span></div></div>
@@ -524,7 +524,7 @@
     <section class="slide">
       <header><div class="eyebrow">Methodology</div></header>
       <main>
-        <h2>我们在<span style="color:var(--blue)">三个层级</span>上量，越往下越贵、也越接近真实</h2>
+        <h2>测量的<span style="color:var(--blue)">三个层级</span></h2>
         <div class="table" style="margin-top: 18px;">
           <div class="row head" style="grid-template-columns: 0.9fr 1.5fr 1.1fr;"><div class="cell">层级</div><div class="cell">拿到什么</div><div class="cell">能回答什么</div></div>
           <div class="row" style="grid-template-columns: 0.9fr 1.5fr 1.1fr;"><div class="cell"><strong>① 训练侧</strong></div><div class="cell"><code>dspark_tau</code>、<code>acc_p0..p6</code>（逐位置一致率）、<code>ar_p0..p6</code>、<code>tv</code></div><div class="cell">只能看<strong>训练进度</strong></div></div>
@@ -540,7 +540,7 @@
     <section class="slide">
       <header><div class="eyebrow">Architecture</div></header>
       <main>
-        <h2>drafter 长什么样，<span style="color:var(--blue)">以及我们关掉的那个头</span></h2>
+        <h2>Drafter 结构与<span style="color:var(--blue)">接受判据</span></h2>
         <div class="grid two" style="margin-top: 22px;">
           <div class="card">
             <h3>参数分布（3L 共 231.2M）</h3>
@@ -551,16 +551,16 @@
             <p style="margin-top:10px">没有 embedding / lm_head，直接共用 target 的。纯 full-attention。</p>
           </div>
           <div class="card">
-            <h3>接受判据（读源码核对过）</h3>
+            <h3>接受判据（已核对源码）</h3>
             <p>draft 一次提 <code>block_size=7</code> 个 token，target <strong>一次前向</strong>验证 8 个位置。</p>
             <p style="margin-top:10px">接受判据是标准 rejection sampling <code>coin·q &lt; p</code> = <strong>min(1, p/q)</strong>。源码核对过：p/q 索引对齐，温度同源且各只应用一次。</p>
           </div>
         </div>
         <div class="card" style="margin-top:18px; border-left:4px solid var(--amber)">
-          <h3>⚠️ 我们没有训 confidence head</h3>
+          <h3>未训练 confidence head 的影响</h3>
           <p><b>它本来干嘛的</b>：预测每个 draft token 会不会被接受，让服务端在没把握时提前终止整个 block。<br>
           <b>代价</b>：<code>compact</code> / <code>cap-accept</code> 两种 verify 模式会从 checkpoint 加载它，所以我们<strong>只能跑 <code>static</code></strong>——而 clawenv harness 默认就是 <code>compact</code>，第一次跑 verl 时就是这么崩的。<br>
-          <b>但实测没吃亏</b>：同权重 static vs compact，accept length 只差 <strong>−0.18</strong>，而 compact 吞吐明显更差（77 vs 126 tok/s）、端到端更慢。<span class="note">static 本来就是该用的模式。</span><br>
+          <b>但实测未造成损失</b>：同权重 static vs compact，accept length 只差 <strong>−0.18</strong>，而 compact 吞吐明显更差（77 vs 126 tok/s）、端到端更慢。<span class="note">static 本来就是该用的模式。</span><br>
           <b>唯一真损失</b>：serving 侧"每步接受几个 token"的直方图被同一个开关挡住了，而那正是定 <code>block_size</code> 的直接依据。</p>
         </div>
       </main>
@@ -571,7 +571,7 @@
     <section class="slide">
       <header><div class="eyebrow">Data & training</div></header>
       <main>
-        <h2>语料、配方，<span style="color:var(--blue)">和两个反直觉的地方</span></h2>
+        <h2>训练语料与<span style="color:var(--blue)">配方</span></h2>
         <div class="grid two" style="margin-top: 20px;">
           <div class="card">
             <h3>语料</h3>
@@ -586,12 +586,12 @@
         </div>
         <div class="grid two" style="margin-top: 18px;">
           <div class="card" style="border-left:4px solid var(--red)">
-            <h3>反直觉 ①：旧版 lr 高了 2.8×</h3>
+            <h3>旧版学习率高于规则值 2.8 倍</h3>
             <p>规则是 <code>lr = 6e-4·sqrt(eff_bs/256)</code>。旧版直接用 6e-4，但它的 eff_bs 只有 32——按规则应是 2.1e-4。</p>
             <p style="margin-top:10px"><span class="note">所以旧 baseline 的 tau 3.71 里，多少是语料、多少是被 lr 拖累的，其实分不清。</span></p>
           </div>
           <div class="card" style="border-left:4px solid var(--red)">
-            <h3>反直觉 ②："训了 20 epoch" ≠ "记住了"</h3>
+            <h3>Anchor 采样下的实际监督覆盖率</h3>
             <p>每条 record 约 7,910 个可监督位置，每 epoch 只采 512 个 anchor：</p>
             <p style="margin-top:8px"><code>(1 − 512/7910)<sup>20</sup> = 0.262</code></p>
             <p style="margin-top:8px"><span class="note">"见过"的样本里 26% 的位置从没被训练过</span>，中位数位置只被监督约 1.3 次。</p>
@@ -605,7 +605,7 @@
     <section class="slide">
       <header><div class="eyebrow">Analysis 1/4</div></header>
       <main>
-        <h2>逐位置接受率：<span style="color:var(--blue)">衰减曲线就是 drafter 的指纹</span></h2>
+        <h2>逐位置接受率与<span style="color:var(--blue)">衰减特性</span></h2>
         <div class="table" style="margin-top: 18px;">
           <div class="row head" style="grid-template-columns: 1.4fr repeat(7, 0.6fr) 0.8fr;"><div class="cell">drafter</div><div class="cell">p0</div><div class="cell">p1</div><div class="cell">p2</div><div class="cell">p3</div><div class="cell">p4</div><div class="cell">p5</div><div class="cell">p6</div><div class="cell">尾/头</div></div>
           <div class="row" style="grid-template-columns: 1.4fr repeat(7, 0.6fr) 0.8fr;"><div class="cell"><strong>DSpark 3L（v2）</strong></div><div class="cell">0.749</div><div class="cell">0.718</div><div class="cell">0.683</div><div class="cell">0.655</div><div class="cell">0.634</div><div class="cell">0.610</div><div class="cell"><strong>0.582</strong></div><div class="cell"><strong>0.81</strong></div></div>
@@ -613,13 +613,13 @@
         </div>
         <div class="grid two" style="margin-top: 20px;">
           <div class="card">
-            <h3>为什么尾部比看起来重要</h3>
+            <h3>尾部位置的权重</h3>
             <p>accept length 是<strong>累乘</strong>：<code>1 + Σ cumprod(acc_pk)</code>。所以尾部塌一点，整条乘积就塌下去。</p>
             <p style="margin-top:10px">DSpark 3L 里<span class="note">位置 4-6 贡献了 0.40</span>——接近总量的三分之一。</p>
           </div>
           <div class="card">
-            <h3>tau 的两个陷阱</h3>
-            <p>① tau 是<strong>逐 block 算完再平均</strong>，所以 <code>1 + Σ mean(ar_pk)</code> 复现不出来（E[Πx] ≠ ΠE[x]）——我们踩过：反推 2.339，真实 1.801。</p>
+            <h3>tau 的两个已知偏差</h3>
+            <p>① tau 是<strong>逐 block 算完再平均</strong>，所以 <code>1 + Σ mean(ar_pk)</code> 复现不出来（E[Πx] ≠ ΠE[x]）——此前曾误用：反推 2.339，真实 1.801。</p>
             <p style="margin-top:10px">② tau 是 <strong>teacher-forced</strong> 的，<span class="note">结构性地看不见只在服务时发生的问题</span>（如 rope_theta 不匹配）。</p>
           </div>
         </div>
@@ -631,7 +631,7 @@
     <section class="slide">
       <header><div class="eyebrow">Analysis 2/4</div></header>
       <main>
-        <h2>accept length vs 生成长度：<span style="color:var(--red)">相关是真的，因果是假的</span></h2>
+        <h2>Accept length 与生成长度：<span style="color:var(--red)">相关但非因果</span></h2>
         <p class="lead" style="margin-top:12px">跨请求相关系数 <strong>−0.519</strong>：生成越长、接受率越低。很容易讲成"越往后越难预测"——<b>但这是错的</b>。</p>
         <div class="table" style="margin-top: 16px;">
           <div class="row head" style="grid-template-columns: 0.7fr 0.9fr 0.9fr 0.9fr;"><div class="cell">max_new_tokens</div><div class="cell">实际生成</div><div class="cell">打到上限</div><div class="cell">accept length</div></div>
@@ -649,21 +649,21 @@
     <section class="slide">
       <header><div class="eyebrow">Analysis 3/4</div></header>
       <main>
-        <h2>轮次深度有一点影响，<span style="color:var(--blue)">并发几乎没有</span></h2>
+        <h2>Accept length 与<span style="color:var(--blue)">轮次深度、并发</span>的关系</h2>
         <div class="grid two" style="margin-top: 20px;">
           <div class="card">
-            <h3>vs 轮次深度</h3>
+            <h3>与轮次深度的关系</h3>
             <p>turn01 <strong>4.58</strong> · turn03 4.18 · turn06 4.23 · turn10 4.18</p>
             <p style="margin-top:10px">第一轮最容易，之后基本平。<span style="color:var(--muted)">注意与上下文长度混淆（16k → 35k）。</span></p>
           </div>
           <div class="card">
-            <h3>vs 并发（同一 run 内部相关）</h3>
+            <h3>与并发的关系（同一 run 内相关）</h3>
             <p>3L <strong>−0.033</strong> · 5L <strong>−0.123</strong> · 老 drafter <strong>+0.091</strong></p>
             <p style="margin-top:10px">基本是 0，方向还不一致。<span class="note">理论上也该如此</span>——<code>coin·q &lt; p</code> 是逐 token、逐请求算的，batch 里有几个请求根本不进这个式子。</p>
           </div>
         </div>
         <div class="card" style="margin-top:18px; border-left:4px solid var(--green)">
-          <h3>推论：sglang 4.67 vs rollout 3.37 的差距是<strong>流量</strong>，不是并发</h3>
+          <h3>结论：sglang 与 rollout 的差距源于流量形态</h3>
           <p>决定性证据：在 verl <strong>内部、并发同样等于 1</strong> 的 105 个采样点上，同一个 drafter 也只有 <strong>3.364</strong>。并发一样，数不一样 → 差异只能来自"在生成什么"。</p>
           <p style="margin-top:10px"><span class="note">所以想提升 rollout 的 accept length，得让训练数据贴近模型自己漂移后的状态</span>（Draft-OPD 路线），调并发没用。</p>
         </div>
@@ -675,7 +675,7 @@
     <section class="slide">
       <header><div class="eyebrow">Analysis 4/4</div></header>
       <main>
-        <h2>看分布，<span style="color:var(--blue)">不要只看均值</span></h2>
+        <h2>Accept length 的<span style="color:var(--blue)">分布</span></h2>
         <div class="table" style="margin-top: 18px;">
           <div class="row head" style="grid-template-columns: 1.2fr repeat(5, 0.7fr);"><div class="cell">每个 decode step（稳态）</div><div class="cell">均值</div><div class="cell">p10</div><div class="cell">中位</div><div class="cell">p90</div><div class="cell">max</div></div>
           <div class="row" style="grid-template-columns: 1.2fr repeat(5, 0.7fr);"><div class="cell"><strong>DSpark 5L</strong></div><div class="cell"><strong>3.71</strong></div><div class="cell">2.47</div><div class="cell">3.58</div><div class="cell">4.75</div><div class="cell">7.90</div></div>
@@ -683,7 +683,7 @@
           <div class="row" style="grid-template-columns: 1.2fr repeat(5, 0.7fr);"><div class="cell">老 drafter</div><div class="cell">2.16</div><div class="cell">1.45</div><div class="cell">2.10</div><div class="cell">2.89</div><div class="cell">3.88</div></div>
         </div>
         <div class="card" style="margin-top:20px; border-left:4px solid var(--amber)">
-          <h3>我们还看不到什么</h3>
+          <h3>当前不可观测的量</h3>
           <p>每一步"7 个里接受了几个"的<strong>直方图</strong>。sglang 内部算了 <code>num_correct_drafts</code>，但统计代码被 confidence head 的开关挡住，而我们的 drafter 是 headless。</p>
           <p style="margin-top:10px"><span class="note">而这个直方图正是该拿来定 block_size 的东西</span>——如果大部分 step 只接受 2-3 个，那位置 4-6 就是纯成本。约 15 行改动可以暴露出来。</p>
         </div>
@@ -695,7 +695,7 @@
     <section class="slide">
       <header><div class="eyebrow">Results 1/3</div></header>
       <main>
-        <h2>新语料成功了：<span style="color:var(--green)">+56% / +72%</span></h2>
+        <h2>语料规模的影响：<span style="color:var(--green)">+56% / +72%</span></h2>
         <p class="lead" style="margin-top:10px">verl rollout，128 条 record，同 shard，单节点，temp 1.0，<b>统一 static verify</b>，取稳态（后 3/4）。</p>
         <div class="table" style="margin-top: 16px;">
           <div class="row head" style="grid-template-columns: 1.3fr 1fr 0.9fr 0.8fr;"><div class="cell">drafter</div><div class="cell">训练语料</div><div class="cell">accept length</div><div class="cell">vs 老</div></div>
@@ -705,11 +705,11 @@
         </div>
         <div class="grid two" style="margin-top: 20px;">
           <div class="card">
-            <h3>协议可复现</h3>
+            <h3>协议可复现性</h3>
             <p>老 drafter 在 compact 下这次量到 <strong>2.337</strong>，历史值 <strong>2.349</strong>——几乎完全复现。所以上面的对比可信。</p>
           </div>
           <div class="card" style="border-left:4px solid var(--red)">
-            <h3>一个被推翻的早期结论</h3>
+            <h3>一个已修正的早期结论</h3>
             <p>更早用 16 条手工 prompt 测时，这个差距只有约 1σ，我当时写的是"语料扩容<b>没有</b>可测提升"。<span class="note">那个结论是错的——harness 分辨力不够，不是模型的问题。</span></p>
           </div>
         </div>
@@ -721,7 +721,7 @@
     <section class="slide">
       <header><div class="eyebrow">Results 2/3</div></header>
       <main>
-        <h2>深度有用，<span style="color:var(--red)">而 tau 预测不了这件事</span></h2>
+        <h2>Draft 深度的影响，<span style="color:var(--red)">以及 tau 的预测失效</span></h2>
         <div class="table" style="margin-top: 18px;">
           <div class="row head" style="grid-template-columns: 1fr 1fr 1.1fr 1fr;"><div class="cell"></div><div class="cell">tau（训练侧）</div><div class="cell">rollout accept length</div><div class="cell">128 条墙钟</div></div>
           <div class="row" style="grid-template-columns: 1fr 1fr 1.1fr 1fr;"><div class="cell">v2 3L</div><div class="cell">4.47</div><div class="cell">3.374</div><div class="cell">1060s</div></div>
@@ -729,15 +729,15 @@
         </div>
         <p style="margin-top:16px">tau 只差 <b>+0.13</b>，当时读作"+42% 参数换 +0.13，深度不划算"。<span class="note">但服务端 5L 是我们最好的 drafter，端到端也最快。tau 是训练进度信号，不能用来给 drafter 排序。</span></p>
         <div class="card" style="margin-top:18px; border-left:4px solid var(--blue)">
-          <h3>和 DSpark 官方结果比，我们还有 <strong>约 1</strong> 的上升空间</h3>
-          <p>官方按 draft 层数做的对比（下图）显示，同一族方法在层数/容量上还能继续往上走。<span class="note">对照我们目前的 accept length（rollout 3.707、并发 1 下 4.52），感觉还有 1 左右的空间没吃到。</span></p>
+          <h3>与 DSpark 官方结果的差距：约 1</h3>
+          <p>官方按 draft 层数做的对比（下图）显示，同一族方法在层数/容量上还能继续往上走。<span class="note">对照我们目前的 accept length（rollout 3.707、并发 1 下 4.52），感觉还有 1 左右的空间尚未获得。</span></p>
           <figure style="margin:14px 0 0">
             <img src="https://arxiv.org/html/2607.05147v1/layer_comparison.svg" alt="DSpark 官方：按 draft 层数的 accept length 对比" style="width:100%; max-height:340px; object-fit:contain; border:1px solid var(--line); border-radius:8px; background:#fff; padding:8px" />
             <figcaption style="color:var(--muted); font-size:13px; margin-top:8px">DSpark 官方 layer comparison。我们的 3L/5L 还在曲线偏低位置。</figcaption>
           </figure>
         </div>
         <div class="card" style="margin-top:18px; border-left:4px solid var(--violet)">
-          <h3>checkpoint 选择：我们没在选，而且 ep13 之后也不用选</h3>
+          <h3>Checkpoint 选择：ep13 之后无显著差异</h3>
           <p>ep13 / 15 / 17 / 19 / 20 = <strong>4.39 / 4.58 / 4.41 / 4.49 / 4.40</strong>，单点 sem 0.12-0.29 —— <strong>统计上无法区分</strong>。</p>
           <p style="margin-top:10px">导出脚本无条件取最后一个 epoch。<span class="note">也就是说 20 个 epoch 里最后 7 个没换来任何可测量的收益</span>（约 5.5 小时卡时）。</p>
         </div>
@@ -749,7 +749,7 @@
     <section class="slide">
       <header><div class="eyebrow">Results 3/3 · 最可执行的一页</div></header>
       <main>
-        <h2>加速比<span style="color:var(--blue)">分场景</span>：低并发赚，rollout 不赚</h2>
+        <h2>端到端加速比：<span style="color:var(--blue)">与并发场景相关</span></h2>
         <div class="grid two" style="margin-top: 18px;">
           <div class="card">
             <h3>① sglang e2e（并发 1，per-request tok/s）</h3>
@@ -774,10 +774,10 @@
           </div>
         </div>
         <div class="card" style="margin-top:16px; border-left:4px solid var(--amber)">
-          <h3>为什么高并发不赚？<strong>按主流说法它本不该这样</strong></h3>
-          <p>一个 DSpark step 吐 accept_len 个 token，但要花 draft 的 7 次串行前向 + target 对 8 个位置的一次前向。低并发时被显存带宽卡住，验 8 个位置几乎白送；高并发时算力饱和，就要花约 8 倍。</p>
-          <p style="margin-top:10px"><span class="note">但这套说法解释不了 DSpark 本身</span>——按目前比较 common 的认知，<b>DSpark 在大 batch 下也不该掉 throughput</b>（见下图 lmsys 的对比）。所以我们在 rollout 上测不出收益，<b>更可能是 AMD 上的 DSpark 实现还不够好</b>，而不是这个技术的固有性质。<b>Piotr 正在看这件事。</b></p>
-          <p style="margin-top:10px">我们目前<b>只有两个端点</b>：并发 1（赚 1.11-1.33×）、rollout 并发（不赚）。<b>中间没测</b>，后续对线上流量做 bsz profile 补上。</p>
+          <h3>高并发下无收益的原因分析</h3>
+          <p>每个 DSpark step 产出 accept_len 个 token，但需付出 draft 的 7 次串行前向 + target 对 8 个位置的一次前向。低并发时被显存带宽卡住，验 8 个位置开销可忽略；高并发时算力饱和，就要花约 8 倍。</p>
+          <p style="margin-top:10px"><span class="note">但该解释不适用于 DSpark 本身</span>——按目前比较 common 的认知，<b>DSpark 在大 batch 下也不该掉 throughput</b>（见下图 lmsys 的对比）。所以我们在 rollout 上测不出收益，<b>更可能是 AMD 上的 DSpark 实现还不够好</b>，而不是这个技术的固有性质。<b>Piotr 正在看这件事。</b></p>
+          <p style="margin-top:10px">我们目前<b>只有两个端点</b>：并发 1（有 1.11-1.33× 收益）、rollout 并发（无收益）。<b>中间没测</b>，后续对线上流量做 bsz profile 补上。</p>
           <figure style="margin:16px 0 0">
             <img src="https://www.lmsys.org/images/blog/dspark-sglang/perf-compare.png" alt="DSpark on SGLang — throughput vs batch size" style="width:100%; border:1px solid var(--line); border-radius:8px; background:#fff" />
             <figcaption style="color:var(--muted); font-size:13px; margin-top:8px">lmsys 官方图：大 batch 下 DSpark 仍保持 throughput。与我们 AMD 上的观测不一致，待查。</figcaption>
@@ -791,19 +791,19 @@
     <section class="slide">
       <header><div class="eyebrow">Serving stack</div></header>
       <main>
-        <h2>服务栈审计：<span style="color:var(--green)">通过</span></h2>
+        <h2>服务栈正确性审计</h2>
         <div class="grid two" style="margin-top: 20px;">
           <div class="card">
-            <h3>接受判据正确</h3>
+            <h3>接受判据正确性</h3>
             <p>确认是标准 <code>min(1, p/q)</code>；p 与 q 索引对齐，block 7 / 8 token 没有越界；温度两边同源、各只应用一次。</p>
           </div>
           <div class="card">
-            <h3>verify mode 影响极小</h3>
+            <h3>Verify mode 影响可忽略</h3>
             <p>static vs compact 只差 <strong>−0.18</strong>，而 compact 吞吐明显更差（77 vs 126 tok/s）、端到端更慢。<span class="note">static 才是该用的模式。</span></p>
           </div>
         </div>
         <div class="card" style="margin-top:18px; border-left:4px solid var(--red)">
-          <h3>rope_theta：机制是真的，幅度被我高估了</h3>
+          <h3>rope_theta：机制成立，幅度已修正</h3>
           <p>draft 的 <code>rope_theta</code> 必须等于 target 的。<b>训练侧看不见</b>——draft 自己建 KV，两边自洽，tau 完全正常；<b>服务时</b> draft 复用 target 的 KV，不匹配才暴露。</p>
           <p style="margin-top:10px">同权重 A/B 实测：匹配比不匹配高 <strong>+0.46（约 1.4σ）</strong>，而且另一个 arm 反而略低。<span class="note">最初报的 "+75%" 是在一套有缺陷的 prompt 上量的，已收回。</span></p>
         </div>
@@ -815,7 +815,7 @@
     <section class="slide">
       <header><div class="eyebrow">DFlash vs DSpark</div></header>
       <main>
-        <h2>Markov 头那 <span style="color:var(--blue)">28% 参数</span>买到了什么</h2>
+        <h2>DFlash 与 DSpark 对比：<span style="color:var(--blue)">Markov 头的作用</span></h2>
         <div class="card" style="margin-top:16px">
           <h3>机制差异</h3>
           <p>DSpark = DFlash backbone + <strong>Markov 转移头</strong> + confidence 头。损失：DFlash 是<strong>纯 block-parallel CE</strong>；DSpark 是 CE 0.1 + <strong>TV/L1 0.9</strong> + conf 1.0。</p>
@@ -828,7 +828,7 @@
         </div>
         <p style="margin-top:18px"><span class="note">DFlash 第一个位置追平，尾部塌掉</span>：位置 4-6 贡献 <strong>0.14 vs 0.40</strong>。这正是 Markov 头在撑住块的后半段——它建模块内相邻位置的依赖，误差不会沿块快速累积。</p>
         <div class="card" style="margin-top:16px; border-left:4px solid var(--green)">
-          <h3>服务侧实测（sglang，并发 1，temp 1.0，刚跑出来）</h3>
+          <h3>服务侧实测（sglang，并发 1，temp 1.0）</h3>
           <div class="table" style="margin-top: 10px;">
             <div class="row head" style="grid-template-columns: 1fr 0.9fr 0.9fr;"><div class="cell">arm</div><div class="cell">accept length</div><div class="cell">tok/s/请求</div></div>
             <div class="row" style="grid-template-columns: 1fr 0.9fr 0.9fr;"><div class="cell"><strong>DSpark 5L</strong></div><div class="cell"><strong>4.52</strong></div><div class="cell">192.0</div></div>
@@ -847,24 +847,24 @@
     <section class="slide">
       <header><div class="eyebrow">Lessons</div></header>
       <main>
-        <h2>四个<span style="color:var(--red)">发出去又收回</span>的结论，全是口径问题</h2>
+        <h2>四个因<span style="color:var(--red)">度量口径</span>而修正的结论</h2>
         <div class="grid two" style="margin-top: 20px;">
           <div class="card" style="border-left:4px solid var(--red)">
-            <h3>prompt 切在 JSON 中间</h3>
-            <p>按固定 token 偏移切 prompt，切点落在 <code>"author": "j</code> 这种地方，模型接的是被截断的乱码。<span class="note">造出一个假的性能回退：1.3 vs 2.44。</span></p>
+            <h3>Prompt 截断位置错误</h3>
+            <p>按固定 token 偏移切 prompt，切点落在 <code>"author": "j</code> 这种地方，模型接的是被截断的乱码。<span class="note">产生了虚假的性能回退：1.3 vs 2.44。</span></p>
             <p style="margin-top:8px">修法：用 supervision mask 的 0→非零跳变，切在 assistant 轮次开头。</p>
           </div>
           <div class="card" style="border-left:4px solid var(--red)">
-            <h3>spec 环境变量泄漏给 baseline</h3>
+            <h3>投机解码环境变量泄漏至 baseline</h3>
             <p>把 <code>SGLANG_RAGGED_VERIFY_MODE</code> 等写在共享的 <code>--export</code> 里，不开投机的 baseline 也吃到了，结果它吐出 <code>&lt;think&gt;</code> + 512 个换行、永不终止。</p>
-            <p style="margin-top:8px"><span class="note">分母被污染，造出一个假的 1.79× 加速。</span>对照臂复现后确认：24/24 全部跑飞。</p>
+            <p style="margin-top:8px"><span class="note">分母被污染，产生了虚假的 1.79× 加速。</span>对照臂复现后确认：24/24 全部输出退化。</p>
           </div>
           <div class="card" style="border-left:4px solid var(--red)">
-            <h3>固定 record 数当吞吐测</h3>
+            <h3>以固定 record 数衡量吞吐</h3>
             <p>各 arm 生成量差 25%，墙钟同时混进"速度"和"内容多少"。<span class="note">我据此报过 1.21× 慢，后来收回。</span></p>
           </div>
           <div class="card" style="border-left:4px solid var(--red)">
-            <h3>rope_theta "+75%"</h3>
+            <h3>rope_theta 增益被高估</h3>
             <p>在有缺陷的 prompt 集上量的，真实只有 +0.46（约 1.4σ）。机制成立，幅度不成立。</p>
           </div>
         </div>
@@ -877,7 +877,7 @@
     <section class="slide">
       <header><div class="eyebrow">Next</div></header>
       <main>
-        <h2>下一步，<span style="color:var(--blue)">按性价比排序</span></h2>
+        <h2>后续工作</h2>
         <div class="grid two" style="margin-top: 20px;">
           <div class="card" style="border-left:4px solid var(--green)">
             <h3>1 · 并发扫描（1/2/4/8/16/32）</h3>
@@ -885,7 +885,7 @@
           </div>
           <div class="card" style="border-left:4px solid var(--green)">
             <h3>2 · block_size 扫描 7 → 4/3/2</h3>
-            <p>压每步成本最直接的抓手。逐位置曲线显示位置 4-6 只贡献 0.40，砍短很可能划算。不用重训。</p>
+            <p>降低每步成本的最直接手段。逐位置曲线显示位置 4-6 只贡献 0.40，缩短 block 可能有收益。不用重训。</p>
           </div>
           <div class="card">
             <h3>3 · 暴露 num_correct_drafts 直方图</h3>
@@ -893,11 +893,11 @@
           </div>
           <div class="card">
             <h3>4 · 用漂移后的 rollout 状态训练</h3>
-            <p>按并发分析，这是提升 rollout accept length 唯一的抓手（Draft-OPD 路线）。</p>
+            <p>按并发分析，这是提升 rollout accept length 唯一途径（Draft-OPD 路线）。</p>
           </div>
         </div>
         <div class="card" style="margin-top:18px">
-          <h3>一句话总结</h3>
+          <h3>小结</h3>
           <p><span class="note">drafter 不是瓶颈</span>——同栈可比参照的 accept length 是 3.65-3.99，我们 5L 是 3.707（rollout）/ 4.79（并发 1），持平甚至略高。<br>
           <strong>瓶颈是高并发下每个 DSpark step 的成本</strong>。所以下一步该压成本（并发扫描、block_size），而不是继续堆 drafter。</p>
         </div>
