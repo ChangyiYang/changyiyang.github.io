@@ -539,9 +539,20 @@
           </div>
         </div>
         <div class="card" style="margin-top:18px">
-          <h3>W&amp;B</h3>
-          <p><code>liquid-lfm-dspark/runs/gxlzenul</code>（3L） · <code>9run8fc4</code>（5L） · <code>liquid-lfm-dflash/runs/xo3kthsv</code>（DFlash）</p>
-          <p style="margin-top:10px; color:var(--muted)">此处贴 tau vs step 曲线截图（3L / 5L 叠加）。</p>
+          <svg viewBox="0 0 980 360" width="100%" role="img" aria-label="训练 tau 随 step 变化：3L 最终 4.47，5L 最终 4.60">
+  <title>dspark_tau vs 训练 step</title>
+  <line x1="56" y1="320.0" x2="850" y2="320.0" stroke="#d8d2c5" stroke-width="1"/><text x="46" y="324.0" text-anchor="end" fill="#667085" font-size="13">1</text><line x1="56" y1="245.0" x2="850" y2="245.0" stroke="#d8d2c5" stroke-width="1"/><text x="46" y="249.0" text-anchor="end" fill="#667085" font-size="13">2</text><line x1="56" y1="170.0" x2="850" y2="170.0" stroke="#d8d2c5" stroke-width="1"/><text x="46" y="174.0" text-anchor="end" fill="#667085" font-size="13">3</text><line x1="56" y1="95.0" x2="850" y2="95.0" stroke="#d8d2c5" stroke-width="1"/><text x="46" y="99.0" text-anchor="end" fill="#667085" font-size="13">4</text><line x1="56" y1="20.0" x2="850" y2="20.0" stroke="#d8d2c5" stroke-width="1"/><text x="46" y="24.0" text-anchor="end" fill="#667085" font-size="13">5</text>
+  <line x1="56" y1="320" x2="850" y2="320" stroke="#d8d2c5" stroke-width="1"/>
+  <path d="M56.0,317.8 L70.4,302.3 L84.9,280.4 L99.3,260.1 L113.7,223.2 L128.2,215.6 L142.6,188.4 L157.1,176.2 L171.5,158.3 L185.9,166.6 L200.4,145.2 L214.8,136.0 L229.2,144.7 L243.7,137.6 L258.1,145.4 L272.5,135.3 L287.0,130.6 L301.4,144.9 L315.9,106.9 L330.3,125.0 L344.7,101.8 L359.2,118.6 L373.6,95.7 L388.0,107.5 L402.5,100.4 L416.9,102.5 L431.3,112.8 L445.8,87.0 L460.2,99.3 L474.7,86.6 L489.1,86.5 L503.5,87.8 L518.0,82.6 L532.4,89.3 L546.8,78.5 L561.3,78.2 L575.7,76.3 L590.1,81.6 L604.6,70.0 L619.0,75.5 L633.5,76.3 L647.9,60.2 L662.3,70.6 L676.8,80.1 L691.2,60.6 L705.6,72.6 L720.1,70.4 L734.5,66.8 L748.9,75.7 L763.4,69.2 L777.8,68.2 L792.3,76.2 L806.7,58.8 L821.1,52.9 L835.6,54.2 L850.0,69.9" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M56.0,317.8 L70.4,305.3 L84.9,284.3 L99.3,267.2 L113.7,230.3 L128.2,220.3 L142.6,190.1 L157.1,173.3 L171.5,170.2 L185.9,158.3 L200.4,148.0 L214.8,135.8 L229.2,133.3 L243.7,134.1 L258.1,129.7 L272.5,137.8 L287.0,112.5 L301.4,107.0 L315.9,103.4 L330.3,103.0 L344.7,107.4 L359.2,91.7 L373.6,100.0 L388.0,90.9 L402.5,98.4 L416.9,100.8 L431.3,84.1 L445.8,91.5 L460.2,77.6 L474.7,73.1 L489.1,79.6 L503.5,73.7 L518.0,79.9 L532.4,64.3 L546.8,75.5 L561.3,60.2 L575.7,60.1 L590.1,68.4 L604.6,66.2 L619.0,52.2 L633.5,59.7 L647.9,74.9 L662.3,56.2 L676.8,53.4 L691.2,55.7 L705.6,55.3 L720.1,68.3 L734.5,55.9 L748.9,61.8 L763.4,64.4 L777.8,52.9 L792.3,45.2 L806.7,43.0 L821.1,51.7 L835.6,54.6 L850.0,46.3" fill="none" stroke="#b76b1f" stroke-width="2" stroke-linejoin="round"/>
+  <circle cx="850" cy="46.3" r="4.5" fill="#b76b1f" stroke="#fffdfa" stroke-width="2"/>
+  <circle cx="850" cy="69.9" r="4.5" fill="#2a78d6" stroke="#fffdfa" stroke-width="2"/>
+  <text x="862" y="50.3" fill="#1f2933" font-size="15" font-weight="700">5L · tau 4.60</text>
+  <text x="862" y="73.9" fill="#1f2933" font-size="15" font-weight="700">3L · tau 4.47</text>
+  <text x="56" y="348" fill="#667085" font-size="13">训练步（20 epoch）</text>
+  <text x="16" y="24" fill="#667085" font-size="13">tau</text>
+</svg>
+          <p style="margin-top:6px; color:var(--muted)">W&amp;B：<code>liquid-lfm-dspark/runs/gxlzenul</code>（3L） · <code>9run8fc4</code>（5L）</p>
         </div>
       </main>
       <footer class="footerline"><span>训练</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
@@ -552,11 +563,19 @@
       <header><div class="eyebrow">Analysis</div></header>
       <main>
         <h2>逐位置接受率</h2>
-        <div class="table" style="margin-top: 28px;">
-          <div class="row head" style="grid-template-columns: 1.3fr repeat(7, 0.6fr);"><div class="cell"></div><div class="cell">p0</div><div class="cell">p1</div><div class="cell">p2</div><div class="cell">p3</div><div class="cell">p4</div><div class="cell">p5</div><div class="cell">p6</div></div>
-          <div class="row" style="grid-template-columns: 1.3fr repeat(7, 0.6fr);"><div class="cell"><strong>v2 3L</strong></div><div class="cell">0.749</div><div class="cell">0.718</div><div class="cell">0.683</div><div class="cell">0.655</div><div class="cell">0.634</div><div class="cell">0.610</div><div class="cell"><strong>0.582</strong></div></div>
-          <div class="row" style="grid-template-columns: 1.3fr repeat(7, 0.6fr);"><div class="cell">上一版</div><div class="cell">0.767</div><div class="cell">—</div><div class="cell">—</div><div class="cell">—</div><div class="cell">—</div><div class="cell">—</div><div class="cell">0.524</div></div>
-        </div>
+        <svg viewBox="0 0 980 350" width="100%" role="img" aria-label="逐位置 top-1 接受率：v2 3L 由 0.749 降至 0.582；上一版仅两端实测 0.767 与 0.524">
+  <title>逐位置 top-1 接受率</title>
+  <line x1="56" y1="265.1" x2="830" y2="265.1" stroke="#d8d2c5" stroke-width="1"/><text x="46" y="269.1" text-anchor="end" fill="#667085" font-size="13">0.5</text><line x1="56" y1="183.4" x2="830" y2="183.4" stroke="#d8d2c5" stroke-width="1"/><text x="46" y="187.4" text-anchor="end" fill="#667085" font-size="13">0.6</text><line x1="56" y1="101.7" x2="830" y2="101.7" stroke="#d8d2c5" stroke-width="1"/><text x="46" y="105.7" text-anchor="end" fill="#667085" font-size="13">0.7</text><line x1="56" y1="20.0" x2="830" y2="20.0" stroke="#d8d2c5" stroke-width="1"/><text x="46" y="24.0" text-anchor="end" fill="#667085" font-size="13">0.8</text><text x="56.0" y="334" text-anchor="middle" fill="#667085" font-size="13">p0</text><text x="185.0" y="334" text-anchor="middle" fill="#667085" font-size="13">p1</text><text x="314.0" y="334" text-anchor="middle" fill="#667085" font-size="13">p2</text><text x="443.0" y="334" text-anchor="middle" fill="#667085" font-size="13">p3</text><text x="572.0" y="334" text-anchor="middle" fill="#667085" font-size="13">p4</text><text x="701.0" y="334" text-anchor="middle" fill="#667085" font-size="13">p5</text><text x="830.0" y="334" text-anchor="middle" fill="#667085" font-size="13">p6</text>
+  <line x1="56" y1="306" x2="830" y2="306" stroke="#d8d2c5" stroke-width="1"/>
+  <path d="M56.0,61.7 L185.0,87.0 L314.0,115.6 L443.0,138.5 L572.0,155.6 L701.0,175.3 L830.0,198.1" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round"/><circle cx="56.0" cy="61.7" r="4.5" fill="#2a78d6" stroke="#fffdfa" stroke-width="2"/><circle cx="185.0" cy="87.0" r="4.5" fill="#2a78d6" stroke="#fffdfa" stroke-width="2"/><circle cx="314.0" cy="115.6" r="4.5" fill="#2a78d6" stroke="#fffdfa" stroke-width="2"/><circle cx="443.0" cy="138.5" r="4.5" fill="#2a78d6" stroke="#fffdfa" stroke-width="2"/><circle cx="572.0" cy="155.6" r="4.5" fill="#2a78d6" stroke="#fffdfa" stroke-width="2"/><circle cx="701.0" cy="175.3" r="4.5" fill="#2a78d6" stroke="#fffdfa" stroke-width="2"/><circle cx="830.0" cy="198.1" r="4.5" fill="#2a78d6" stroke="#fffdfa" stroke-width="2"/><circle cx="56.0" cy="47.0" r="5" fill="none" stroke="#b76b1f" stroke-width="2.5"/><circle cx="830.0" cy="245.5" r="5" fill="none" stroke="#b76b1f" stroke-width="2.5"/>
+  <text x="842.0" y="202.1" fill="#1f2933" font-size="15" font-weight="700">v2 3L · 0.582</text>
+  <text x="842.0" y="249.5" fill="#1f2933" font-size="15" font-weight="700">上一版 · 0.524</text>
+  <text x="16" y="24" fill="#667085" font-size="13">acc</text>
+  <g transform="translate(56,22)">
+    <circle cx="6" cy="6" r="4.5" fill="#2a78d6"/><text x="18" y="10" fill="#667085" font-size="13">v2 3L（7 点实测）</text>
+    <circle cx="150" cy="6" r="5" fill="none" stroke="#b76b1f" stroke-width="2.5"/><text x="164" y="10" fill="#667085" font-size="13">上一版（仅 p0 / p6 实测，中间无数据）</text>
+  </g>
+</svg>
         <p style="margin-top:28px; font-size:20px">accept length = <code>1 + Σ cumprod(acc_pk)</code>，<span class="note">尾部按累乘进入结果</span>——位置 4-6 贡献 0.40，接近总量三分之一。</p>
       </main>
       <footer class="footerline"><span>逐位置</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>
@@ -609,8 +628,14 @@
           </div>
           <div class="card">
             <h3>verl rollout · 生产并发</h3>
-            <p style="margin-top:12px">accept length 提升明显（2.158 → 3.707），<strong>但吞吐无收益</strong>。</p>
-            <p style="margin-top:12px; color:var(--muted)">该层吞吐未测准：各 arm 生成量差 25%，固定 record 数的墙钟不能当吞吐用。</p>
+            <div class="table" style="margin-top: 12px;">
+              <div class="row head" style="grid-template-columns: 0.9fr 0.8fr 0.8fr;"><div class="cell"></div><div class="cell">accept len</div><div class="cell">128 条墙钟</div></div>
+              <div class="row" style="grid-template-columns: 0.9fr 0.8fr 0.8fr;"><div class="cell">不开投机</div><div class="cell">—</div><div class="cell"><strong>777s</strong></div></div>
+              <div class="row" style="grid-template-columns: 0.9fr 0.8fr 0.8fr;"><div class="cell">上一版</div><div class="cell">2.158</div><div class="cell">1097s</div></div>
+              <div class="row" style="grid-template-columns: 0.9fr 0.8fr 0.8fr;"><div class="cell"><strong>3L</strong></div><div class="cell"><strong>3.374</strong></div><div class="cell">1060s</div></div>
+              <div class="row" style="grid-template-columns: 0.9fr 0.8fr 0.8fr;"><div class="cell"><strong>5L</strong></div><div class="cell"><strong>3.707</strong></div><div class="cell"><strong>943s</strong></div></div>
+            </div>
+            <p style="margin-top:10px; color:var(--muted)">墙钟不能直接当吞吐：各 arm 生成量差 25%。</p>
           </div>
         </div>
         <p style="margin-top:24px; font-size:20px"><span class="note">低并发有收益，rollout 并发无收益</span>；中间区段未测。</p>
@@ -637,11 +662,15 @@
       <header><div class="eyebrow">Comparison</div></header>
       <main>
         <h2>DFlash 与 DSpark</h2>
-        <div class="table" style="margin-top: 24px;">
-          <div class="row head" style="grid-template-columns: 1fr repeat(6, 0.6fr) 0.9fr;"><div class="cell"></div><div class="cell">p1</div><div class="cell">p2</div><div class="cell">p3</div><div class="cell">p4</div><div class="cell">p5</div><div class="cell">p6</div><div class="cell">accept len</div></div>
-          <div class="row" style="grid-template-columns: 1fr repeat(6, 0.6fr) 0.9fr;"><div class="cell">DFlash 3L</div><div class="cell">0.70</div><div class="cell">0.56</div><div class="cell">0.46</div><div class="cell">0.38</div><div class="cell">0.31</div><div class="cell">0.27</div><div class="cell">4.15</div></div>
-          <div class="row" style="grid-template-columns: 1fr repeat(6, 0.6fr) 0.9fr;"><div class="cell"><strong>DSpark 3L</strong></div><div class="cell">0.72</div><div class="cell">0.68</div><div class="cell">0.66</div><div class="cell">0.63</div><div class="cell">0.61</div><div class="cell"><strong>0.58</strong></div><div class="cell"><strong>4.50</strong></div></div>
-        </div>
+        <svg viewBox="0 0 980 350" width="100%" role="img" aria-label="DFlash 与 DSpark 逐位置接受率：首位置接近，DFlash 尾部降至 0.27，DSpark 为 0.58">
+  <title>DFlash 与 DSpark 逐位置接受率</title>
+  <line x1="56" y1="306.0" x2="820" y2="306.0" stroke="#d8d2c5" stroke-width="1"/><text x="46" y="310.0" text-anchor="end" fill="#667085" font-size="13">0.2</text><line x1="56" y1="212.0" x2="820" y2="212.0" stroke="#d8d2c5" stroke-width="1"/><text x="46" y="216.0" text-anchor="end" fill="#667085" font-size="13">0.4</text><line x1="56" y1="118.0" x2="820" y2="118.0" stroke="#d8d2c5" stroke-width="1"/><text x="46" y="122.0" text-anchor="end" fill="#667085" font-size="13">0.6</text><line x1="56" y1="24.0" x2="820" y2="24.0" stroke="#d8d2c5" stroke-width="1"/><text x="46" y="28.0" text-anchor="end" fill="#667085" font-size="13">0.8</text><text x="56.0" y="334" text-anchor="middle" fill="#667085" font-size="13">p1</text><text x="208.8" y="334" text-anchor="middle" fill="#667085" font-size="13">p2</text><text x="361.6" y="334" text-anchor="middle" fill="#667085" font-size="13">p3</text><text x="514.4" y="334" text-anchor="middle" fill="#667085" font-size="13">p4</text><text x="667.2" y="334" text-anchor="middle" fill="#667085" font-size="13">p5</text><text x="820.0" y="334" text-anchor="middle" fill="#667085" font-size="13">p6</text>
+  <line x1="56" y1="306" x2="820" y2="306" stroke="#d8d2c5" stroke-width="1"/>
+  <path d="M56.0,71.0 L208.8,136.8 L361.6,183.8 L514.4,221.4 L667.2,254.3 L820.0,273.1" fill="none" stroke="#b76b1f" stroke-width="2" stroke-linejoin="round"/><circle cx="56.0" cy="71.0" r="4.5" fill="#b76b1f" stroke="#fffdfa" stroke-width="2"/><circle cx="208.8" cy="136.8" r="4.5" fill="#b76b1f" stroke="#fffdfa" stroke-width="2"/><circle cx="361.6" cy="183.8" r="4.5" fill="#b76b1f" stroke="#fffdfa" stroke-width="2"/><circle cx="514.4" cy="221.4" r="4.5" fill="#b76b1f" stroke="#fffdfa" stroke-width="2"/><circle cx="667.2" cy="254.3" r="4.5" fill="#b76b1f" stroke="#fffdfa" stroke-width="2"/><circle cx="820.0" cy="273.1" r="4.5" fill="#b76b1f" stroke="#fffdfa" stroke-width="2"/><path d="M56.0,61.6 L208.8,80.4 L361.6,89.8 L514.4,103.9 L667.2,113.3 L820.0,127.4" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round"/><circle cx="56.0" cy="61.6" r="4.5" fill="#2a78d6" stroke="#fffdfa" stroke-width="2"/><circle cx="208.8" cy="80.4" r="4.5" fill="#2a78d6" stroke="#fffdfa" stroke-width="2"/><circle cx="361.6" cy="89.8" r="4.5" fill="#2a78d6" stroke="#fffdfa" stroke-width="2"/><circle cx="514.4" cy="103.9" r="4.5" fill="#2a78d6" stroke="#fffdfa" stroke-width="2"/><circle cx="667.2" cy="113.3" r="4.5" fill="#2a78d6" stroke="#fffdfa" stroke-width="2"/><circle cx="820.0" cy="127.4" r="4.5" fill="#2a78d6" stroke="#fffdfa" stroke-width="2"/>
+  <text x="832.0" y="131.4" fill="#1f2933" font-size="15" font-weight="700">DSpark · 0.58</text>
+  <text x="832.0" y="277.1" fill="#1f2933" font-size="15" font-weight="700">DFlash · 0.27</text>
+  <text x="16" y="28" fill="#667085" font-size="13">acc</text>
+</svg>
         <p style="margin-top:24px; font-size:20px">同语料、同 taps、同 batch、同 lr。<span class="note">DFlash 首位置追平，尾部塌陷</span>——DSpark 的 Markov 头建模块内相邻位置依赖，误差不沿块累积。</p>
         <p style="margin-top:14px; font-size:20px">损失函数：DFlash 纯 CE；DSpark 为 CE 0.1 + <strong>TV 0.9</strong> + conf 1.0，<span class="note">而 TV 就是接受判据本身</span>。</p>
       </main>
