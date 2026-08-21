@@ -5,7 +5,7 @@ Changyi Yang 的 decks & proposals 总站。
 👉 <https://changyiyang.github.io/>
 
 ## 目录
-- [`lfm2-logits-alignment/`](https://changyiyang.github.io/lfm2-logits-alignment/) — LFM2 24B MoE 训推 logits exact alignment：术语、完整定位与未采用方案（63 slides）
+- [`lfm2-logits-alignment/`](https://changyiyang.github.io/lfm2-logits-alignment/) — LFM2 24B MoE 训推 logits exact alignment：术语、完整定位与未采用方案（64 slides）
 - [`dspark-draft-model/`](https://changyiyang.github.io/dspark-draft-model/) — DSpark / DFlash：面向 agentic 流量的 in-domain draft model（10 slides）
 - [`interrupt-benchmark-survey/`](https://changyiyang.github.io/interrupt-benchmark-survey/) — 模型主动打断：Instruct-FD 与三个 Benchmark（18 slides）
 
