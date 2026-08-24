@@ -413,8 +413,8 @@
             <span style="color: var(--green)">1.38 ms/token</span>
           </h1>
           <p class="lead">
-            不放宽数值合同：最终 20-step、55,224 个 warm chosen tokens 全部
-            bitwise exact。
+            不放宽数值合同：最终 20 轮里，55,224 个实际参与训练的 token， actor
+            与 rollout 给出的 log-prob 每一个二进制位都相同。
           </p>
           <div class="grid" style="margin-top: 24px">
             <div class="card">
@@ -434,6 +434,310 @@
               <span class="tag">结果</span>
               <p><strong>generation -56%</strong><br />whole step -28%</p>
             </div>
+          </div>
+        </main>
+      </section>
+
+      <section class="slide" data-label="执行路径">
+        <header><div class="eyebrow">先解释对象</div></header>
+        <main>
+          <h2>我们在对齐两次“同一个模型的前向计算”</h2>
+          <div class="flow">
+            <div class="node">
+              <span class="tag blue">Actor</span>
+              <h3>训练侧前向</h3>
+              <p>
+                FSDP 把模型参数分散在多张 GPU 上；它重算回答中每个 token 的
+                log-prob，并参与反向传播。
+              </p>
+            </div>
+            <div class="arrow">↔</div>
+            <div class="node">
+              <span class="tag violet">Rollout</span>
+              <h3>生成侧前向</h3>
+              <p>
+                SGLang 逐 token 生成回答；它缓存历史状态，并为刚生成的 token
+                给出 log-prob。
+              </p>
+            </div>
+          </div>
+          <div class="callout" style="margin-top: 18px">
+            <p>
+              <strong>chosen token</strong>：rollout
+              最终选中并写进回答、随后拿去训练的
+              token。我们只在这些真实训练位置比较两边的 log-prob。
+            </p>
+          </div>
+        </main>
+      </section>
+
+      <section class="slide" data-label="Exact 的含义">
+        <header><div class="eyebrow">先解释正确性</div></header>
+        <main>
+          <h2>“Bitwise exact” 比“数值很接近”更严格</h2>
+          <div class="grid four">
+            <div class="card green">
+              <h3>Bitwise exact</h3>
+              <p>两个浮点数的二进制表示完全相同，不只是打印出来的小数接近。</p>
+            </div>
+            <div class="card green">
+              <h3>Zero diff</h3>
+              <p>
+                每个 chosen token 的 actor log-prob 减 rollout log-prob 都等于
+                0。
+              </p>
+            </div>
+            <div class="card">
+              <h3>MAE / Max</h3>
+              <p>平均绝对误差 / 最大绝对误差；exact 时两者都必须为 0。</p>
+            </div>
+            <div class="card">
+              <h3>Pearson</h3>
+              <p>
+                两组数的线性相关系数；完全相同时为 1，但单独等于 1 还不代表
+                exact。
+              </p>
+            </div>
+          </div>
+          <div class="formula">
+            actor_logprob[token] === rollout_logprob[token]
+          </div>
+          <p class="footnote">
+            BF16 用 16 bit 存一个浮点数，速度快但精度较低；FP32 用 32
+            bit，常用于中间累加。exact 要求两边在相同位置做相同的精度转换。
+          </p>
+        </main>
+      </section>
+
+      <section class="slide" data-label="速度指标">
+        <header><div class="eyebrow">先解释速度</div></header>
+        <main>
+          <h2>后面所有速度数字都落在这四个词里</h2>
+          <div class="grid four">
+            <div class="card">
+              <h3>Generation ms/token</h3>
+              <p>rollout 生成阶段总耗时 ÷ 新生成 token 数；越低越快。</p>
+            </div>
+            <div class="card">
+              <h3>Whole step</h3>
+              <p>
+                一轮训练总时间：生成、旧 log-prob、actor
+                更新、权重同步等全部相加。
+              </p>
+            </div>
+            <div class="card">
+              <h3>Warm step</h3>
+              <p>
+                去掉第 1 轮模型加载、编译和 Graph capture 后的稳态训练轮次。
+              </p>
+            </div>
+            <div class="card">
+              <h3>Stock</h3>
+              <p>
+                当前主分支的默认快速实现；它是速度参照，但 actor/rollout
+                仍有数值差异。
+              </p>
+            </div>
+          </div>
+        </main>
+      </section>
+
+      <section class="slide" data-label="一层的算子">
+        <header><div class="eyebrow">先解释模型计算</div></header>
+        <main>
+          <h2>一层里反复出现的六类操作</h2>
+          <div class="grid two">
+            <div class="card">
+              <h3>GEMM / MM</h3>
+              <p>矩阵乘法，是 Linear、router 和 expert 计算的主体。</p>
+            </div>
+            <div class="card">
+              <h3>RoPE</h3>
+              <p>把 token 的位置编码进 attention 的 Query / Key 向量。</p>
+            </div>
+            <div class="card">
+              <h3>RMSNorm</h3>
+              <p>
+                按向量均方根做归一化；<span class="mono">rsqrt</span> 就是计算
+                1/√x。
+              </p>
+            </div>
+            <div class="card">
+              <h3>TopK / MoE</h3>
+              <p>
+                router 给 64 个 expert 打分，每个 token 只选分数最高的 4 个。
+              </p>
+            </div>
+            <div class="card">
+              <h3>Attention</h3>
+              <p>
+                当前 token 的 Query 读取历史 token 的 Key /
+                Value，决定应关注哪些历史位置。
+              </p>
+            </div>
+            <div class="card">
+              <h3>Log-softmax</h3>
+              <p>把模型最后的 logits 转成每个候选 token 的 log-prob。</p>
+            </div>
+          </div>
+        </main>
+      </section>
+
+      <section class="slide" data-label="KV cache / split">
+        <header><div class="eyebrow">先解释 Attention</div></header>
+        <main>
+          <h2>KV split：把“全部历史”沿序列长度分块计算</h2>
+          <div class="flow">
+            <div class="node">
+              <span class="tag blue">KV cache</span>
+              <h3>缓存历史</h3>
+              <p>
+                每个已生成 token 的 Key / Value
+                都留在显存里，下一步无需重新计算。
+              </p>
+            </div>
+            <div class="arrow">→</div>
+            <div class="node">
+              <span class="tag violet">Split</span>
+              <h3>分成若干段</h3>
+              <p>
+                例如 2,048 个历史位置切成约 6–8 段，每段独立算局部 attention。
+              </p>
+            </div>
+            <div class="arrow">→</div>
+            <div class="node">
+              <span class="tag">Merge</span>
+              <h3>固定顺序合并</h3>
+              <p>再把各段的局部最大值、归一化和输出合成最终 attention 结果。</p>
+            </div>
+          </div>
+          <div class="callout amber" style="margin-top: 18px">
+            <p>
+              这里的 split 不是多
+              GPU，也不是把模型层切开；它只是在一张卡上把历史序列分段。
+            </p>
+          </div>
+        </main>
+      </section>
+
+      <section class="slide" data-label="Graph 与证据">
+        <header><div class="eyebrow">先解释运行方式</div></header>
+        <main>
+          <h2>Microbenchmark、CUDA Graph 与 E2E 分别回答不同问题</h2>
+          <div class="grid">
+            <div class="card">
+              <h3>Microbenchmark</h3>
+              <p>
+                只反复计时一个 GPU kernel（GPU
+                上执行的函数），用来筛选候选；不能证明整轮训练会更快。
+              </p>
+            </div>
+            <div class="card">
+              <h3>CUDA Graph</h3>
+              <p>
+                先记录一串固定 GPU 操作，之后整串重放，减少 Python/CPU
+                每次重新发起 kernel 的开销。
+              </p>
+            </div>
+            <div class="card green">
+              <h3>E2E run</h3>
+              <p>
+                完整跑生成和训练，既看 chosen-token diff，也看 generation 与
+                whole-step；这是最终验收。
+              </p>
+            </div>
+          </div>
+          <div class="callout">
+            <p>
+              <strong>Eager</strong> 表示每次由 CPU 逐个发起 GPU 操作；它的
+              profiling 只能帮助定位，不能直接代替 Graph 下的最终时间。
+            </p>
+          </div>
+        </main>
+      </section>
+
+      <section class="slide" data-label="GEMM 调优词">
+        <header><div class="eyebrow">先解释 Kernel 调优</div></header>
+        <main>
+          <h2>M / N / K、tile、warp、stage 与 LDS 是什么</h2>
+          <div class="grid two">
+            <div class="card">
+              <h3>M × K · K × N</h3>
+              <p>
+                M 是本次 token 行数，K 是输入宽度，N 是输出宽度。decode 常见
+                M≤16，所以叫 small-M。
+              </p>
+            </div>
+            <div class="card">
+              <h3>Tile / block</h3>
+              <p>
+                一个 GPU 程序一次计算的矩阵小块；M16/N64/K128
+                就是三条轴各自的小块尺寸。
+              </p>
+            </div>
+            <div class="card">
+              <h3>Warp / stage</h3>
+              <p>
+                warp 是协作执行的一组线程；stage
+                是预取和计算流水线中同时保留的数据批次。
+              </p>
+            </div>
+            <div class="card">
+              <h3>LDS / native MM</h3>
+              <p>
+                LDS 是一个计算单元内约 64 KiB 的高速共享存储；native MM
+                是直接调用 PyTorch/ROCm 默认矩阵乘实现。
+              </p>
+            </div>
+          </div>
+          <div class="callout">
+            <p>
+              <strong>gfx942</strong> 是 MI325X 所用 AMD GPU
+              架构的代码名；tuning table 是针对该架构预先测好的 kernel 参数表。
+            </p>
+          </div>
+        </main>
+      </section>
+
+      <section class="slide" data-label="MoE 与数据流">
+        <header><div class="eyebrow">先解释结构词</div></header>
+        <main>
+          <h2>Router、slot、combine、residual 与 materialize</h2>
+          <div class="grid two">
+            <div class="card">
+              <h3>Router / expert</h3>
+              <p>
+                router 是给 expert 打分的小矩阵；expert 是被选中后真正处理 token
+                的 FFN 子网络。
+              </p>
+            </div>
+            <div class="card">
+              <h3>Top-k slot / combine</h3>
+              <p>
+                一个 token 的 4 个 expert 结果按第 1–4 个位置存放；combine
+                按权重把四路结果加回一个向量。
+              </p>
+            </div>
+            <div class="card">
+              <h3>Residual</h3>
+              <p>
+                把某个子层输入直接加回输出的旁路；加法顺序会影响最后几个浮点位。
+              </p>
+            </div>
+            <div class="card">
+              <h3>Materialize</h3>
+              <p>
+                把中间结果真正写成显存 tensor（多维数组）。delayed residual
+                是先保留两份已有数组，到下一层需要时再相加，少一次写回。
+              </p>
+            </div>
+          </div>
+          <div class="callout amber">
+            <p>
+              <strong>FP32 accumulation / BF16 cast boundary</strong>：先用 FP32
+              按固定顺序累加，再在指定位置转回 BF16；这两个细节共同决定 bitwise
+              结果。
+            </p>
           </div>
         </main>
       </section>
@@ -496,7 +800,7 @@
           </div>
           <div class="callout">
             <p>
-              不是重新选“差不多准确”的 Pareto 点，而是在已确定的 exact
+              不是重新选“速度更快、误差也能接受”的折中点，而是在已确定的 exact
               数值合同内减少执行成本。
             </p>
           </div>
@@ -513,17 +817,17 @@
               <ul>
                 <li>LFM2 24B MoE · GSM8K tool loop</li>
                 <li>FSDP actor + SGLang async rollout</li>
-                <li>4× MI325X · TP1 · batch 8</li>
-                <li>CUDA Graph max batch 32</li>
+                <li>4× MI325X · TP1（rollout 不做张量并行）</li>
+                <li>batch 8 · Graph 最多捕获 32 条序列</li>
               </ul>
             </div>
             <div class="card">
               <h3>长度与并行</h3>
               <ul>
                 <li>response max 512</li>
-                <li>rollout replicas = 4</li>
-                <li>BF16 weights / KV / Mamba state</li>
-                <li>同一 task-specific worktree</li>
+                <li>4 个 rollout 副本，各占 1 张 GPU</li>
+                <li>权重、KV cache、Mamba 递归历史状态均为 BF16</li>
+                <li>全部实验使用同一份任务代码</li>
               </ul>
             </div>
             <div class="card">
@@ -531,15 +835,15 @@
               <ul>
                 <li>chosen-token MAE = 0</li>
                 <li>max = 0 · Pearson = 1</li>
-                <li>短 screen 后做 5/20-step</li>
+                <li>短筛选通过后再跑 5/20 轮确认</li>
               </ul>
             </div>
             <div class="card">
               <h3>资源</h3>
               <ul>
                 <li><span class="mono">trainer.save_freq=-1</span></li>
-                <li>不写 checkpoint</li>
-                <li>脏卡 allocation 直接释放</li>
+                <li>不写 checkpoint（可恢复训练的模型快照）</li>
+                <li>发现 GPU 已被其他进程占用就释放资源</li>
               </ul>
             </div>
           </div>
@@ -559,12 +863,12 @@
             <div class="card amber">
               <span class="tag amber">候选</span>
               <h3>Microbench</h3>
-              <p>只筛选 tile/kernel，不能直接进入 endpoint。</p>
+              <p>只筛选矩阵小块和 GPU 函数，不能直接成为保留结果。</p>
             </div>
             <div class="card red">
               <span class="tag red">否决</span>
               <h3>快但不 exact</h3>
-              <p>不属于本轮 exact endpoint。</p>
+              <p>不属于本轮 exact 保留结果。</p>
             </div>
             <div class="card red">
               <span class="tag red">否决</span>
@@ -574,8 +878,8 @@
           </div>
           <div class="callout amber" style="margin-top: 18px">
             <p>
-              不同 20-step run 的 response 长度不同。只有配对实验才做严格
-              attribution；其余标为 confirmation / endpoint observation。
+              不同 20 轮实验的回答长度不同。只有配对实验才做严格归因；
+              其余结果只表示“长跑确认”或“当前保留结果”，不把差值全部归因给单个改动。
             </p>
           </div>
         </main>
@@ -584,7 +888,7 @@
       <section class="slide" data-label="起点">
         <header><div class="eyebrow">性能基线</div></header>
         <main>
-        <h2>主要性能差异位于 deterministic rollout generation</h2>
+          <h2>主要性能差异位于固定执行顺序的 rollout generation</h2>
           <div class="table">
             <div class="row head">
               <div class="cell">配置</div>
@@ -610,8 +914,8 @@
           </div>
           <div class="callout red" style="margin-top: 18px">
             <p>
-              generic deterministic SGLang 改写 GEMM、attention 与
-              reductions；FSDP target 再增加目标语义分支。
+              通用确定性模式把 GEMM、attention 和归约都换成固定执行顺序； FSDP
+              对齐分支再复现训练侧特有的精度转换和算子顺序。
             </p>
           </div>
         </main>
@@ -620,7 +924,7 @@
       <section class="slide" data-label="开关分解">
         <header><div class="eyebrow">第一轮分解</div></header>
         <main>
-          <h2>generic determinism 很贵；对齐收益来自 target branches</h2>
+          <h2>通用固定顺序算子很慢；FSDP 对齐分支才消除误差</h2>
           <div class="table">
             <div class="row head">
               <div class="cell">Rollout</div>
@@ -637,7 +941,7 @@
               <div class="cell">默认快路径</div>
             </div>
             <div class="row">
-              <div class="cell">Generic deterministic</div>
+              <div class="cell">通用固定顺序算子</div>
               <div class="cell bad">0.03295</div>
               <div class="cell warn">2.679 ms</div>
               <div class="cell warn">15.195 s</div>
@@ -653,8 +957,8 @@
           </div>
           <div class="callout">
             <p>
-              不能简单关 deterministic mode。必须优化它实际使用的 ROCm
-              GEMM、MoE、RMSNorm 与数据流。
+              不能简单关闭固定执行顺序，因为那会重新引入误差。必须优化这条路径实际使用的
+              ROCm GEMM、MoE、RMSNorm 与数据流。
             </p>
           </div>
         </main>
@@ -663,7 +967,7 @@
       <section class="slide" data-label="路线总览">
         <header><div class="eyebrow">保留路径</div></header>
         <main>
-        <h2>七个阶段把 3.15 ms/token 降到 1.38</h2>
+          <h2>七个阶段把 3.15 ms/token 降到 1.38</h2>
           <div class="timeline">
             <strong>① MoE + small-M</strong>
             <div class="dot"></div>
@@ -676,16 +980,16 @@
             <p>扩大 K tile，同时满足 64-KiB LDS。</p>
             <strong>④ Native router</strong>
             <div class="dot"></div>
-            <p>仅 2048→64 router shape 使用 native MM。</p>
+            <p>仅 2048→64 的 router 矩阵尺寸使用 native MM。</p>
             <strong>⑤ Fused combine</strong>
             <div class="dot"></div>
-            <p>固定 slot order，删除 combine 中间 tensors。</p>
+            <p>固定四路位置的加法顺序，删除 combine 中间数组。</p>
             <strong>⑥ Residual + norm</strong>
             <div class="dot"></div>
             <p>两阶段 exact kernel，保留 PyTorch rsqrt。</p>
             <strong>⑦ Delayed residual</strong>
             <div class="dot"></div>
-            <p>跨 layer 延迟 FFN residual materialization。</p>
+            <p>跨层延迟 FFN residual 的显存写回。</p>
           </div>
         </main>
       </section>
@@ -693,13 +997,13 @@
       <section class="slide" data-label="容量假设">
         <header><div class="eyebrow">候选 0 · Context length</div></header>
         <main>
-          <h2>先验证看起来最便宜的 KV-split 优化</h2>
+          <h2>候选 0：减少为 KV split 预留的最大分块数</h2>
           <div class="grid two">
             <div class="card">
               <h3>观察</h3>
               <p>
-                模型声明 128k context；deterministic split decode 据此 cap 到
-                256 splits，而 GSM8K 实际只需约 6–8。
+                模型声明最长 128k token；系统因此最多预留 256 个历史分块。 这批
+                GSM8K 上下文只有约 2k token，实际通常只需 6–8 个分块。
               </p>
             </div>
             <div class="card blue">
@@ -707,19 +1011,21 @@
               <p>
                 传
                 <span class="mono">context_length=2048</span
-                >，只改变容量，不改变 active split reduction。
+                >，把最大可预留分块数降到约 8；每一步仍只合并实际有内容的分块。
               </p>
             </div>
             <div class="card red">
               <h3>结果</h3>
               <p>
-                generic deterministic 只变化约 1%；full exact unified decode
-                也无稳定收益。
+                只开通用确定性计算时，速度变化约 1%；完整 exact decode
+                也没有稳定收益。
               </p>
             </div>
             <div class="card amber">
               <h3>决定</h3>
-              <p>empty splits 不是主要成本；撤掉配置。</p>
+              <p>
+                预留但没有内容的分块几乎不花时间；它不是主要成本，撤掉配置。
+              </p>
             </div>
           </div>
         </main>
@@ -728,20 +1034,20 @@
       <section class="slide" data-label="MoE tuning">
         <header><div class="eyebrow">保留 1 · MoE table</div></header>
         <main>
-          <h2>deterministic path 没读 MI325X 的现成 tuning table</h2>
+          <h2>固定顺序路径没有读取 MI325X 的现成参数表</h2>
           <div class="grid two">
             <div class="card red">
               <h3>问题</h3>
               <p>
-                exact path 绕过 stock 已使用的 gfx942 tuned config，decode MoE
-                使用通用 tile。
+                exact 路径绕过默认实现已使用的 gfx942 参数表，decode MoE
+                因而使用通用矩阵小块。
               </p>
             </div>
             <div class="card green">
               <h3>修改</h3>
               <p>
-                opt-in tuned table；只改变 launch config，不改 slot order、dtype
-                与 reduction。
+                显式启用参数表；只改变 GPU 启动参数，不改 slot
+                顺序、数据类型与归约顺序。
               </p>
             </div>
           </div>
@@ -779,6 +1085,12 @@
                 M16 / N64 / 4 warps。N32 接近但略慢；M32、N128、2/8 warps 更慢。
               </p>
             </div>
+          </div>
+          <div class="callout">
+            <p>
+              <strong>Persistent GEMM</strong>：固定一批 GPU
+              程序驻留在计算单元上，连续领取矩阵小块，减少频繁启动程序的成本。
+            </p>
           </div>
           <div class="callout green" style="margin-top: 18px">
             <p>
@@ -869,17 +1181,17 @@
       <section class="slide" data-label="Native router">
         <header><div class="eyebrow">保留 5 · Native MM</div></header>
         <main>
-          <h2>只让一个已验证 shape 绕过 persistent GEMM</h2>
+          <h2>只让一个已验证矩阵尺寸绕过 persistent GEMM</h2>
           <div class="grid two">
             <div class="card">
-              <h3>逐 shape screening</h3>
+              <h3>逐矩阵尺寸筛选</h3>
               <p>
                 dense-up、down、lm-head 等 native
                 <span class="mono">mm.out</span> 会改变数值，全部拒绝。
               </p>
             </div>
             <div class="card green">
-              <h3>唯一 exact shape</h3>
+              <h3>唯一 exact 尺寸</h3>
               <p>
                 MoE router：<strong>K=2048, N=64</strong>。真实 actor/decode M
                 都保持 bitwise aligned。
@@ -895,8 +1207,8 @@
           </div>
           <div class="callout red">
             <p>
-              exact 是 shape、layout、M 与 backend 的联合性质，不能推广成“native
-              GEMM 都可用”。
+              exact 取决于矩阵尺寸、内存排列、M 和具体实现，不能推广成“所有
+              native GEMM 都可用”。
             </p>
           </div>
         </main>
@@ -905,7 +1217,7 @@
       <section class="slide" data-label="Native 否决">
         <header><div class="eyebrow">未保留 · 扩大 native 范围</div></header>
         <main>
-          <h2>Fixed-M 与 classic hipBLAS 都没有成为 endpoint</h2>
+          <h2>固定 M 与 classic hipBLAS 都没有成为保留结果</h2>
           <div class="grid two">
             <div class="card red">
               <h3>Fixed-row M32</h3>
@@ -1084,7 +1396,7 @@
       <section class="slide" data-label="Delayed residual dataflow">
         <header><div class="eyebrow">保留 8 · 实现</div></header>
         <main>
-          <h2>跨层传两个已有 tensor，不改变数学顺序</h2>
+          <h2>跨层传两个已有数组，不改变数学顺序</h2>
           <div class="flow">
             <div class="node">
               <span class="tag blue">Layer L</span>
@@ -1124,7 +1436,7 @@
               <ul>
                 <li>逐层完整 y 写回</li>
                 <li>下一层独立 norm launch</li>
-                <li>最终 residual materialization</li>
+                <li>最终 residual 中间结果写回</li>
               </ul>
             </div>
           </div>
@@ -1134,7 +1446,7 @@
       <section class="slide" data-label="最终 endpoint">
         <header><div class="eyebrow">最终保留结果</div></header>
         <main>
-          <h2>20-step exact endpoint：b54s2ly6</h2>
+          <h2>20 轮 exact 保留结果：b54s2ly6</h2>
           <div class="grid four">
             <div class="card green">
               <span class="tag">正确性</span>
@@ -1173,7 +1485,7 @@
       </section>
 
       <section class="slide" data-label="优化阶梯">
-        <header><div class="eyebrow">完整 endpoint</div></header>
+        <header><div class="eyebrow">完整保留结果</div></header>
         <main>
           <h2>所有保留阶段</h2>
           <div class="table">
@@ -1203,7 +1515,7 @@
               <div class="cell">2.428</div>
               <div class="cell">14.329</div>
               <div class="cell">warm all</div>
-              <div class="cell">shape</div>
+              <div class="cell">矩阵尺寸</div>
             </div>
             <div class="row">
               <div class="cell">c8clvuzn</div>
@@ -1249,12 +1561,12 @@
       </section>
 
       <section class="slide" data-label="Profiling">
-        <header><div class="eyebrow">最终 endpoint 之后</div></header>
+        <header><div class="eyebrow">最终保留结果之后</div></header>
         <main>
           <h2>剩余 generation 工作集中在 MoE 与 GEMM</h2>
           <div class="grid two">
             <div class="card">
-              <h3>Eager launch attribution</h3>
+              <h3>Eager 启动开销归因</h3>
               <p>
                 10 forwards ≈158.5 ms：no-combine experts 50.7，linear 41.3，mm
                 39.3 ms。
@@ -1309,7 +1621,7 @@
       <section class="slide" data-label="Attention 否决">
         <header><div class="eyebrow">未保留 · Attention</div></header>
         <main>
-          <h2>AITER 更快，但完全破坏 target semantics</h2>
+          <h2>AITER 更快，但不符合 FSDP 对齐语义</h2>
           <div class="grid two">
             <div class="card green">
               <h3>速度</h3>
@@ -1326,6 +1638,12 @@
               </p>
             </div>
           </div>
+          <div class="callout amber">
+            <p>
+              <strong>AITER</strong> 是 AMD 提供的一组优化 GPU 算子；这里的
+              attention 实现更快，但计算顺序与训练侧不同。
+            </p>
+          </div>
           <div class="callout">
             <p>
               Triton attention M16/M32/M64 isolated latency均约 52–55 µs；masked
@@ -1338,7 +1656,7 @@
       <section class="slide" data-label="调度否决">
         <header><div class="eyebrow">未保留 · Scheduling</div></header>
         <main>
-          <h2>减少调度次数或 replica 数量都没有收益</h2>
+          <h2>减少调度次数或生成副本数量都没有收益</h2>
           <div class="table">
             <div class="row head">
               <div class="cell">实验</div>
@@ -1362,14 +1680,14 @@
               <div class="cell">否决</div>
             </div>
             <div class="row">
-              <div class="cell">4→1 replica</div>
+              <div class="cell">4→1 个生成副本</div>
               <div class="cell good">exact</div>
               <div class="cell bad">3.279</div>
               <div class="cell bad">16.587</div>
               <div class="cell">否决</div>
             </div>
             <div class="row">
-              <div class="cell">4→2 replicas</div>
+              <div class="cell">4→2 个生成副本</div>
               <div class="cell good">exact</div>
               <div class="cell bad">≈3.1</div>
               <div class="cell bad">更慢</div>
@@ -1413,30 +1731,34 @@
       <section class="slide" data-label="Weight sync">
         <header><div class="eyebrow">剩余 step 分解</div></header>
         <main>
-          <h2>weight-sync gap 没复现为 exact 因果成本</h2>
+          <h2>权重同步差值没有复现为 exact 路径的固定成本</h2>
           <div class="grid two">
             <div class="card">
               <h3>表面差值</h3>
               <p>
-                Exact-stock = +2.213 s：generation +1.194，weights
-                +0.743，old-logprob +0.177，actor +0.098。
+                Exact 减 stock = +2.213 s：生成 +1.194，权重同步 +0.743，旧
+                log-prob +0.177，actor 更新 +0.098。
               </p>
             </div>
             <div class="card red">
-              <h3>8192-MiB bucket</h3>
-              <p>weights 5.109/5.404 s，mean 5.257；比 retained 5.178 更慢。</p>
+              <h3>8192-MiB 同步分块</h3>
+              <p>
+                权重同步 5.109/5.404 s，平均 5.257；比当前保留结果 5.178 更慢。
+              </p>
             </div>
           </div>
           <div class="callout amber" style="margin-top: 18px">
             <p>
-              同节点 diagnostics 得到 3.228–3.944
-              s，方向反转；它依赖节点/运行状态，不是已证明的 deterministic
-              overhead。
+              同节点诊断实验得到 3.228–3.944 s，方向反转；它依赖节点和运行状态，
+              不是已证明的固定顺序路径额外成本。
             </p>
           </div>
           <div class="callout">
             <p>唯一稳定复现的剩余目标仍是 rollout generation。</p>
           </div>
+          <p class="footnote">
+            权重同步分块（bucket）决定每批传多少模型参数；分块更大意味着请求次数更少，但单次传输和内存压力更高。
+          </p>
         </main>
       </section>
 
@@ -1477,11 +1799,11 @@
               <div class="cell">GEMM+combine</div>
               <div class="cell good">54 exact</div>
               <div class="cell bad">44.97&gt;43.47</div>
-              <div class="cell">M16 replication</div>
+              <div class="cell">M16 重复计算</div>
               <div class="cell">删除</div>
             </div>
             <div class="row">
-              <div class="cell">fewer replicas</div>
+              <div class="cell">更少生成副本</div>
               <div class="cell good">exact</div>
               <div class="cell bad">3.1–3.28</div>
               <div class="cell">并行度下降</div>
@@ -1518,7 +1840,7 @@
               </p>
             </div>
             <div class="card green">
-              <h3>优先删 materialization</h3>
+              <h3>优先减少中间结果写回</h3>
               <p>
                 最大收益来自 combine、residual/norm 与 delayed stream，而非小
                 kernel 微调。
@@ -1535,7 +1857,7 @@
       <section class="slide" data-label="结论">
         <header><div class="eyebrow">当前状态</div></header>
         <main>
-        <h2>Exact rollout 已接近 stock，但尚未等速</h2>
+          <h2>Exact rollout 已接近 stock，但尚未等速</h2>
           <div class="grid">
             <div class="card green">
               <h3>正确性</h3>
@@ -1581,7 +1903,7 @@
                 hkgim3ll · mdagdxnl · c8clvuzn · col62rhl<br />daxteqj3 ·
                 wecny6kl · 731ndh4e · b54s2ly6
               </p>
-              <p>最终结论优先使用 5/20-step confirmation。</p>
+              <p>最终结论优先使用 5/20 轮长跑确认。</p>
             </div>
             <div class="card">
               <h3>实现</h3>
