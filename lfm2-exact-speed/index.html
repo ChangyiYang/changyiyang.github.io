@@ -382,6 +382,18 @@
           transform: rotate(90deg);
           justify-content: center;
         }
+        .timeline {
+          grid-template-columns: 120px 12px 1fr;
+          gap: 4px 8px;
+        }
+        .timeline > strong,
+        .timeline p {
+          font-size: 10.5px;
+          line-height: 1.2;
+        }
+        .timeline p {
+          margin-bottom: 1px;
+        }
         .footerline {
           margin-top: 20px;
         }
@@ -971,26 +983,58 @@
           <div class="timeline">
             <strong>① MoE + small-M</strong>
             <div class="dot"></div>
-            <p>读取 gfx942 tuning；为 decode GEMM 选择小 M tile。</p>
+            <p>
+              读取 gfx942 tuning；为 decode GEMM 选择小 M tile。<br /><strong
+                >3.155→2.545 ms/token · 16.259→14.340 s/step</strong
+              >
+            </p>
             <strong>② Shape tuning</strong>
             <div class="dot"></div>
-            <p>普通 projection 与 wide projection 使用不同配置。</p>
+            <p>
+              普通 projection 与 wide projection 使用不同配置。<br /><strong
+                >2.545→2.428 ms/token · 14.340→14.329 s/step</strong
+              >
+            </p>
             <strong>③ K128 / stage2</strong>
             <div class="dot"></div>
-            <p>扩大 K tile，同时满足 64-KiB LDS。</p>
+            <p>
+              扩大 K tile，同时满足 64-KiB LDS。<br /><strong
+                >2.428→2.270 ms/token · 14.329→13.629 s/step</strong
+              >
+            </p>
             <strong>④ Native router</strong>
             <div class="dot"></div>
-            <p>仅 2048→64 的 router 矩阵尺寸使用 native MM。</p>
+            <p>
+              仅 2048→64 的 router 矩阵尺寸使用 native MM。<br /><strong
+                >2.270→2.2167 ms/token · 13.629→13.5059 s/step</strong
+              >
+            </p>
             <strong>⑤ Fused combine</strong>
             <div class="dot"></div>
-            <p>固定四路位置的加法顺序，删除 combine 中间数组。</p>
+            <p>
+              固定四路位置的加法顺序，删除 combine 中间数组。<br /><strong
+                >2.2167→2.0041 ms/token · 13.5059→13.2255 s/step</strong
+              >
+            </p>
             <strong>⑥ Residual + norm</strong>
             <div class="dot"></div>
-            <p>两阶段 exact kernel，保留 PyTorch rsqrt。</p>
+            <p>
+              两阶段 exact kernel，保留 PyTorch rsqrt。<br /><strong
+                >2.0041→1.7980 ms/token · 13.2255→12.4854 s/step</strong
+              >
+            </p>
             <strong>⑦ Delayed residual</strong>
             <div class="dot"></div>
-            <p>跨层延迟 FFN residual 的显存写回。</p>
+            <p>
+              跨层延迟 FFN residual 的显存写回。<br /><strong
+                >1.7980→1.3805 ms/token · 12.4854→11.6351 s/step</strong
+              >
+            </p>
           </div>
+          <p class="footnote">
+            这里列相邻 confirmed endpoint；不同 run 的生成 workload
+            不完全相同，严格配对收益以各阶段结果页为准。
+          </p>
         </main>
       </section>
 
@@ -1032,7 +1076,7 @@
       </section>
 
       <section class="slide" data-label="MoE tuning">
-        <header><div class="eyebrow">保留 1 · MoE table</div></header>
+        <header><div class="eyebrow">阶段 1A · MoE table</div></header>
         <main>
           <h2>固定顺序路径没有读取 MI325X 的现成参数表</h2>
           <div class="grid two">
@@ -1068,7 +1112,7 @@
       </section>
 
       <section class="slide" data-label="Small-M GEMM">
-        <header><div class="eyebrow">保留 2 · Persistent GEMM</div></header>
+        <header><div class="eyebrow">阶段 1B · Persistent GEMM</div></header>
         <main>
           <h2>online decode 的 M≤16，通用 tile 大量空算</h2>
           <div class="grid two">
@@ -1109,7 +1153,7 @@
       </section>
 
       <section class="slide" data-label="Shape tuning">
-        <header><div class="eyebrow">保留 3 · Shape-specific GEMM</div></header>
+        <header><div class="eyebrow">阶段 2 · Shape-specific GEMM</div></header>
         <main>
           <h2>普通 projection 与 wide projection 不能共用一套 tile</h2>
           <div class="grid two">
@@ -1136,7 +1180,7 @@
       </section>
 
       <section class="slide" data-label="K128">
-        <header><div class="eyebrow">保留 4 · K128 / stage2</div></header>
+        <header><div class="eyebrow">阶段 3 · K128 / stage2</div></header>
         <main>
           <h2>扩大 K tile 有收益，但 stage3 超过 LDS</h2>
           <div class="flow">
@@ -1179,7 +1223,7 @@
       </section>
 
       <section class="slide" data-label="Native router">
-        <header><div class="eyebrow">保留 5 · Native MM</div></header>
+        <header><div class="eyebrow">阶段 4 · Native MM</div></header>
         <main>
           <h2>只让一个已验证矩阵尺寸绕过 persistent GEMM</h2>
           <div class="grid two">
@@ -1250,7 +1294,7 @@
       </section>
 
       <section class="slide" data-label="Fused combine">
-        <header><div class="eyebrow">保留 6 · Ordered MoE combine</div></header>
+        <header><div class="eyebrow">阶段 5 · Ordered MoE combine</div></header>
         <main>
           <h2>融合 combine，但不改变四个 expert slot 的加法顺序</h2>
           <div class="formula">
@@ -1282,7 +1326,7 @@
       </section>
 
       <section class="slide" data-label="Combine 收益">
-        <header><div class="eyebrow">保留 6 · 结果</div></header>
+        <header><div class="eyebrow">阶段 5 · 结果</div></header>
         <main>
           <h2>Boundary 与 20-step E2E 都变快</h2>
           <div class="grid two">
@@ -1310,7 +1354,7 @@
       </section>
 
       <section class="slide" data-label="Residual / Norm">
-        <header><div class="eyebrow">保留 7 · Residual + RMSNorm</div></header>
+        <header><div class="eyebrow">阶段 6 · Residual + RMSNorm</div></header>
         <main>
           <h2>每层 residual add 后马上做 RMSNorm</h2>
           <div class="code">
@@ -1330,6 +1374,13 @@
               <p>应用 inverse RMS 与 scale，保持 multiplication order。</p>
             </div>
           </div>
+          <div class="callout green">
+            <p>
+              单独加入这一阶段：<strong>2.0041→1.7980 ms/token</strong>
+              （generation -10.3%），<strong>13.2255→12.4854 s/step</strong>
+              （step -5.6%）；49,424 warm tokens 保持 exact。
+            </p>
+          </div>
           <div class="callout red">
             <p>
               rsqrt 留在 PyTorch：Triton <span class="mono">rsqrt</span> 与
@@ -1340,7 +1391,7 @@
       </section>
 
       <section class="slide" data-label="Exact staged kernel">
-        <header><div class="eyebrow">保留 7 · 验证</div></header>
+        <header><div class="eyebrow">阶段 6 · 验证</div></header>
         <main>
           <h2>为什么是两阶段，而不是更短的 one-kernel</h2>
           <div class="grid">
@@ -1374,7 +1425,7 @@
       </section>
 
       <section class="slide" data-label="Delayed residual">
-        <header><div class="eyebrow">保留 8 · 跨层数据流</div></header>
+        <header><div class="eyebrow">阶段 7 · 跨层数据流</div></header>
         <main>
           <h2>第二类 residual 不必在本层末尾 materialize</h2>
           <div class="code">
@@ -1390,11 +1441,18 @@
           <div class="formula">
             传 pair (m, p)，下一层开头再精确计算 p + m 与 norm
           </div>
+          <div class="callout green">
+            <p>
+              相对上一阶段：<strong>1.7980→1.3805 ms/token</strong> （generation
+              -23.2%），<strong>12.4854→11.6351 s/step</strong>
+              （step -6.8%）；55,224 warm tokens 保持 exact。
+            </p>
+          </div>
         </main>
       </section>
 
       <section class="slide" data-label="Delayed residual dataflow">
-        <header><div class="eyebrow">保留 8 · 实现</div></header>
+        <header><div class="eyebrow">阶段 7 · 实现</div></header>
         <main>
           <h2>跨层传两个已有数组，不改变数学顺序</h2>
           <div class="flow">
