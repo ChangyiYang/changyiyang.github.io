@@ -1,0 +1,1667 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      name="description"
+      content="LFM2 24B MoE 在 AMD 上保持训推 bitwise exact 的 SGLang 性能优化：逐步修改、收益与失败实验。"
+    />
+    <title>把 exact SGLang rollout 从 3.15 优化到 1.38 ms/token</title>
+    <style>
+      :root {
+        --bg: #f7f4ee;
+        --panel: #fffdfa;
+        --ink: #1f2933;
+        --muted: #667085;
+        --line: #d8d2c5;
+        --blue: #245f73;
+        --green: #2f6b55;
+        --red: #a13c35;
+        --amber: #b76b1f;
+        --violet: #6a4c93;
+        --shadow: 0 10px 34px rgba(38, 34, 28, 0.08);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        background:
+          radial-gradient(
+            circle at 18% 0%,
+            rgba(36, 95, 115, 0.07),
+            transparent 30%
+          ),
+          linear-gradient(180deg, #fbf9f5, var(--bg));
+        color: var(--ink);
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          sans-serif;
+      }
+      body {
+        overflow: hidden;
+      }
+      .slide {
+        position: absolute;
+        inset: 0;
+        display: none;
+        padding: clamp(22px, 3.1vw, 48px);
+        overflow: hidden;
+      }
+      .slide.active {
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        gap: 12px;
+      }
+      .eyebrow {
+        color: var(--blue);
+        font-weight: 760;
+        font-size: clamp(10px, 0.78vw, 13px);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+      h1 {
+        font-size: clamp(33px, 4.35vw, 62px);
+        line-height: 1.05;
+        max-width: 1120px;
+        margin-bottom: 13px;
+      }
+      h2 {
+        font-size: clamp(26px, 3vw, 43px);
+        line-height: 1.1;
+        margin-bottom: 8px;
+        max-width: 1160px;
+      }
+      h3 {
+        font-size: clamp(16px, 1.28vw, 21px);
+        line-height: 1.2;
+        margin-bottom: 7px;
+      }
+      p,
+      li {
+        font-size: clamp(12px, 0.98vw, 17px);
+        line-height: 1.38;
+        color: #4b5563;
+      }
+      .lead {
+        font-size: clamp(17px, 1.5vw, 24px);
+        line-height: 1.35;
+        color: #334155;
+        max-width: 1100px;
+      }
+      .small,
+      .small li {
+        font-size: clamp(9.5px, 0.74vw, 12.5px);
+      }
+      strong {
+        color: #25313b;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 13px;
+      }
+      .grid.two {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .grid.four {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+      .card {
+        background: rgba(255, 253, 250, 0.93);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: clamp(11px, 1.2vw, 18px);
+        box-shadow: var(--shadow);
+        min-width: 0;
+      }
+      .red {
+        border-left: 5px solid var(--red);
+      }
+      .green {
+        border-left: 5px solid var(--green);
+      }
+      .blue {
+        border-left: 5px solid var(--blue);
+      }
+      .amber {
+        border-left: 5px solid var(--amber);
+      }
+      .violet {
+        border-left: 5px solid var(--violet);
+      }
+      .tag {
+        display: inline-flex;
+        padding: 3px 9px;
+        border-radius: 999px;
+        background: #e9f2ef;
+        color: var(--green);
+        font-size: clamp(9px, 0.7vw, 12px);
+        font-weight: 720;
+      }
+      .tag.red {
+        background: #fae8e6;
+        color: var(--red);
+        border: 0;
+      }
+      .tag.blue {
+        background: #e6f1f5;
+        color: var(--blue);
+        border: 0;
+      }
+      .tag.amber {
+        background: #fff2dc;
+        color: var(--amber);
+        border: 0;
+      }
+      .tag.violet {
+        background: #eee9f6;
+        color: var(--violet);
+        border: 0;
+      }
+      ul,
+      ol {
+        margin: 0;
+        padding-left: 1.2em;
+      }
+      li + li {
+        margin-top: 5px;
+      }
+      .metric {
+        font-size: clamp(28px, 3.3vw, 50px);
+        font-weight: 820;
+        line-height: 1;
+        color: var(--red);
+        letter-spacing: -0.03em;
+      }
+      .metric.green {
+        color: var(--green);
+        border: 0;
+      }
+      .metric.blue {
+        color: var(--blue);
+        border: 0;
+      }
+      .mono {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.88em;
+      }
+      .table {
+        display: grid;
+        border: 1px solid var(--line);
+        background: var(--panel);
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: var(--shadow);
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 1.5fr repeat(4, 1fr);
+        border-bottom: 1px solid var(--line);
+      }
+      .row:last-child {
+        border-bottom: 0;
+      }
+      .cell {
+        padding: 8px 10px;
+        font-size: clamp(9.5px, 0.8vw, 14px);
+        line-height: 1.24;
+        color: #475467;
+        border-right: 1px solid var(--line);
+      }
+      .cell:last-child {
+        border-right: 0;
+      }
+      .head .cell {
+        background: #efe9dd;
+        color: var(--ink);
+        font-weight: 760;
+      }
+      .good {
+        color: var(--green) !important;
+        font-weight: 760;
+      }
+      .bad {
+        color: var(--red) !important;
+        font-weight: 760;
+      }
+      .warn {
+        color: var(--amber) !important;
+        font-weight: 760;
+      }
+      .flow {
+        display: flex;
+        align-items: stretch;
+        gap: 8px;
+      }
+      .node {
+        flex: 1;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 13px;
+        box-shadow: var(--shadow);
+      }
+      .arrow {
+        display: flex;
+        align-items: center;
+        color: var(--muted);
+        font-size: 23px;
+      }
+      .callout {
+        border-left: 5px solid var(--blue);
+        background: rgba(230, 241, 245, 0.72);
+        padding: 12px 16px;
+        border-radius: 0 8px 8px 0;
+      }
+      .callout.red {
+        border-left-color: var(--red);
+        background: rgba(250, 232, 230, 0.75);
+      }
+      .callout.green {
+        border-left-color: var(--green);
+        background: rgba(233, 242, 239, 0.78);
+      }
+      .callout.amber {
+        border-left-color: var(--amber);
+        background: rgba(255, 242, 220, 0.78);
+      }
+      .callout p {
+        margin: 0;
+        color: #344054;
+      }
+      .timeline {
+        display: grid;
+        grid-template-columns: 155px 16px 1fr;
+        gap: 7px 13px;
+        align-items: start;
+      }
+      .dot {
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        background: var(--blue);
+        margin-top: 5px;
+        box-shadow: 0 0 0 4px rgba(36, 95, 115, 0.12);
+      }
+      .timeline p {
+        margin: 0 0 4px;
+      }
+      .code {
+        background: #222a32;
+        color: #e8edf2;
+        border-radius: 8px;
+        padding: 12px 15px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: clamp(9.5px, 0.74vw, 12.5px);
+        line-height: 1.42;
+        white-space: pre-wrap;
+      }
+      .formula {
+        text-align: center;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: clamp(15px, 1.45vw, 23px);
+        padding: 13px;
+        background: #f1eee7;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+      .footerline {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        gap: 12px;
+        align-items: center;
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .progress {
+        height: 3px;
+        background: #dfd9ce;
+      }
+      .bar {
+        height: 100%;
+        background: var(--blue);
+      }
+      .controls {
+        position: fixed;
+        right: 18px;
+        bottom: 18px;
+        z-index: 20;
+        display: flex;
+        gap: 8px;
+      }
+      .controls button {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        border: 1px solid var(--line);
+        background: rgba(255, 253, 250, 0.92);
+        font-size: 19px;
+        cursor: pointer;
+        box-shadow: var(--shadow);
+      }
+      a {
+        color: var(--blue);
+      }
+      .footnote {
+        font-size: clamp(8.5px, 0.66vw, 11px);
+        color: var(--muted);
+      }
+      @media (max-width: 800px) {
+        body {
+          overflow: auto;
+        }
+        .slide {
+          overflow-y: auto;
+        }
+        .slide.active {
+          display: block;
+        }
+        .grid,
+        .grid.two,
+        .grid.four {
+          grid-template-columns: 1fr;
+        }
+        .flow {
+          flex-direction: column;
+        }
+        .arrow {
+          transform: rotate(90deg);
+          justify-content: center;
+        }
+        .footerline {
+          margin-top: 20px;
+        }
+      }
+      @media print {
+        body {
+          overflow: visible;
+        }
+        .slide {
+          display: grid !important;
+          position: relative;
+          height: 100vh;
+          page-break-after: always;
+        }
+        .controls {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="deck">
+      <section class="slide" data-label="LFM2 24B MoE">
+        <header><div class="eyebrow">AMD · verl · SGLang</div></header>
+        <main>
+          <h1>
+            把 exact SGLang rollout<br />从
+            <span style="color: var(--red)">3.15</span> 优化到
+            <span style="color: var(--green)">1.38 ms/token</span>
+          </h1>
+          <p class="lead">
+            不放宽数值合同：最终 20-step、55,224 个 warm chosen tokens 全部
+            bitwise exact。
+          </p>
+          <div class="grid" style="margin-top: 24px">
+            <div class="card">
+              <span class="tag blue">对象</span>
+              <p>
+                <strong>LFM2 24B MoE</strong><br />FSDP actor ↔ SGLang rollout
+              </p>
+            </div>
+            <div class="card">
+              <span class="tag violet">约束</span>
+              <p>
+                <strong>每步验证 zero diff</strong><br />不接受只在
+                microbenchmark 快
+              </p>
+            </div>
+            <div class="card green">
+              <span class="tag">结果</span>
+              <p><strong>generation -56%</strong><br />whole step -28%</p>
+            </div>
+          </div>
+        </main>
+      </section>
+
+      <section class="slide" data-label="最终结果">
+        <header><div class="eyebrow">先看结果</div></header>
+        <main>
+          <h2>严格 exact 不再是 2.8× rollout</h2>
+          <div class="grid">
+            <div class="card red">
+              <h3>最初 exact</h3>
+              <div class="metric">3.155</div>
+              <p>ms / generated token<br /><strong>16.259 s/step</strong></p>
+            </div>
+            <div class="card green">
+              <h3>最终 exact</h3>
+              <div class="metric green">1.3805</div>
+              <p>ms / generated token<br /><strong>11.6351 s/step</strong></p>
+            </div>
+            <div class="card blue">
+              <h3>当前 stock 范围</h3>
+              <div class="metric blue">1.06–1.13</div>
+              <p>ms / generated token<br /><strong>约 9.4 s/step</strong></p>
+            </div>
+          </div>
+          <div class="callout green" style="margin-top: 18px">
+            <p>
+              最终 exact generation 相对初始下降约 56.2%，whole-step 下降约
+              28.4%。stock 来自独立 workload，只描述剩余距离。
+            </p>
+          </div>
+        </main>
+      </section>
+
+      <section class="slide" data-label="目标">
+        <header><div class="eyebrow">为什么继续优化</div></header>
+        <main>
+          <h2>先完成 bitwise exact，再处理性能差异</h2>
+          <div class="flow">
+            <div class="node">
+              <span class="tag">正确性阶段</span>
+              <h3>统一执行合同</h3>
+              <p>
+                GEMM、RoPE、RMSNorm、TopK、attention、MoE combine 与 log-softmax
+                全部对齐。
+              </p>
+            </div>
+            <div class="arrow">→</div>
+            <div class="node">
+              <span class="tag red">代价</span>
+              <h3>Full-exact Graph</h3>
+              <p>generation 约 3.15 ms/token；stock 约 1.13 ms/token。</p>
+            </div>
+            <div class="arrow">→</div>
+            <div class="node">
+              <span class="tag blue">本轮目标</span>
+              <h3>只优化 exact path</h3>
+              <p>每个候选必须 zero diff，并在真实 E2E Graph run 中变快。</p>
+            </div>
+          </div>
+          <div class="callout">
+            <p>
+              不是重新选“差不多准确”的 Pareto 点，而是在已确定的 exact
+              数值合同内减少执行成本。
+            </p>
+          </div>
+        </main>
+      </section>
+
+      <section class="slide" data-label="实验合同">
+        <header><div class="eyebrow">实验设置</div></header>
+        <main>
+          <h2>每轮固定的运行与验收合同</h2>
+          <div class="grid two">
+            <div class="card">
+              <h3>运行</h3>
+              <ul>
+                <li>LFM2 24B MoE · GSM8K tool loop</li>
+                <li>FSDP actor + SGLang async rollout</li>
+                <li>4× MI325X · TP1 · batch 8</li>
+                <li>CUDA Graph max batch 32</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h3>长度与并行</h3>
+              <ul>
+                <li>response max 512</li>
+                <li>rollout replicas = 4</li>
+                <li>BF16 weights / KV / Mamba state</li>
+                <li>同一 task-specific worktree</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h3>正确性</h3>
+              <ul>
+                <li>chosen-token MAE = 0</li>
+                <li>max = 0 · Pearson = 1</li>
+                <li>短 screen 后做 5/20-step</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h3>资源</h3>
+              <ul>
+                <li><span class="mono">trainer.save_freq=-1</span></li>
+                <li>不写 checkpoint</li>
+                <li>脏卡 allocation 直接释放</li>
+              </ul>
+            </div>
+          </div>
+        </main>
+      </section>
+
+      <section class="slide" data-label="证据规则">
+        <header><div class="eyebrow">证据边界</div></header>
+        <main>
+          <h2>什么结果才算“优化”</h2>
+          <div class="grid four">
+            <div class="card green">
+              <span class="tag">保留</span>
+              <h3>E2E + exact</h3>
+              <p>真实 Graph training 变快，且 chosen tokens zero diff。</p>
+            </div>
+            <div class="card amber">
+              <span class="tag amber">候选</span>
+              <h3>Microbench</h3>
+              <p>只筛选 tile/kernel，不能直接进入 endpoint。</p>
+            </div>
+            <div class="card red">
+              <span class="tag red">否决</span>
+              <h3>快但不 exact</h3>
+              <p>不属于本轮 exact endpoint。</p>
+            </div>
+            <div class="card red">
+              <span class="tag red">否决</span>
+              <h3>局部快、E2E 慢</h3>
+              <p>缓存、padding 与调度会抵消单点收益。</p>
+            </div>
+          </div>
+          <div class="callout amber" style="margin-top: 18px">
+            <p>
+              不同 20-step run 的 response 长度不同。只有配对实验才做严格
+              attribution；其余标为 confirmation / endpoint observation。
+            </p>
+          </div>
+        </main>
+      </section>
+
+      <section class="slide" data-label="起点">
+        <header><div class="eyebrow">性能基线</div></header>
+        <main>
+        <h2>主要性能差异位于 deterministic rollout generation</h2>
+          <div class="table">
+            <div class="row head">
+              <div class="cell">配置</div>
+              <div class="cell">MAE</div>
+              <div class="cell">gen/token</div>
+              <div class="cell">step</div>
+              <div class="cell">结论</div>
+            </div>
+            <div class="row">
+              <div class="cell">Stock Graph</div>
+              <div class="cell bad">≈0.033</div>
+              <div class="cell good">≈1.13 ms</div>
+              <div class="cell good">8.4–9.4 s</div>
+              <div class="cell">快，但训推不一致</div>
+            </div>
+            <div class="row">
+              <div class="cell">Full exact Graph</div>
+              <div class="cell good">0</div>
+              <div class="cell bad">≈3.15 ms</div>
+              <div class="cell bad">≈16.26 s</div>
+              <div class="cell">优化起点</div>
+            </div>
+          </div>
+          <div class="callout red" style="margin-top: 18px">
+            <p>
+              generic deterministic SGLang 改写 GEMM、attention 与
+              reductions；FSDP target 再增加目标语义分支。
+            </p>
+          </div>
+        </main>
+      </section>
+
+      <section class="slide" data-label="开关分解">
+        <header><div class="eyebrow">第一轮分解</div></header>
+        <main>
+          <h2>generic determinism 很贵；对齐收益来自 target branches</h2>
+          <div class="table">
+            <div class="row head">
+              <div class="cell">Rollout</div>
+              <div class="cell">MAE</div>
+              <div class="cell">gen/token</div>
+              <div class="cell">step</div>
+              <div class="cell">解释</div>
+            </div>
+            <div class="row">
+              <div class="cell">Neither</div>
+              <div class="cell bad">0.03248</div>
+              <div class="cell good">1.327 ms</div>
+              <div class="cell good">11.161 s</div>
+              <div class="cell">默认快路径</div>
+            </div>
+            <div class="row">
+              <div class="cell">Generic deterministic</div>
+              <div class="cell bad">0.03295</div>
+              <div class="cell warn">2.679 ms</div>
+              <div class="cell warn">15.195 s</div>
+              <div class="cell">无 MAE 收益</div>
+            </div>
+            <div class="row">
+              <div class="cell">FSDP target</div>
+              <div class="cell good">0</div>
+              <div class="cell bad">3.107 ms</div>
+              <div class="cell bad">16.778 s</div>
+              <div class="cell">关闭剩余 diff</div>
+            </div>
+          </div>
+          <div class="callout">
+            <p>
+              不能简单关 deterministic mode。必须优化它实际使用的 ROCm
+              GEMM、MoE、RMSNorm 与数据流。
+            </p>
+          </div>
+        </main>
+      </section>
+
+      <section class="slide" data-label="路线总览">
+        <header><div class="eyebrow">保留路径</div></header>
+        <main>
+        <h2>七个阶段把 3.15 ms/token 降到 1.38</h2>
+          <div class="timeline">
+            <strong>① MoE + small-M</strong>
+            <div class="dot"></div>
+            <p>读取 gfx942 tuning；为 decode GEMM 选择小 M tile。</p>
+            <strong>② Shape tuning</strong>
+            <div class="dot"></div>
+            <p>普通 projection 与 wide projection 使用不同配置。</p>
+            <strong>③ K128 / stage2</strong>
+            <div class="dot"></div>
+            <p>扩大 K tile，同时满足 64-KiB LDS。</p>
+            <strong>④ Native router</strong>
+            <div class="dot"></div>
+            <p>仅 2048→64 router shape 使用 native MM。</p>
+            <strong>⑤ Fused combine</strong>
+            <div class="dot"></div>
+            <p>固定 slot order，删除 combine 中间 tensors。</p>
+            <strong>⑥ Residual + norm</strong>
+            <div class="dot"></div>
+            <p>两阶段 exact kernel，保留 PyTorch rsqrt。</p>
+            <strong>⑦ Delayed residual</strong>
+            <div class="dot"></div>
+            <p>跨 layer 延迟 FFN residual materialization。</p>
+          </div>
+        </main>
+      </section>
+
+      <section class="slide" data-label="容量假设">
+        <header><div class="eyebrow">候选 0 · Context length</div></header>
+        <main>
+          <h2>先验证看起来最便宜的 KV-split 优化</h2>
+          <div class="grid two">
+            <div class="card">
+              <h3>观察</h3>
+              <p>
+                模型声明 128k context；deterministic split decode 据此 cap 到
+                256 splits，而 GSM8K 实际只需约 6–8。
+              </p>
+            </div>
+            <div class="card blue">
+              <h3>修改</h3>
+              <p>
+                传
+                <span class="mono">context_length=2048</span
+                >，只改变容量，不改变 active split reduction。
+              </p>
+            </div>
+            <div class="card red">
+              <h3>结果</h3>
+              <p>
+                generic deterministic 只变化约 1%；full exact unified decode
+                也无稳定收益。
+              </p>
+            </div>
+            <div class="card amber">
+              <h3>决定</h3>
+              <p>empty splits 不是主要成本；撤掉配置。</p>
+            </div>
+          </div>
+        </main>
+      </section>
+
+      <section class="slide" data-label="MoE tuning">
+        <header><div class="eyebrow">保留 1 · MoE table</div></header>
+        <main>
+          <h2>deterministic path 没读 MI325X 的现成 tuning table</h2>
+          <div class="grid two">
+            <div class="card red">
+              <h3>问题</h3>
+              <p>
+                exact path 绕过 stock 已使用的 gfx942 tuned config，decode MoE
+                使用通用 tile。
+              </p>
+            </div>
+            <div class="card green">
+              <h3>修改</h3>
+              <p>
+                opt-in tuned table；只改变 launch config，不改 slot order、dtype
+                与 reduction。
+              </p>
+            </div>
+          </div>
+          <div class="flow" style="margin-top: 18px">
+            <div class="node">
+              <strong>Matched step 2</strong>
+              <div class="metric blue">3.203</div>
+              <p>ms/token</p>
+            </div>
+            <div class="arrow">→</div>
+            <div class="node">
+              <strong>Tuned MoE</strong>
+              <div class="metric green">2.984</div>
+              <p>ms/token · exact</p>
+            </div>
+          </div>
+        </main>
+      </section>
+
+      <section class="slide" data-label="Small-M GEMM">
+        <header><div class="eyebrow">保留 2 · Persistent GEMM</div></header>
+        <main>
+          <h2>online decode 的 M≤16，通用 tile 大量空算</h2>
+          <div class="grid two">
+            <div class="card">
+              <h3>扫描</h3>
+              <p>
+                <span class="mono">BLOCK_M/N</span>、warps、stages；先固定
+                K64，要求 Graph capture 与 bitwise exact。
+              </p>
+            </div>
+            <div class="card green">
+              <h3>保留</h3>
+              <p>
+                M16 / N64 / 4 warps。N32 接近但略慢；M32、N128、2/8 warps 更慢。
+              </p>
+            </div>
+          </div>
+          <div class="callout green" style="margin-top: 18px">
+            <p>
+              MoE table + small-M：matched generation
+              <strong>3.203→2.440 ms/token</strong>，step
+              <strong>16.328→14.390 s</strong>，相同 2,637 chosen tokens exact。
+            </p>
+          </div>
+          <div class="callout">
+            <p>
+              5-step W&B <span class="mono">hkgim3ll</span>：10,195 warm tokens
+              exact；2.545 ms/token，14.340 s/step。
+            </p>
+          </div>
+        </main>
+      </section>
+
+      <section class="slide" data-label="Shape tuning">
+        <header><div class="eyebrow">保留 3 · Shape-specific GEMM</div></header>
+        <main>
+          <h2>普通 projection 与 wide projection 不能共用一套 tile</h2>
+          <div class="grid two">
+            <div class="card">
+              <h3>普通 projection</h3>
+              <p>N64 / 4 warps，适配 hidden-size 相近矩阵与 decode 小 M。</p>
+            </div>
+            <div class="card">
+              <h3>Wide dense-up / lm-head</h3>
+              <p>
+                N128 / 8 warps。N256 在 Graph batch 16 超过 gfx942 64-KiB LDS。
+              </p>
+            </div>
+          </div>
+          <div class="callout green" style="margin-top: 18px">
+            <p>
+              W&B <span class="mono">mdagdxnl</span>：warm tokens 全
+              exact；generation <strong>2.428 ms/token</strong>，step
+              <strong>14.329 s</strong>。相对 N64 confirmation，generation
+              -4.6%。
+            </p>
+          </div>
+        </main>
+      </section>
+
+      <section class="slide" data-label="K128">
+        <header><div class="eyebrow">保留 4 · K128 / stage2</div></header>
+        <main>
+          <h2>扩大 K tile 有收益，但 stage3 超过 LDS</h2>
+          <div class="flow">
+            <div class="node">
+              <span class="tag blue">Microbench</span>
+              <h3>K64→K128</h3>
+              <p>5963→5702 µs，约 -4.4%。</p>
+            </div>
+            <div class="arrow">→</div>
+            <div class="node">
+              <span class="tag red">失败</span>
+              <h3>stage3</h3>
+              <p>LDS 73,792 B &gt; 64 KiB。</p>
+            </div>
+            <div class="arrow">→</div>
+            <div class="node">
+              <span class="tag">保留</span>
+              <h3>stage2</h3>
+              <p>M8/M16 可 capture，仍保留约 4% gain。</p>
+            </div>
+          </div>
+          <div class="grid two" style="margin-top: 18px">
+            <div class="card green">
+              <h3>c8clvuzn · 5-step</h3>
+              <p>
+                9,997 tokens exact；<strong>2.270 ms/token</strong>，<strong
+                  >13.629 s/step</strong
+                >。
+              </p>
+            </div>
+            <div class="card">
+              <h3>col62rhl · 20-step</h3>
+              <p>
+                52,034 tokens exact；unpaired mean
+                <strong>2.303 ms/token</strong>。
+              </p>
+            </div>
+          </div>
+        </main>
+      </section>
+
+      <section class="slide" data-label="Native router">
+        <header><div class="eyebrow">保留 5 · Native MM</div></header>
+        <main>
+          <h2>只让一个已验证 shape 绕过 persistent GEMM</h2>
+          <div class="grid two">
+            <div class="card">
+              <h3>逐 shape screening</h3>
+              <p>
+                dense-up、down、lm-head 等 native
+                <span class="mono">mm.out</span> 会改变数值，全部拒绝。
+              </p>
+            </div>
+            <div class="card green">
+              <h3>唯一 exact shape</h3>
+              <p>
+                MoE router：<strong>K=2048, N=64</strong>。真实 actor/decode M
+                都保持 bitwise aligned。
+              </p>
+            </div>
+          </div>
+          <div class="callout green" style="margin-top: 18px">
+            <p>
+              20-step <span class="mono">daxteqj3</span>：50,657 warm tokens
+              exact；mean/weighted <strong>2.2167/2.1797 ms/token</strong>，step
+              <strong>13.5059 s</strong>。
+            </p>
+          </div>
+          <div class="callout red">
+            <p>
+              exact 是 shape、layout、M 与 backend 的联合性质，不能推广成“native
+              GEMM 都可用”。
+            </p>
+          </div>
+        </main>
+      </section>
+
+      <section class="slide" data-label="Native 否决">
+        <header><div class="eyebrow">未保留 · 扩大 native 范围</div></header>
+        <main>
+          <h2>Fixed-M 与 classic hipBLAS 都没有成为 endpoint</h2>
+          <div class="grid two">
+            <div class="card red">
+              <h3>Fixed-row M32</h3>
+              <p>
+                actor 拆 32 rows，decode pad 到 M32。全 shape exact，但
+                <strong>2.496 ms/token</strong>、<strong>15.466 s/step</strong
+                >。
+              </p>
+              <p class="small">
+                Router 58.6→999.4 µs；lm-head 2496.8→5174.1 µs。
+              </p>
+            </div>
+            <div class="card red">
+              <h3>Classic hipBLAS lm-head</h3>
+              <p>
+                局部切 backend 可 exact；20-step
+                <span class="mono">5950e6tu</span> 为
+                <strong>2.2376 ms/token</strong>，不优于 native-router
+                endpoint。
+              </p>
+            </div>
+          </div>
+          <div class="callout">
+            <p>
+              固定 reduction path 的 padding 成本过高；两套 runtime code
+              均删除。
+            </p>
+          </div>
+        </main>
+      </section>
+
+      <section class="slide" data-label="Fused combine">
+        <header><div class="eyebrow">保留 6 · Ordered MoE combine</div></header>
+        <main>
+          <h2>融合 combine，但不改变四个 expert slot 的加法顺序</h2>
+          <div class="formula">
+            out = bf16((((e₀·w₀)+(e₁·w₁))+(e₂·w₂))+(e₃·w₃))
+          </div>
+          <div class="grid two" style="margin-top: 16px">
+            <div class="card">
+              <h3>原实现</h3>
+              <p>
+                多个 multiply/sum/cast operations，产生中间 tensors 与
+                launches。
+              </p>
+            </div>
+            <div class="card green">
+              <h3>新实现</h3>
+              <p>
+                Triton <span class="mono">ordered_weighted_sum</span>；固定 slot
+                order、FP32 accumulation 与 BF16 cast boundary。
+              </p>
+            </div>
+          </div>
+          <div class="callout amber">
+            <p>
+              不能换 arbitrary reduction / atomic sum。exact 合同不仅是
+              FP32，还包括 slot order。
+            </p>
+          </div>
+        </main>
+      </section>
+
+      <section class="slide" data-label="Combine 收益">
+        <header><div class="eyebrow">保留 6 · 结果</div></header>
+        <main>
+          <h2>Boundary 与 20-step E2E 都变快</h2>
+          <div class="grid two">
+            <div class="card">
+              <h3>Microbenchmark</h3>
+              <div class="metric blue">6–14 µs</div>
+              <p>1–1024 tokens；原路径 18–91 µs。</p>
+            </div>
+            <div class="card green">
+              <h3>wecny6kl · 20-step</h3>
+              <div class="metric green">2.0041</div>
+              <p>
+                ms/token · weighted 1.9903<br /><strong>13.2255 s/step</strong>
+              </p>
+            </div>
+          </div>
+          <div class="callout green" style="margin-top: 18px">
+            <p>
+              52,085 warm tokens exact。相对
+              <span class="mono">daxteqj3</span>，mean/weighted generation
+              -9.6%/-8.7%，step -2.1%。
+            </p>
+          </div>
+        </main>
+      </section>
+
+      <section class="slide" data-label="Residual / Norm">
+        <header><div class="eyebrow">保留 7 · Residual + RMSNorm</div></header>
+        <main>
+          <h2>每层 residual add 后马上做 RMSNorm</h2>
+          <div class="code">
+            post_operator = operator_output + residual ffn_normed =
+            rms_norm(post_operator)
+          </div>
+          <div class="grid two" style="margin-top: 16px">
+            <div class="card blue">
+              <h3>Stage 1</h3>
+              <p>
+                FP32 residual add、square、相同 1024-wide ordered mean；同时输出
+                residual。
+              </p>
+            </div>
+            <div class="card blue">
+              <h3>Stage 2</h3>
+              <p>应用 inverse RMS 与 scale，保持 multiplication order。</p>
+            </div>
+          </div>
+          <div class="callout red">
+            <p>
+              rsqrt 留在 PyTorch：Triton <span class="mono">rsqrt</span> 与
+              <span class="mono">1/sqrt</span> 都会漂移 1 ULP。
+            </p>
+          </div>
+        </main>
+      </section>
+
+      <section class="slide" data-label="Exact staged kernel">
+        <header><div class="eyebrow">保留 7 · 验证</div></header>
+        <main>
+          <h2>为什么是两阶段，而不是更短的 one-kernel</h2>
+          <div class="grid">
+            <div class="card green">
+              <h3>Exact staged</h3>
+              <p>
+                rows 1–8192：normalized output、FP32 residual、inverse RMS 全
+                bitwise identical。
+              </p>
+            </div>
+            <div class="card">
+              <h3>速度</h3>
+              <p>decode rows 1.07–1.17×；prefill rows 1.92–2.35×。</p>
+            </div>
+            <div class="card red">
+              <h3>One-kernel</h3>
+              <p>
+                inverse RMS max diff 5.96e-8；output max diff 1.91e-6。否决。
+              </p>
+            </div>
+          </div>
+          <div class="callout green" style="margin-top: 18px">
+            <p>
+              <span class="mono">731ndh4e</span>：49,424 warm tokens
+              exact；<strong>1.7980 ms/token</strong>，<strong
+                >12.4854 s/step</strong
+              >。相对 fused combine，generation -10.3%，step -5.6%。
+            </p>
+          </div>
+        </main>
+      </section>
+
+      <section class="slide" data-label="Delayed residual">
+        <header><div class="eyebrow">保留 8 · 跨层数据流</div></header>
+        <main>
+          <h2>第二类 residual 不必在本层末尾 materialize</h2>
+          <div class="code">
+            p = x + operator(norm(x)) m = FFN(norm(p)) y = p + m # 旧：写出完整
+            y next = operator(norm(y)) # 下一层：马上读回并 norm
+          </div>
+          <div class="callout">
+            <p>
+              <span class="mono">y</span> 在 layer
+              之间没有其他消费者，只被写到显存，再被下一层第一项 RMSNorm 读回。
+            </p>
+          </div>
+          <div class="formula">
+            传 pair (m, p)，下一层开头再精确计算 p + m 与 norm
+          </div>
+        </main>
+      </section>
+
+      <section class="slide" data-label="Delayed residual dataflow">
+        <header><div class="eyebrow">保留 8 · 实现</div></header>
+        <main>
+          <h2>跨层传两个已有 tensor，不改变数学顺序</h2>
+          <div class="flow">
+            <div class="node">
+              <span class="tag blue">Layer L</span>
+              <h3>不算 y</h3>
+              <p>
+                <span class="mono">hidden=m</span><br /><span class="mono"
+                  >residual=p</span
+                >
+              </p>
+            </div>
+            <div class="arrow">→</div>
+            <div class="node">
+              <span class="tag">Layer L+1</span>
+              <h3>融合消费 pair</h3>
+              <p>
+                <span class="mono">normed,y = residual_add_rms_norm(m,p)</span>
+              </p>
+            </div>
+            <div class="arrow">→</div>
+            <div class="node">
+              <span class="tag violet">Final norm</span>
+              <h3>同样消费 pair</h3>
+              <p>最后一层也无需额外 materialize。</p>
+            </div>
+          </div>
+          <div class="grid two" style="margin-top: 18px">
+            <div class="card green">
+              <h3>保持</h3>
+              <ul>
+                <li>FP32 <span class="mono">p+m</span> 顺序</li>
+                <li>cast / mean / rsqrt 合同</li>
+                <li>actor 仍用原 autograd 路径</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h3>删除</h3>
+              <ul>
+                <li>逐层完整 y 写回</li>
+                <li>下一层独立 norm launch</li>
+                <li>最终 residual materialization</li>
+              </ul>
+            </div>
+          </div>
+        </main>
+      </section>
+
+      <section class="slide" data-label="最终 endpoint">
+        <header><div class="eyebrow">最终保留结果</div></header>
+        <main>
+          <h2>20-step exact endpoint：b54s2ly6</h2>
+          <div class="grid four">
+            <div class="card green">
+              <span class="tag">正确性</span>
+              <div class="metric green">0</div>
+              <p>MAE / max<br />55,224 tokens</p>
+            </div>
+            <div class="card">
+              <span class="tag blue">Generation</span>
+              <div class="metric blue">1.3805</div>
+              <p>ms/token</p>
+            </div>
+            <div class="card">
+              <span class="tag blue">Weighted</span>
+              <div class="metric blue">1.3670</div>
+              <p>ms/token</p>
+            </div>
+            <div class="card">
+              <span class="tag violet">Whole step</span>
+              <div class="metric blue">11.6351</div>
+              <p>seconds</p>
+            </div>
+          </div>
+          <div class="callout green" style="margin-top: 18px">
+            <p>
+              相对 <span class="mono">wecny6kl</span>：generation mean/weighted
+              -31.1%/-31.3%，whole-step -12.0%。
+            </p>
+          </div>
+          <div class="callout amber">
+            <p>
+              相对 stock 仍约慢 generation 23%–30%、whole-step 约
+              24%；尚未等速。
+            </p>
+          </div>
+        </main>
+      </section>
+
+      <section class="slide" data-label="优化阶梯">
+        <header><div class="eyebrow">完整 endpoint</div></header>
+        <main>
+          <h2>所有保留阶段</h2>
+          <div class="table">
+            <div class="row head">
+              <div class="cell">Run</div>
+              <div class="cell">gen ms/token</div>
+              <div class="cell">step s</div>
+              <div class="cell">exact tokens</div>
+              <div class="cell">新增</div>
+            </div>
+            <div class="row">
+              <div class="cell">Initial exact</div>
+              <div class="cell bad">3.155</div>
+              <div class="cell bad">16.259</div>
+              <div class="cell good">exact</div>
+              <div class="cell">baseline</div>
+            </div>
+            <div class="row">
+              <div class="cell">hkgim3ll</div>
+              <div class="cell">2.545</div>
+              <div class="cell">14.340</div>
+              <div class="cell">10,195</div>
+              <div class="cell">MoE+small-M</div>
+            </div>
+            <div class="row">
+              <div class="cell">mdagdxnl</div>
+              <div class="cell">2.428</div>
+              <div class="cell">14.329</div>
+              <div class="cell">warm all</div>
+              <div class="cell">shape</div>
+            </div>
+            <div class="row">
+              <div class="cell">c8clvuzn</div>
+              <div class="cell">2.270</div>
+              <div class="cell">13.629</div>
+              <div class="cell">9,997</div>
+              <div class="cell">K128</div>
+            </div>
+            <div class="row">
+              <div class="cell">daxteqj3</div>
+              <div class="cell">2.2167</div>
+              <div class="cell">13.5059</div>
+              <div class="cell">50,657</div>
+              <div class="cell">router</div>
+            </div>
+            <div class="row">
+              <div class="cell">wecny6kl</div>
+              <div class="cell">2.0041</div>
+              <div class="cell">13.2255</div>
+              <div class="cell">52,085</div>
+              <div class="cell">combine</div>
+            </div>
+            <div class="row">
+              <div class="cell">731ndh4e</div>
+              <div class="cell">1.7980</div>
+              <div class="cell">12.4854</div>
+              <div class="cell">49,424</div>
+              <div class="cell">norm</div>
+            </div>
+            <div class="row">
+              <div class="cell good">b54s2ly6</div>
+              <div class="cell good">1.3805</div>
+              <div class="cell good">11.6351</div>
+              <div class="cell good">55,224</div>
+              <div class="cell good">delayed</div>
+            </div>
+          </div>
+          <p class="footnote">
+            不同 run workload 不完全相同；表展示 confirmed endpoint
+            演进，不把每行差值都当严格 attribution。
+          </p>
+        </main>
+      </section>
+
+      <section class="slide" data-label="Profiling">
+        <header><div class="eyebrow">最终 endpoint 之后</div></header>
+        <main>
+          <h2>剩余 generation 工作集中在 MoE 与 GEMM</h2>
+          <div class="grid two">
+            <div class="card">
+              <h3>Eager launch attribution</h3>
+              <p>
+                10 forwards ≈158.5 ms：no-combine experts 50.7，linear 41.3，mm
+                39.3 ms。
+              </p>
+            </div>
+            <div class="card amber">
+              <h3>边界</h3>
+              <p>
+                这是 eager CPU/launch attribution，不是 Graph device
+                time，只用于筛选候选。
+              </p>
+            </div>
+          </div>
+          <div class="callout">
+            <p>
+              captured Graph 扫描真实 MoE shape 后，当前 M32/N64/K64、1
+              warp/stage2 仍最快，约 144–146 µs。
+            </p>
+          </div>
+        </main>
+      </section>
+
+      <section class="slide" data-label="直接融合否决">
+        <header><div class="eyebrow">未保留 · GEMM + combine</div></header>
+        <main>
+          <h2>把第二 expert GEMM 直接写入 combine，仍然更慢</h2>
+          <div class="grid two">
+            <div class="card green">
+              <h3>正确性</h3>
+              <p>
+                54 个 M/N/K/warp variants 全 bitwise exact，证明 BF16 rounding
+                与 slot order 可同时保留。
+              </p>
+            </div>
+            <div class="card red">
+              <h3>性能</h3>
+              <p>
+                best direct fused：<strong>44.97 µs</strong>；existing
+                two-kernel：<strong>43.47 µs</strong>。
+              </p>
+            </div>
+          </div>
+          <div class="callout red" style="margin-top: 18px">
+            <p>
+              minimum M16 dot replication 抵消少写一个中间 tensor 的收益。未做
+              E2E，代码删除。
+            </p>
+          </div>
+        </main>
+      </section>
+
+      <section class="slide" data-label="Attention 否决">
+        <header><div class="eyebrow">未保留 · Attention</div></header>
+        <main>
+          <h2>AITER 更快，但完全破坏 target semantics</h2>
+          <div class="grid two">
+            <div class="card green">
+              <h3>速度</h3>
+              <p>
+                warm generation <strong>2.024 / 1.836 ms/token</strong>，step
+                <strong>14.283 / 13.949 s</strong>。
+              </p>
+            </div>
+            <div class="card red">
+              <h3>正确性</h3>
+              <p>
+                MAE <strong>3.661–3.664</strong>，Pearson
+                <strong>0.32–0.37</strong>。不可用。
+              </p>
+            </div>
+          </div>
+          <div class="callout">
+            <p>
+              Triton attention M16/M32/M64 isolated latency均约 52–55 µs；masked
+              query rows 不是预期的大浪费。N128 改变 reduction 且不更快。
+            </p>
+          </div>
+        </main>
+      </section>
+
+      <section class="slide" data-label="调度否决">
+        <header><div class="eyebrow">未保留 · Scheduling</div></header>
+        <main>
+          <h2>减少调度次数或 replica 数量都没有收益</h2>
+          <div class="table">
+            <div class="row head">
+              <div class="cell">实验</div>
+              <div class="cell">正确性</div>
+              <div class="cell">gen/token</div>
+              <div class="cell">step</div>
+              <div class="cell">决定</div>
+            </div>
+            <div class="row">
+              <div class="cell">continuous=4</div>
+              <div class="cell good">exact</div>
+              <div class="cell">1.412/1.273</div>
+              <div class="cell bad">11.912/11.671</div>
+              <div class="cell">无稳定 gain</div>
+            </div>
+            <div class="row">
+              <div class="cell">continuous=8</div>
+              <div class="cell good">exact</div>
+              <div class="cell bad">2.489</div>
+              <div class="cell bad">更慢</div>
+              <div class="cell">否决</div>
+            </div>
+            <div class="row">
+              <div class="cell">4→1 replica</div>
+              <div class="cell good">exact</div>
+              <div class="cell bad">3.279</div>
+              <div class="cell bad">16.587</div>
+              <div class="cell">否决</div>
+            </div>
+            <div class="row">
+              <div class="cell">4→2 replicas</div>
+              <div class="cell good">exact</div>
+              <div class="cell bad">≈3.1</div>
+              <div class="cell bad">更慢</div>
+              <div class="cell">否决</div>
+            </div>
+          </div>
+        </main>
+      </section>
+
+      <section class="slide" data-label="其他否决">
+        <header><div class="eyebrow">未保留 · 其他</div></header>
+        <main>
+          <h2>局部 exact 加速不一定进入 E2E</h2>
+          <div class="grid two">
+            <div class="card red">
+              <h3>Q/K RMSNorm</h3>
+              <p>isolated 69–71→33 µs；E2E 无收益，删除。</p>
+            </div>
+            <div class="card red">
+              <h3>Actor delayed residual</h3>
+              <p>
+                3-step exact；old-logprob / actor update 无收益，只保留
+                rollout。
+              </p>
+            </div>
+            <div class="card red">
+              <h3>Disable log-softmax</h3>
+              <p>MAE 2.92e-7；无速度收益，保留 exact 实现。</p>
+            </div>
+            <div class="card red">
+              <h3>AITER no-combine</h3>
+              <p>
+                public API 无该模式；lower path 只支持 FP4，而模型 weights 为
+                BF16。
+              </p>
+            </div>
+          </div>
+        </main>
+      </section>
+
+      <section class="slide" data-label="Weight sync">
+        <header><div class="eyebrow">剩余 step 分解</div></header>
+        <main>
+          <h2>weight-sync gap 没复现为 exact 因果成本</h2>
+          <div class="grid two">
+            <div class="card">
+              <h3>表面差值</h3>
+              <p>
+                Exact-stock = +2.213 s：generation +1.194，weights
+                +0.743，old-logprob +0.177，actor +0.098。
+              </p>
+            </div>
+            <div class="card red">
+              <h3>8192-MiB bucket</h3>
+              <p>weights 5.109/5.404 s，mean 5.257；比 retained 5.178 更慢。</p>
+            </div>
+          </div>
+          <div class="callout amber" style="margin-top: 18px">
+            <p>
+              同节点 diagnostics 得到 3.228–3.944
+              s，方向反转；它依赖节点/运行状态，不是已证明的 deterministic
+              overhead。
+            </p>
+          </div>
+          <div class="callout">
+            <p>唯一稳定复现的剩余目标仍是 rollout generation。</p>
+          </div>
+        </main>
+      </section>
+
+      <section class="slide" data-label="失败总表">
+        <header><div class="eyebrow">Appendix · 决策记录</div></header>
+        <main>
+          <h2>主要未保留实验</h2>
+          <div class="table">
+            <div class="row head">
+              <div class="cell">方向</div>
+              <div class="cell">局部观察</div>
+              <div class="cell">E2E/exact</div>
+              <div class="cell">原因</div>
+              <div class="cell">状态</div>
+            </div>
+            <div class="row">
+              <div class="cell">context 2048</div>
+              <div class="cell">更少 splits</div>
+              <div class="cell">≈1%/exact</div>
+              <div class="cell">非主因</div>
+              <div class="cell">删除</div>
+            </div>
+            <div class="row">
+              <div class="cell">AITER attn</div>
+              <div class="cell good">更快</div>
+              <div class="cell bad">MAE≈3.66</div>
+              <div class="cell">语义不同</div>
+              <div class="cell">删除</div>
+            </div>
+            <div class="row">
+              <div class="cell">Q/K norm</div>
+              <div class="cell good">≈2.1×</div>
+              <div class="cell bad">E2E 无益</div>
+              <div class="cell">非主导</div>
+              <div class="cell">删除</div>
+            </div>
+            <div class="row">
+              <div class="cell">GEMM+combine</div>
+              <div class="cell good">54 exact</div>
+              <div class="cell bad">44.97&gt;43.47</div>
+              <div class="cell">M16 replication</div>
+              <div class="cell">删除</div>
+            </div>
+            <div class="row">
+              <div class="cell">fewer replicas</div>
+              <div class="cell good">exact</div>
+              <div class="cell bad">3.1–3.28</div>
+              <div class="cell">并行度下降</div>
+              <div class="cell">删除</div>
+            </div>
+            <div class="row">
+              <div class="cell">fixed-M32</div>
+              <div class="cell good">exact</div>
+              <div class="cell bad">2.496</div>
+              <div class="cell">padding</div>
+              <div class="cell">删除</div>
+            </div>
+          </div>
+        </main>
+      </section>
+
+      <section class="slide" data-label="方法总结">
+        <header><div class="eyebrow">可复用方法</div></header>
+        <main>
+          <h2>优化 exact inference 的四条经验</h2>
+          <div class="grid two">
+            <div class="card green">
+              <h3>写清 operation order</h3>
+              <p>
+                FP32 不够；还要固定 slot order、cast boundary、reduction 与
+                rsqrt。
+              </p>
+            </div>
+            <div class="card green">
+              <h3>Shape screen → E2E</h3>
+              <p>
+                backend exactness 取决于 M/K/N 与 layout；局部快必须再过 Graph
+                training。
+              </p>
+            </div>
+            <div class="card green">
+              <h3>优先删 materialization</h3>
+              <p>
+                最大收益来自 combine、residual/norm 与 delayed stream，而非小
+                kernel 微调。
+              </p>
+            </div>
+            <div class="card green">
+              <h3>负结果删除 surface</h3>
+              <p>不保留无收益 flags、kernels 或 fallback branches。</p>
+            </div>
+          </div>
+        </main>
+      </section>
+
+      <section class="slide" data-label="结论">
+        <header><div class="eyebrow">当前状态</div></header>
+        <main>
+        <h2>Exact rollout 已接近 stock，但尚未等速</h2>
+          <div class="grid">
+            <div class="card green">
+              <h3>正确性</h3>
+              <div class="metric green">55,224</div>
+              <p>warm tokens 全 exact</p>
+            </div>
+            <div class="card green">
+              <h3>Generation</h3>
+              <div class="metric green">−56.2%</div>
+              <p>3.155→1.3805 ms/token</p>
+            </div>
+            <div class="card green">
+              <h3>Whole step</h3>
+              <div class="metric green">−28.4%</div>
+              <p>16.259→11.635 s</p>
+            </div>
+          </div>
+          <div class="callout amber" style="margin-top: 18px">
+            <p>
+              尚未等速。下一阶段需要新的 MoE/GEMM execution structure；当前
+              tile、attention、replica consolidation 与 AITER lower path
+              已被实验边界封住。
+            </p>
+          </div>
+          <div class="callout">
+            <p>
+              最终 endpoint：W&B <span class="mono">b54s2ly6</span>。所有 run
+              使用 <span class="mono">trainer.save_freq=-1</span>，无
+              checkpoint。
+            </p>
+          </div>
+        </main>
+      </section>
+
+      <section class="slide" data-label="数据来源">
+        <header><div class="eyebrow">Appendix</div></header>
+        <main>
+          <h2>数据来源与实现位置</h2>
+          <div class="grid two">
+            <div class="card">
+              <h3>W&B runs</h3>
+              <p class="small mono">
+                hkgim3ll · mdagdxnl · c8clvuzn · col62rhl<br />daxteqj3 ·
+                wecny6kl · 731ndh4e · b54s2ly6
+              </p>
+              <p>最终结论优先使用 5/20-step confirmation。</p>
+            </div>
+            <div class="card">
+              <h3>实现</h3>
+              <p class="small mono">
+                sglang/srt/batch_invariant_ops/<br />sglang/srt/models/lfm2_moe.py<br />verl/models/transformers/monkey_patch.py
+              </p>
+              <p>
+                actor/rollout 共享 exact primitives；delayed residual 仅 rollout
+                启用。
+              </p>
+            </div>
+          </div>
+          <div class="callout">
+            <p>
+              公开 deck 呈现实验指标与算法结构；代码位于 task-specific research
+              branches。
+            </p>
+          </div>
+        </main>
+      </section>
+    </div>
+    <div class="controls">
+      <button id="prev" aria-label="上一页">←</button
+      ><button id="next" aria-label="下一页">→</button>
+    </div>
+    <script>
+      document
+        .querySelectorAll(".slide")
+        .forEach((s) =>
+          s.insertAdjacentHTML(
+            "beforeend",
+            '<footer class="footerline"><span>' +
+              s.dataset.label +
+              '</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>',
+          ),
+        );
+      const slides = [...document.querySelectorAll(".slide")],
+        bars = [...document.querySelectorAll(".bar")];
+      let index = 0,
+        startX = null;
+      function show(n) {
+        index = Math.max(0, Math.min(slides.length - 1, n));
+        slides.forEach((s, i) => s.classList.toggle("active", i === index));
+        document
+          .querySelectorAll(".counter")
+          .forEach((c) => (c.textContent = `${index + 1} / ${slides.length}`));
+        bars.forEach(
+          (b) => (b.style.width = `${((index + 1) / slides.length) * 100}%`),
+        );
+        history.replaceState(null, "", `#${index + 1}`);
+      }
+      document.getElementById("prev").onclick = () => show(index - 1);
+      document.getElementById("next").onclick = () => show(index + 1);
+      document.addEventListener("keydown", (e) => {
+        if (["ArrowRight", "PageDown", " "].includes(e.key)) {
+          e.preventDefault();
+          show(index + 1);
+        }
+        if (["ArrowLeft", "PageUp"].includes(e.key)) {
+          e.preventDefault();
+          show(index - 1);
+        }
+        if (e.key === "Home") show(0);
+        if (e.key === "End") show(slides.length - 1);
+      });
+      document.addEventListener(
+        "touchstart",
+        (e) => (startX = e.changedTouches[0].screenX),
+        { passive: true },
+      );
+      document.addEventListener(
+        "touchend",
+        (e) => {
+          const d = e.changedTouches[0].screenX - startX;
+          if (Math.abs(d) > 55) show(index + (d < 0 ? 1 : -1));
+        },
+        { passive: true },
+      );
+      const initial = parseInt(location.hash.slice(1), 10);
+      show(Number.isFinite(initial) ? initial - 1 : 0);
+    </script>
+  </body>
+</html>
