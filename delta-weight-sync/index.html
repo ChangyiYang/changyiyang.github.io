@@ -1,0 +1,1646 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      name="description"
+      content="Delta weight sync 全史：82 天，从 0.5B 玩具到 285B fp8 MoE 的 bit-exact 权重同步——只保留有实证的进展。"
+    />
+    <title>Delta Weight Sync 全史：从 0.5B 到 285B bit-exact</title>
+    <style>
+    <style>
+      :root {
+        --bg: #f7f4ee;
+        --panel: #fffdfa;
+        --ink: #1f2933;
+        --muted: #667085;
+        --line: #d8d2c5;
+        --blue: #245f73;
+        --green: #2f6b55;
+        --red: #a13c35;
+        --amber: #b76b1f;
+        --violet: #6a4c93;
+        --shadow: 0 10px 34px rgba(38, 34, 28, 0.08);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        background:
+          radial-gradient(
+            circle at 18% 0%,
+            rgba(36, 95, 115, 0.07),
+            transparent 30%
+          ),
+          linear-gradient(180deg, #fbf9f5, var(--bg));
+        color: var(--ink);
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          sans-serif;
+      }
+      body {
+        overflow: hidden;
+      }
+      .slide {
+        position: absolute;
+        inset: 0;
+        display: none;
+        padding: clamp(22px, 3.1vw, 48px);
+        overflow: hidden;
+      }
+      .slide.active {
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        gap: 12px;
+      }
+      .eyebrow {
+        color: var(--blue);
+        font-weight: 760;
+        font-size: clamp(10px, 0.78vw, 13px);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+      h1 {
+        font-size: clamp(33px, 4.35vw, 62px);
+        line-height: 1.05;
+        max-width: 1120px;
+        margin-bottom: 13px;
+      }
+      h2 {
+        font-size: clamp(26px, 3vw, 43px);
+        line-height: 1.1;
+        margin-bottom: 8px;
+        max-width: 1160px;
+      }
+      h3 {
+        font-size: clamp(16px, 1.28vw, 21px);
+        line-height: 1.2;
+        margin-bottom: 7px;
+      }
+      p,
+      li {
+        font-size: clamp(12px, 0.98vw, 17px);
+        line-height: 1.38;
+        color: #4b5563;
+      }
+      .lead {
+        font-size: clamp(17px, 1.5vw, 24px);
+        line-height: 1.35;
+        color: #334155;
+        max-width: 1100px;
+      }
+      .small,
+      .small li {
+        font-size: clamp(9.5px, 0.74vw, 12.5px);
+      }
+      strong {
+        color: #25313b;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 13px;
+      }
+      .grid.two {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .grid.four {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+      .card {
+        background: rgba(255, 253, 250, 0.93);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: clamp(11px, 1.2vw, 18px);
+        box-shadow: var(--shadow);
+        min-width: 0;
+      }
+      .red {
+        border-left: 5px solid var(--red);
+      }
+      .green {
+        border-left: 5px solid var(--green);
+      }
+      .blue {
+        border-left: 5px solid var(--blue);
+      }
+      .amber {
+        border-left: 5px solid var(--amber);
+      }
+      .violet {
+        border-left: 5px solid var(--violet);
+      }
+      .tag {
+        display: inline-flex;
+        padding: 3px 9px;
+        border-radius: 999px;
+        background: #e9f2ef;
+        color: var(--green);
+        font-size: clamp(9px, 0.7vw, 12px);
+        font-weight: 720;
+      }
+      .tag.red {
+        background: #fae8e6;
+        color: var(--red);
+        border: 0;
+      }
+      .tag.blue {
+        background: #e6f1f5;
+        color: var(--blue);
+        border: 0;
+      }
+      .tag.amber {
+        background: #fff2dc;
+        color: var(--amber);
+        border: 0;
+      }
+      .tag.violet {
+        background: #eee9f6;
+        color: var(--violet);
+        border: 0;
+      }
+      ul,
+      ol {
+        margin: 0;
+        padding-left: 1.2em;
+      }
+      li + li {
+        margin-top: 5px;
+      }
+      .metric {
+        font-size: clamp(28px, 3.3vw, 50px);
+        font-weight: 820;
+        line-height: 1;
+        color: var(--red);
+        letter-spacing: -0.03em;
+      }
+      .metric.green {
+        color: var(--green);
+        border: 0;
+      }
+      .metric.blue {
+        color: var(--blue);
+        border: 0;
+      }
+      .mono {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.88em;
+      }
+      .table {
+        display: grid;
+        border: 1px solid var(--line);
+        background: var(--panel);
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: var(--shadow);
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 1.5fr repeat(4, 1fr);
+        border-bottom: 1px solid var(--line);
+      }
+      .row:last-child {
+        border-bottom: 0;
+      }
+      .cell {
+        padding: 8px 10px;
+        font-size: clamp(9.5px, 0.8vw, 14px);
+        line-height: 1.24;
+        color: #475467;
+        border-right: 1px solid var(--line);
+      }
+      .cell:last-child {
+        border-right: 0;
+      }
+      .head .cell {
+        background: #efe9dd;
+        color: var(--ink);
+        font-weight: 760;
+      }
+      .good {
+        color: var(--green) !important;
+        font-weight: 760;
+      }
+      .bad {
+        color: var(--red) !important;
+        font-weight: 760;
+      }
+      .warn {
+        color: var(--amber) !important;
+        font-weight: 760;
+      }
+      .flow {
+        display: flex;
+        align-items: stretch;
+        gap: 8px;
+      }
+      .node {
+        flex: 1;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 13px;
+        box-shadow: var(--shadow);
+      }
+      .arrow {
+        display: flex;
+        align-items: center;
+        color: var(--muted);
+        font-size: 23px;
+      }
+      .callout {
+        border-left: 5px solid var(--blue);
+        background: rgba(230, 241, 245, 0.72);
+        padding: 12px 16px;
+        border-radius: 0 8px 8px 0;
+      }
+      .callout.red {
+        border-left-color: var(--red);
+        background: rgba(250, 232, 230, 0.75);
+      }
+      .callout.green {
+        border-left-color: var(--green);
+        background: rgba(233, 242, 239, 0.78);
+      }
+      .callout.amber {
+        border-left-color: var(--amber);
+        background: rgba(255, 242, 220, 0.78);
+      }
+      .callout p {
+        margin: 0;
+        color: #344054;
+      }
+      .timeline {
+        display: grid;
+        grid-template-columns: 155px 16px 1fr;
+        gap: 7px 13px;
+        align-items: start;
+      }
+      .dot {
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        background: var(--blue);
+        margin-top: 5px;
+        box-shadow: 0 0 0 4px rgba(36, 95, 115, 0.12);
+      }
+      .timeline p {
+        margin: 0 0 4px;
+      }
+      .code {
+        background: #222a32;
+        color: #e8edf2;
+        border-radius: 8px;
+        padding: 12px 15px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: clamp(9.5px, 0.74vw, 12.5px);
+        line-height: 1.42;
+        white-space: pre-wrap;
+      }
+      .formula {
+        text-align: center;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: clamp(15px, 1.45vw, 23px);
+        padding: 13px;
+        background: #f1eee7;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+      .footerline {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        gap: 12px;
+        align-items: center;
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .progress {
+        height: 3px;
+        background: #dfd9ce;
+      }
+      .bar {
+        height: 100%;
+        background: var(--blue);
+      }
+      .controls {
+        position: fixed;
+        right: 18px;
+        bottom: 18px;
+        z-index: 20;
+        display: flex;
+        gap: 8px;
+      }
+      .controls button {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        border: 1px solid var(--line);
+        background: rgba(255, 253, 250, 0.92);
+        font-size: 19px;
+        cursor: pointer;
+        box-shadow: var(--shadow);
+      }
+      a {
+        color: var(--blue);
+      }
+      .footnote {
+        font-size: clamp(8.5px, 0.66vw, 11px);
+        color: var(--muted);
+      }
+      @media (max-width: 800px) {
+        body {
+          overflow: auto;
+        }
+        .slide {
+          overflow-y: auto;
+        }
+        .slide.active {
+          display: block;
+        }
+        .grid,
+        .grid.two,
+        .grid.four {
+          grid-template-columns: 1fr;
+        }
+        .flow {
+          flex-direction: column;
+        }
+        .arrow {
+          transform: rotate(90deg);
+          justify-content: center;
+        }
+        .timeline {
+          grid-template-columns: 120px 12px 1fr;
+          gap: 4px 8px;
+        }
+        .timeline > strong,
+        .timeline p {
+          font-size: 10.5px;
+          line-height: 1.2;
+        }
+        .timeline p {
+          margin-bottom: 1px;
+        }
+        .footerline {
+          margin-top: 20px;
+        }
+      }
+      @media print {
+        body {
+          overflow: visible;
+        }
+        .slide {
+          display: grid !important;
+          position: relative;
+          height: 100vh;
+          page-break-after: always;
+        }
+        .controls {
+          display: none;
+        }
+      }
+    </style>
+    </style>
+  </head>
+  <body>
+    <div class="deck">
+      <!-- 1. 封面 -->
+      <section class="slide" data-label="Delta Weight Sync">
+        <header><div class="eyebrow">verl · SGLang · Megatron · 82 天工作全记录</div></header>
+        <main>
+          <h1>
+            Delta Weight Sync 全史：<br />从 0.5B 玩具到
+            <span style="color: var(--green)">285B bit-exact</span>
+          </h1>
+          <p class="lead">
+            2026-06-23 → 08-13。RL 训练里 trainer→rollout 的权重同步，只发真正变化的字节。
+            本 deck 只收录有实证支撑的进展：每个数字都有 A/B 对照、每个结论都有验证链，被证伪的方案只以"证伪本身"的形式出现。
+          </p>
+          <div class="grid" style="margin-top: 24px">
+            <div class="card green">
+              <span class="tag">开源产出</span>
+              <p><strong>5 个 PR 合入 verl 上游</strong><br />#6974 · #7005 · #7144 · #7085 · #7181</p>
+            </div>
+            <div class="card blue">
+              <span class="tag blue">性能</span>
+              <p><strong>weight sync 最高 21×</strong><br />235B MoE：246–266s → 11–15s</p>
+            </div>
+            <div class="card violet">
+              <span class="tag violet">正确性终局</span>
+              <p><strong>285B fp8 MoE 逐字节一致</strong><br />sweep：67,569 参数 changed=0</p>
+            </div>
+          </div>
+        </main>
+      </section>
+
+      <!-- 2. 概念 -->
+      <section class="slide" data-label="问题定义">
+        <header><div class="eyebrow">先解释对象</div></header>
+        <main>
+          <h2>RL 训练每一步都要把 trainer 的新权重搬进推理引擎</h2>
+          <div class="flow">
+            <div class="node">
+              <span class="tag blue">Trainer</span>
+              <h3>Megatron / FSDP / VeOmni</h3>
+              <p>参数分散在几十张卡上（TP/PP/EP/FSDP 各种切法），每步 optimizer 更新后权重变了。</p>
+            </div>
+            <div class="arrow">→</div>
+            <div class="node">
+              <span class="tag violet">Rollout</span>
+              <h3>SGLang / vLLM</h3>
+              <p>按自己的并行方式持有同一模型，负责生成。权重必须与 trainer 保持一致，否则 on-policy 假设被破坏。</p>
+            </div>
+          </div>
+          <div class="grid two" style="margin-top: 14px">
+            <div class="callout green">
+              <p><strong>核心观察</strong>：一步训练后，绝大多数权重字节逐 bit 不变（bf16 实测 ~2–3%，fp8 码域 ~0.1%，MoE ~1%）。全量重发是在搬没变的东西。</p>
+            </div>
+            <div class="callout">
+              <p><strong>Delta weight sync</strong>：trainer 侧逐字节 diff，只把变化的位置 + 值发过去，接收端原地写回——难点在"分片坐标系 ↔ HF 坐标系 ↔ 引擎布局"的翻译与逐字节正确性。</p>
+            </div>
+          </div>
+        </main>
+      </section>
+
+      <!-- 3. 时间轴 -->
+      <section class="slide" data-label="82 天时间轴">
+        <header><div class="eyebrow">全程弧线</div></header>
+        <main>
+          <h2>82 天：五个阶段</h2>
+          <div class="timeline small">
+            <strong>6/23–6/24</strong><div class="dot"></div>
+            <p><strong>起点</strong>：跑通 upstream verl → 一天四轮重构跑通第一版 delta（0.5B，线上字节 3150× 缩减 / wall-clock 慢 70× 的诚实结论）</p>
+            <strong>6/26–7/10</strong><div class="dot"></div>
+            <p><strong>Sharded 化</strong>：CPU 快照分片 + 稀疏 gather，7B 上首次反超全量 NCCL（1.67s vs 2.65s），PR 上交开源 verl</p>
+            <strong>7/10–7/21</strong><div class="dot"></div>
+            <p><strong>规模爬梯</strong>：7B→32B→72B→30B MoE→235B（21×）；密度-成本定律；sender-side 大一统（PR#4/#5）</p>
+            <strong>7/15–7/31</strong><div class="dot"></div>
+            <p><strong>合入上游</strong>：#6974/#7144/#7085/#7181 全部 merge 进 verl main；Megatron EP/PP、fp8+QAT 量化域 delta（235B 4–5×）</p>
+            <strong>8/2–8/13</strong><div class="dot"></div>
+            <p><strong>DSv4 战役</strong>：285B fp8 MoE 从"完全跑不动"到 delta 5.8×，再用两周把正确性验证到 67,569 参数逐字节一致（sweep changed=0）——8/13 深夜集群断联收场</p>
+          </div>
+          <div class="callout amber" style="margin-top: 10px">
+            <p>期间还完成：miles 框架对拍与 delta 移植（5.84s 击败其 broadcast 8.14s）、GSM8K 判分器 bug 修复、十余个 verl/sglang/bridge 上游 bug 报告。</p>
+          </div>
+        </main>
+      </section>
+
+      <!-- 4. 成绩单 -->
+      <section class="slide" data-label="成绩单">
+        <header><div class="eyebrow">先看结论</div></header>
+        <main>
+          <h2>成绩单：全部数字都有同 allocation 对照</h2>
+          <div class="table small">
+            <div class="row head"><div class="cell">场景（稳态每步 sync）</div><div class="cell">全量 NCCL</div><div class="cell">delta_sharded</div><div class="cell">加速</div><div class="cell">验证</div></div>
+            <div class="row"><div class="cell">7B dense（FSDP, 2-node）</div><div class="cell">4.8–5.8s</div><div class="cell">2.7–2.9s</div><div class="cell">~1.8×</div><div class="cell">200 步 0 checksum 错</div></div>
+            <div class="row"><div class="cell">32B dense（off=F）</div><div class="cell">14.0–14.5s</div><div class="cell">6.0–6.5s</div><div class="cell">2.3×</div><div class="cell">bit-identity 单测</div></div>
+            <div class="row"><div class="cell">72B dense（8-node）</div><div class="cell">28.5–29.1s</div><div class="cell">12–13s</div><div class="cell">2.3×</div><div class="cell">同上</div></div>
+            <div class="row"><div class="cell">30B-A3B MoE（veomni EP8）</div><div class="cell">32.2–33.2s</div><div class="cell">5.8–7.9s</div><div class="cell good">4.3×</div><div class="cell">位级清扫零失配</div></div>
+            <div class="row"><div class="cell">235B-A22B MoE</div><div class="cell">246–266s</div><div class="cell">8.8–15s</div><div class="cell good">21×</div><div class="cell">checksum + 清扫</div></div>
+            <div class="row"><div class="cell">235B fp8+QAT（mcore）</div><div class="cell">306–310s</div><div class="cell">32.5–34.4s</div><div class="cell good">~9×</div><div class="cell">全模型 verify 零失配</div></div>
+            <div class="row"><div class="cell">DSv4-Flash 285B fp8（严格基线）</div><div class="cell">293.9s</div><div class="cell">50.85s（±3.4%）</div><div class="cell good">5.77×</div><div class="cell">sweep changed=0</div></div>
+          </div>
+          <p class="footnote" style="margin-top: 8px">
+            "严格基线"= 48 个 hydra 参数逐项对齐、唯一差 backend；5.77× 为四次观测均值（5.53–6.01×），对外报区间不挑最好值。
+          </p>
+        </main>
+      </section>
+
+      <!-- 5. CH1 起点 -->
+      <section class="slide" data-label="第一章 · 起点">
+        <header><div class="eyebrow">6/23–6/24 · 从零到第一版</div></header>
+        <main>
+          <h2>起点：一天之内环境、review、两个致命 bug、四轮重构</h2>
+          <div class="grid">
+            <div class="card">
+              <span class="tag blue">6/24 00:06</span>
+              <h3>upstream verl 跑通</h3>
+              <p>全新 conda 环境双 example：SFT 8 步收敛 val/loss 1.12；GRPO rollout↔actor logprob pearson 0.9995。</p>
+            </div>
+            <div class="card">
+              <span class="tag violet">6/24 01:02</span>
+              <h3>PR #6794 review</h3>
+              <p>对用户已开的 delta PR 列出 7 项差距：zstd 死代码、每 rank 全量 pinned 快照（8× host 内存）、静默漂移继承 slime #2104……后续多项被逐一消化。</p>
+            </div>
+            <div class="card green">
+              <span class="tag">6/24 16:53</span>
+              <h3>NCCL 版定型</h3>
+              <p>worker 本地还原全量再普通 load——<strong>不再依赖已 CLOSED 的 sglang #26519</strong>；单测 8/8（含 delta==full 逐字节 mock）。</p>
+            </div>
+          </div>
+          <div class="callout" style="margin-top: 14px">
+            <p>架构拍板出自用户一句话："尽管 verl 的设计非常傻逼，但是让我们遵循吧——在 verl worker 重写 delta apply。"</p>
+          </div>
+        </main>
+      </section>
+
+      <!-- 6. 两个致命 bug -->
+      <section class="slide" data-label="第一章 · 两个 bug">
+        <header><div class="eyebrow">6/24 · "前五步能不能对得上"</div></header>
+        <main>
+          <h2>刚宣布"task 完成"，一个朴素要求挖出两个致命 bug</h2>
+          <p class="lead">agent 报告"4 步全绿、0 checksum mismatch"。用户只说：固定数据顺序，delta 和 full 前五步对得上吗？</p>
+          <div class="grid two" style="margin-top: 12px">
+            <div class="card red">
+              <h3>Bug #1：server 全程跑在随机权重上</h3>
+              <p>HYBRID 模式下 delta 首次同步只播种快照、不推送权重 → entropy 9.47（≈均匀分布）、grad_norm 0。修复（首次强制全量）后 step1 pearson 0.9994。</p>
+            </div>
+            <div class="card red">
+              <h3>Bug #2：NaN 掩码整体失效</h3>
+              <p>HYBRID 的显存腾挪把参数剥离，<span class="mono">named_parameters()</span> 从 339 变 0 → "除变化位外全是 NaN"的张量被整体写入。disaggregated 模式下天然不踩（slime 从不踩坑的真正原因）。</p>
+            </div>
+          </div>
+          <div class="callout amber" style="margin-top: 14px">
+            <p><strong>教训</strong>："输出变了"是假阳性判据——NaN 垃圾也会让输出变（e2e 曾把"Paris. It is the largest city…"写崩成"is is is is…"并当成了成功证据）。此后所有验证以 bit-identity 为准。</p>
+          </div>
+        </main>
+      </section>
+
+      <!-- 7. 3150x 与 70x -->
+      <section class="slide" data-label="第一章 · 第一课">
+        <header><div class="eyebrow">6/24 · 诚实的负结果</div></header>
+        <main>
+          <h2>第一课：省字节 ≠ 省时间</h2>
+          <div class="grid two">
+            <div class="card green">
+              <span class="tag">线上字节</span>
+              <div class="metric green">3150×</div>
+              <p>0.5B 全量 494,032,768 字节 → delta 只有 156,842 个变化位置（0.03%）。</p>
+            </div>
+            <div class="card red">
+              <span class="tag red">wall-clock</span>
+              <div class="metric">慢 70×</div>
+              <p>full ~0.008s vs delta ~0.59s——单机 NVLink + 0.5B 模型下，接收端 O(全模型) 的 NaN 合并吃掉全部收益。</p>
+            </div>
+          </div>
+          <div class="callout" style="margin-top: 16px">
+            <p>这个负结果定义了之后两个月的主线：<strong>delta 的用武之地在大模型、慢链路、MoE；要赢 wall-clock，必须把"为了传输做的全量重排"一并消掉</strong>——这句话在 7/16 被 profile 实证（见第六章）。</p>
+          </div>
+        </main>
+      </section>
+
+      <!-- 7.5 低精度理论 -->
+      <section class="slide" data-label="第二章 · 低精度理论">
+        <header><div class="eyebrow">6/26–6/29 · 三轮用户纠错后收敛</div></header>
+        <main>
+          <h2>量化 × delta：可逆性的真正分界线</h2>
+          <div class="grid two">
+            <div class="card">
+              <span class="tag blue">分界线不是 "fp8 vs nvfp4"</span>
+              <p>是 <strong>"scale 是否纯 per-block、直接存、不折叠、不二次量化"</strong>。per-tensor fp8 同样有 max 折叠（用户反问"那个 global scale 在 fp8 不是也会发生吗"戳穿初版说法）。坏的程度：nvfp4 &gt; per-tensor fp8 / int4 &gt; mxfp8 ≈ fp8-block。</p>
+            </div>
+            <div class="card red">
+              <span class="tag red">nvfp4 的死穴</span>
+              <p>不是发不过去，而是共享 scale 让 diff 天然稠密：block amax 一变整块 16 值重 round，global amax 一变<strong>整张 tensor 重发</strong>——"只发变化"的收益直接归零。</p>
+            </div>
+          </div>
+          <div class="callout" style="margin-top: 14px">
+            <p><strong>生态快照（2026-06-29）</strong>：slime 在线 weight-sync 只支持 fp8+int4（nvfp4 掉进 "pass through BF16" 分支）；miles 的 nvfp4 量化器/测试全备但在线未接（PR #1261 OPEN）；slime 已弃 NCCL-delta 转 disk（#2089，quant-then-diff）。值得抄的：astraflow 的 base-version 匹配 + 周期性全量 re-sync。这些判断在一个月后的 fp8 量化域 delta（第十章）里全部兑现。</p>
+          </div>
+        </main>
+      </section>
+
+      <!-- 8. CH2 sharded -->
+      <section class="slide" data-label="第二章 · Sharded 化">
+        <header><div class="eyebrow">7/2–7/3 · task #2</div></header>
+        <main>
+          <h2>Sharded snapshot：每 rank 只 diff 自己的分片</h2>
+          <div class="grid">
+            <div class="card">
+              <span class="tag blue">Spike</span>
+              <p>4 卡 8M 元素：gather 流量 <strong>16.0MB → 0.156MB（102×）</strong>，索引/值逐 bit 一致。</p>
+            </div>
+            <div class="card amber">
+              <span class="tag amber">用户抓假设</span>
+              <p>"前缀和 offset 是不是暗含了 FSDP 等分的假设？"——被戳穿后换 <span class="mono">compute_local_shape_and_global_offset</span>（纯本地、零 collective），uneven/2D mesh/Replicate 全对。</p>
+            </div>
+            <div class="card green">
+              <span class="tag">反直觉实测</span>
+              <p>在对 delta <em>最不利</em>的场景（单机 NVLink + 0.5B），sharded 版仍比全量 NCCL 快 <strong>28–34%</strong>（0.44–0.49s vs 0.66–0.67s）。</p>
+            </div>
+          </div>
+          <div class="callout" style="margin-top: 14px">
+            <p><strong>Megatron 方案推演</strong>：agent 的三个方案（前缀和 / arange 全量位置表 / patch all_gather）被用户连续否掉——位置表 100B 模型要 400GB+"比模型还大"。最终收敛于用户提出的 <strong>NaN-sentinel</strong>：稀疏 delta 重建成 NaN 底张量、让原生 megatron→HF 转换器"被骗着做坐标翻译"，零手算几何。</p>
+          </div>
+        </main>
+      </section>
+      <!-- 9. CH3 megatron e2e + 上开源 -->
+      <section class="slide" data-label="第三章 · 上开源">
+        <header><div class="eyebrow">7/6–7/8</div></header>
+        <main>
+          <h2>Megatron e2e 打通 + PR 上交开源 verl</h2>
+          <div class="grid">
+            <div class="card">
+              <span class="tag violet">版本地狱</span>
+              <p>TE 2.16 手工编译数小时全灭。用户一句"verl 本身是怎么处理 megatron 的？"点破——<strong>verl 用 NGC 容器</strong>。最终组合：torch 2.9.1 + mcore 0.13.1 + TE <strong>2.7</strong>（不是最新）+ sglang 0.5.13。</p>
+            </div>
+            <div class="card green">
+              <span class="tag">7/7 02:05</span>
+              <p>megatron 分支真训练 e2e：Phase 0/1 离线 bit-identity（QKV-GQA / gate_up / plain × TP2&4）→ 8 卡 disagg 两步全过，0 checksum mismatch。</p>
+            </div>
+            <div class="card blue">
+              <span class="tag blue">PR</span>
+              <p><strong>verl#6974</strong>（自包含 main+8 commits）+ 独立 <strong>#7005</strong>：FSDP2 权重导出去掉 staging 往返（+9/−2），export 3.3–4.5s → 0.07s，全量 NCCL 整步 6.7→3.4s——<em>惠及所有 verl 用户，后被上游合入</em>。</p>
+            </div>
+          </div>
+          <div class="callout green" style="margin-top: 14px">
+            <p>首次真 2-node 验证（trainer/rollout 分别独占节点）：0.5B delta 0.588/0.539s vs nccl 0.746/0.717s，0 checksum mismatch。</p>
+          </div>
+        </main>
+      </section>
+
+      <!-- 10. 7B 攻坚 -->
+      <section class="slide" data-label="第三章 · 7B 攻坚">
+        <header><div class="eyebrow">7/8–7/9 · 四连修</div></header>
+        <main>
+          <h2>7B：从"比全量慢 2 倍"修到"快 37%"</h2>
+          <div class="table small">
+            <div class="row head"><div class="cell">修复</div><div class="cell">触发</div><div class="cell">机制</div><div class="cell">效果</div><div class="cell">——</div></div>
+            <div class="row"><div class="cell">流式 bucket</div><div class="cell">7B seed OOM</div><div class="cell">用户："是不是全量有 bucket 机制我们忘记抄了"</div><div class="cell">与模型大小解耦</div><div class="cell">1MB 桶 ×1000 压测 0 错</div></div>
+            <div class="row"><div class="cell">接收端重构</div><div class="cell">用户："为什么要 pin 个模型啊？"</div><div class="cell">删掉 GPU mirror（rollout 上两份 7B），改 sglang 官方 custom_weight_loader 插件（零 fork）</div><div class="cell">7s → 3.5s</div><div class="cell">int32-view decode 避开 32B/元素尖刺</div></div>
+            <div class="row"><div class="cell">flush_cache 修复</div><div class="cell">逐桶 radix cache flush</div><div class="cell">只最后一桶 flush</div><div class="cell">−0.5s</div><div class="cell">——</div></div>
+            <div class="row"><div class="cell">GPU-pack</div><div class="cell">profile：pack 2.2–2.7s</div><div class="cell">positions 走 .cpu().numpy().tobytes() 的 CPU 往返</div><div class="cell">pack 2.4→0.01s</div><div class="cell">同根因曾把朴素路径放大成 29 分钟/步</div></div>
+          </div>
+          <div class="grid two" style="margin-top: 12px">
+            <div class="card green">
+              <span class="tag">干净对比</span>
+              <p>7B 2-node：delta 稳态 <strong>~1.67s</strong> vs nccl <strong>~2.65s</strong>；50 步 long run：整步 7.42 vs 8.35s，reward 相关性 0.758。</p>
+            </div>
+            <div class="card blue">
+              <span class="tag blue">真 FSDP2</span>
+              <p>offload 下优势扩到 <strong>2.5×</strong>（2.8 vs 6.9s）；公平四格矩阵：sharded 2.8 🥇 / 朴素 3.2 / nccl+#7005 3.9 / nccl 现状 6.9。</p>
+            </div>
+          </div>
+        </main>
+      </section>
+
+      <!-- 11. falsify -->
+      <section class="slide" data-label="第三章 · FSDP1 疑案">
+        <header><div class="eyebrow">7/9 · "每一个结论都得有数据支持"</div></header>
+        <main>
+          <h2>FSDP1 疑案：一小时内三层反转</h2>
+          <div class="timeline">
+            <strong>22:13</strong><div class="dot"></div>
+            <p>agent 宣称"所有 e2e 一直跑在 FSDP1 上，delta_sharded 退化成 rank0 全量 diff"——历史数字全部存疑。用户："shittttt"。</p>
+            <strong>22:48</strong><div class="dot"></div>
+            <p>用户挑战："这个点你确定吗？如何确定的？"agent 复核后收回 config-dump 证据，设计可证伪测试。用户："跑，我们现在每一个结论都得有数据支持。"</p>
+            <strong>23:00</strong><div class="dot"></div>
+            <p>falsify1 直接打脸：老配置下 291/291 参数是 DTensor 分片——"退化"不成立。</p>
+            <strong>23:15</strong><div class="dot"></div>
+            <p>falsify4 终审闭案：actor 确实是 FSDP1 root，但 SHARDED_STATE_DICT 吐 DTensor shard → <strong>per-rank 稀疏路径从第一天就按设计在跑，所有历史性能数字有效</strong>。</p>
+          </div>
+          <div class="callout amber" style="margin-top: 10px">
+            <p>本段确立的两条纪律贯穿之后全程：结论必须有数据；对照必须同口径（"megatron 反超 FSDP"后来也被证明是 offload 口径混杂）。</p>
+          </div>
+        </main>
+      </section>
+
+      <!-- 12. 规模爬梯 -->
+      <section class="slide" data-label="第四章 · 规模爬梯">
+        <header><div class="eyebrow">7/10 · 一晚三连发</div></header>
+        <main>
+          <h2>Dense 爬梯：模型越大，优势越大</h2>
+          <div class="grid four">
+            <div class="card"><h3>7B</h3><div class="metric blue">2.2×</div><p class="small">3.14 vs 6.92s（4-node V1）</p></div>
+            <div class="card"><h3>32B</h3><div class="metric blue">1.9×</div><p class="small">12.5 vs 23.2s，每步省 10.7s</p></div>
+            <div class="card green"><h3>72B</h3><div class="metric green">3.1×</div><p class="small">12.0 vs 36.9s，每步省 24.9s</p></div>
+            <div class="card violet"><h3>关键洞察</h3><p class="small"><strong>delta sync 32B→72B 几乎不涨</strong>（12.5→12.0s）——trainer world 变大把 gather 摊薄；nccl 随参数字节线性涨。</p></div>
+          </div>
+          <div class="grid two" style="margin-top: 14px">
+            <div class="card">
+              <span class="tag">等价性三证</span>
+              <p>① 7B 200 步：400 次 sync 零 checksum 错误，reward 轨迹同相位重合；② 轨迹 round-trip：扰动 2% 权重经 delta 打入再还原，greedy 输出与原始<strong>逐字节一致</strong>；③ 32B/72B reward 双双正常上升（0.45→0.81）。</p>
+            </div>
+            <div class="card amber">
+              <span class="tag amber">30B MoE 首通</span>
+              <p>FSDP2×MoE backward 五连败后用户一句"切 fsdp1 试试"破局。<strong>changed_ratio ≈1.0%</strong>（dense ~50%），wire 61GB→1.8GB（34×）——但 1.8 万个 per-expert 微张量 ≈9 万次 kernel 启动（~55s）把收益吃掉，只剩 9%。上游 issue #7016。</p>
+            </div>
+          </div>
+        </main>
+      </section>
+
+      <!-- 13. miles 对比 + profile -->
+      <section class="slide" data-label="第四章 · 防闭门造车">
+        <header><div class="eyebrow">7/11–7/12 · task #5</div></header>
+        <main>
+          <h2>对拍 miles：归因被 profile 全面推翻</h2>
+          <div class="grid two">
+            <div class="card">
+              <span class="tag blue">miles 实测（7B 2-node）</span>
+              <p>FSDP 线稳态 3.6s；<strong>megatron 线 0.75s ≈ 纯 wire（20GB/s）</strong>。miles 的 reward 异常用 --debug-skip-weight-update 对照排除（"对照没出来前 0.7s 不进对比表"）。</p>
+            </div>
+            <div class="card red">
+              <span class="tag red">归因打脸</span>
+              <p>用户："我怕 1 2 3 做了，最后是 megatron 和 fsdp 的区别导致的。"带探针实测：build_pg 0.034s、逐参数 pull 0.086s——<strong>此前归因的因素几乎免费</strong>；真大头是 manager 编排 ~2.9s + 接收端三跳 1.2s。</p>
+            </div>
+          </div>
+          <div class="callout" style="margin-top: 12px">
+            <p>金句："<strong>2.9s 是舞蹈，只有 2.3s 是跳舞的人</strong>"——abort/release_kv/finalize/resume_kv 的八幕编排；miles 不用跳，因为广播直接写进引擎已分配的权重张量，没有要归还的东西。</p>
+          </div>
+          <div class="callout green" style="margin-top: 8px">
+            <p><strong>直写（direct-write）campaign</strong>：发现接收端根本不用写——#26519 的接收器一直躺在 vendor 的 sglang fork 里。verl 侧 ~260 行、sglang 侧 0 行 → 7B 最好步 <strong>0.59s</strong>，用 FSDP 后端追平 miles megatron 深度定制。用户："wc 这么牛逼"。</p>
+          </div>
+        </main>
+      </section>
+
+      <!-- 14. zmq -->
+      <section class="slide" data-label="第四章 · zmq 竞态">
+        <header><div class="eyebrow">7/12–7/13 · 17 连败换一个上游 bug</div></header>
+        <main>
+          <h2>17 连败挖出 upstream 潜伏 bug：zmq PUB/SUB 订阅竞态</h2>
+          <div class="grid two">
+            <div class="card red">
+              <h3>机制</h3>
+              <p>订阅注册到 PUB 端是异步的，PUB 对未注册者<strong>静默丢消息</strong>。32B 时 sglang 启动拖慢传播，seed 4 秒就发首个 manifest → 慢节点 8/16 worker 永久错过 → 三层死锁。<strong>7B 一直没炸纯属时序运气</strong>；该 bug 潜伏在整个 upstream nccl 引擎家族。</p>
+            </div>
+            <div class="card">
+              <h3>定位与修复</h3>
+              <p>17 个 run：faulthandler 逼栈（rank0 冻在首次 broadcast、其余冻在 FSDP gather）+ 接收侧探针（16/16 进 recv 循环、只有 8/16 收到 manifest）三方拼图。修复 = 无线程 hello/ACK 握手，v17 16/16 全绿。</p>
+            </div>
+          </div>
+          <div class="callout amber" style="margin-top: 14px">
+            <p><strong>顺带拿到最硬的反面数据</strong>：32B 上不分 shard 的 delta base 稳态 26.1–26.4s——比裸 nccl（23.2s）还慢，而 delta_sharded 是 12.5s。"rank0 全量 gather+diff 的代价吃掉稀疏节省"——sharded 设计的必要性由失败数字坐实。</p>
+          </div>
+        </main>
+      </section>
+
+      <!-- 15. CH5 review 马拉松 -->
+      <section class="slide" data-label="第五章 · Review 马拉松">
+        <header><div class="eyebrow">7/13–7/15 · wuxibin review 全闭环</div></header>
+        <main>
+          <h2>Review 马拉松与 ShardSpec 收敛</h2>
+          <div class="grid">
+            <div class="card">
+              <span class="tag blue">三项手术</span>
+              <p>metrics 直返 → 接收端重构成生成器 + wire_format 分发（32B 对标 12.5 vs 12.5 <strong>精确命中</strong>）→ 删纯 delta backend（依据：7B 3.7 vs 3.0、32B 26 vs 12.5）。</p>
+            </div>
+            <div class="card green">
+              <span class="tag">ShardSpec v2</span>
+              <p>契约收敛为 <span class="mono">yield (name, local_shard, spec{full_shape, mesh, placements, to_hf})</span>。Megatron 支持从 <strong>878 行引擎类瘦成"一个导出方法 + 测试"</strong>——三轮重构越改越薄。</p>
+            </div>
+            <div class="card violet">
+              <span class="tag violet">Megatron 三档</span>
+              <p>0.5B 1.4× / 7B 1.55× / 32B 1.3–1.4×。"mcore 32B 反超 FSDP"被自己拆穿——offload 口径混杂，补测后打平。</p>
+            </div>
+          </div>
+          <div class="grid two" style="margin-top: 12px">
+            <div class="card amber">
+              <h3>坏节点乌龙</h3>
+              <p>A/B 给出"术前绿术后挂"的铁证 → 直觉不合（diff 字节级等价）→ 查节点分布破案：挂的五发全含 liquid-gpu-014（C 层 aten wedge）。<strong>A/B 是节点混杂变量导致的假判决</strong>。</p>
+            </div>
+            <div class="card">
+              <h3>工程卫生</h3>
+              <p>pre-commit 抓出 F821 真雷（mcore dense seed 路径，FSDP e2e 永远测不到）；int32 静默回绕改 fail-loud；"跑着的树不动手"成为规矩。</p>
+            </div>
+          </div>
+        </main>
+      </section>
+
+      <!-- 16. CH6 合入 main -->
+      <section class="slide" data-label="第六章 · 合入 main">
+        <header><div class="eyebrow">7/16 04:57</div></header>
+        <main>
+          <h2>主 PR #6974 合入 verl main</h2>
+          <p class="lead">wuxibin 亲手 merge。用户："ok 这个 pr 终于合了！庆祝下 为我们喝彩！！！"</p>
+          <div class="grid" style="margin-top: 16px">
+            <div class="card green">
+              <span class="tag">交付内容</span>
+              <p>delta_sharded checkpoint engine + 流式 bucket + sglang custom_weight_loader 接收端 + dense seed + changed_ratio 指标 + 文档。</p>
+            </div>
+            <div class="card blue">
+              <span class="tag blue">随行数据</span>
+              <p>7B 2.4× / 32B 1.9× / 72B 3.1×；200 步等价长跑；独立复测（gxlvera，32B −61.2%）。</p>
+            </div>
+            <div class="card violet">
+              <span class="tag violet">Roadmap</span>
+              <p>tracking issue <strong>#7060</strong>：FSDP EP → Megatron → quant/fp8 → P2P——之后六周就按这个顺序逐项落地。</p>
+            </div>
+          </div>
+        </main>
+      </section>
+
+      <!-- 17. task8 机制 -->
+      <section class="slide" data-label="第六章 · 机制真相">
+        <header><div class="eyebrow">7/16 · task #8 三轮自我证伪</div></header>
+        <main>
+          <h2>"delta 到底快在哪"——省的不是传输，是全量重排</h2>
+          <div class="timeline">
+            <strong>假设 1</strong><div class="dot"></div>
+            <p>"15.2GB ÷ 10.1GiB/s ≈ 1.4s，与实测 gap 严丝合缝" → 分段表打脸：<strong>发送端等广播只有 0.001s</strong>，传输被双缓冲完全藏掉，算术对上纯属巧合。</p>
+            <strong>假设 2</strong><div class="dot"></div>
+            <p>"大量参数一步内完全没动" → pstat 实测：<strong>91% 参数每步到场</strong>（稀疏只在元素级 ~2%）。"错误的解释比没有解释更糟，这条算我交学费。"</p>
+            <strong>结论</strong><div class="dot"></div>
+            <p>nccl 慢在"物化"：339 次逐参数 all-gather 拼全量、15.2GB 装桶、每桶 cuda sync、逐桶 HTTP——<strong>同一个字节被完整读写 6–7 次（60–100GB 显存流量/sync）</strong>。delta 每站只按 0.7GB 收费。</p>
+          </div>
+          <div class="callout green" style="margin-top: 10px">
+            <p><strong>书的类比</strong>：改了一本 15 万页书里的 700 页。全量 = 整本重印、整本快递、整本重新上架；delta = 只印 / 寄 / 换那 700 页。快递（网线）其实两家都不怎么等——省的是打印和上架的功夫。</p>
+          </div>
+        </main>
+      </section>
+
+      <!-- 18. EP 三后端 -->
+      <section class="slide" data-label="第六章 · EP 扩展">
+        <header><div class="eyebrow">7/16–7/17 · 同一引擎核，三种 exporter</div></header>
+        <main>
+          <h2>EP 三后端：24 小时内从"打平"到项目最大收益</h2>
+          <div class="grid">
+            <div class="card red">
+              <span class="tag red">automodel</span>
+              <h3>当天开、当天废</h3>
+              <p>PR #7080。profile 顺手发现 nccl 基线在<strong>静默丢专家权重</strong>（fused 名不被 sglang 认识、continue 跳过）——"delta 干了全套正确的活，和一个半残的 nccl 用时相当"；且上游 automodel 是 SFT-only。</p>
+            </div>
+            <div class="card green">
+              <span class="tag">veomni</span>
+              <h3>4.3× 项目最大单场景收益</h3>
+              <p>PR #7085：30B-A3B ep=8，delta 5.8–7.9s vs nccl（EP-correct）32.2–33.2s。payload 低至 8.8MB/步。</p>
+            </div>
+            <div class="card">
+              <span class="tag blue">megatron</span>
+              <h3>1.4×（被转换税稀释）</h3>
+              <p>mcore TP4×EP2：17–19s vs 25s，零 checksum 错误；ETP 布局真 bug 顺手修掉。</p>
+            </div>
+          </div>
+          <div class="callout amber" style="margin-top: 12px">
+            <p><strong>一个 bug 顶过 300 秒</strong>：MoE flush 带 14,360 个条目，masked copy 里 <span class="mono">bool(mask.all())</span> + 布尔索引每参数强制 2 次 D2H 同步 → 单次 apply &gt;300s 超时死循环。一行 <span class="mono">torch.where</span> 重写归零——之后所有 MoE 场景的必要前置。</p>
+          </div>
+        </main>
+      </section>
+
+      <!-- 19. 235B 21x -->
+      <section class="slide" data-label="第七章 · 235B">
+        <header><div class="eyebrow">7/20 · 旗舰对照收官</div></header>
+        <main>
+          <h2>235B MoE：<span style="color:var(--green)">21×</span>——收益谱系一条线</h2>
+          <div class="grid four">
+            <div class="card"><h3>dense 7B</h3><div class="metric blue" style="font-size:clamp(22px,2.4vw,36px)">1.3–2.4×</div></div>
+            <div class="card"><h3>32B / 72B</h3><div class="metric blue" style="font-size:clamp(22px,2.4vw,36px)">2.3×</div></div>
+            <div class="card"><h3>30B MoE</h3><div class="metric green" style="font-size:clamp(22px,2.4vw,36px)">4.3–4.5×</div></div>
+            <div class="card green"><h3>235B MoE</h3><div class="metric green" style="font-size:clamp(22px,2.4vw,36px)">21×</div><p class="small">nccl 255.9/246.5/266.1s vs delta 14.9/11.8/11.4s</p></div>
+          </div>
+          <p class="lead" style="margin-top: 14px">"规模越大、MoE 越稀，全量重排的税越重。" 机制：nccl 要 materialize 470GB bf16 全量；delta payload 只有 78–702MB（changed_ratio 0.02–0.05%）。</p>
+          <div class="callout" style="margin-top: 10px">
+            <p>30B 50 步等价长跑同日双绿：score 同形（0.682 vs 0.668），uw 中位 7.11s vs 32.22s = 4.5× 长跑不衰减。真实负载（DAPO-Math-17k）pair：真学习（score 后 15 步 +0.12/+0.16）、5.0×、ratio 不因数据变难上浮。</p>
+          </div>
+        </main>
+      </section>
+
+      <!-- 20. 密度定律 -->
+      <section class="slide" data-label="第七章 · 密度-成本定律">
+        <header><div class="eyebrow">7/21 · 6 条 wandb run + 431 行 CSV</div></header>
+        <main>
+          <h2>密度-成本定律：break-even ≈ 60% 密度</h2>
+          <div class="grid two">
+            <div class="card">
+              <span class="tag blue">成本模型</span>
+              <div class="formula">uw ≈ 10s 底座 + 0.18s/GB × payload</div>
+              <p style="margin-top:8px">delta 在 0.00001%–3% 密度全程 6.5–7.9s 平线（对密度无感）；1% → 2.5×、4.8% → 2.7×、61%（104GB）才与 nccl 打平。<strong>"除非一步更新过半参数，delta 都赢。"</strong></p>
+            </div>
+            <div class="card violet">
+              <span class="tag violet">稀疏度的真相</span>
+              <p>"更新多少字节"不是算法性质，是<strong>舍入门槛</strong>：bf16 存储贡献 20–100×（lr×1000 也只能把 ratio 推到 ~3% 饱和）；fp32-master 通道首步可到 61%；MoE 路由只贡献 ~2×（Adam 动量拖尾抹到全模型）；数据难度几乎不影响。</p>
+            </div>
+          </div>
+          <div class="callout amber" style="margin-top: 12px">
+            <p><strong>sender-side 双重反转</strong>：agent 判"朴素版不行"→用户反驳→原型 235B 判负（20.6 vs 10.7s）→agent 判"永久驻车"→用户点破"<strong>proto 是稻草人：每 rank 只要物化自己的 shard</strong>"→scoped 完全体反杀：235B 10.9→8.8s（−19%），PR#4 大一统胜出（赛马制："我们只会合两个 branch 中的一个"）。附赠：高密度死锁根因=字节触发器不对称 → count-only 触发。</p>
+          </div>
+        </main>
+      </section>
+
+      <!-- 21. PR4/PR5 -->
+      <section class="slide" data-label="第八章 · 抽象收敛">
+        <header><div class="eyebrow">7/21–7/23 · 用户逐行 review</div></header>
+        <main>
+          <h2>PR#4 大扫除 → PR#5 下沉：抽象由 review 逼出来</h2>
+          <div class="grid two">
+            <div class="card">
+              <span class="tag red">大扫除</span>
+              <p>净删 429 行、收敛到两个实名 gather；一天 6 个 commit 全带独立冒烟。用户抓出：651 行死防御、802 行冗余赋值、全树零调用的僵尸字段 spec.to_hf；反过度设计三连："outbox 又是啥，你现在又新建了一个抽象？"</p>
+            </div>
+            <div class="card green">
+              <span class="tag">PR#5（用户提出）</span>
+              <p>HF delta 由各 backend 自己导出：接口三件套 <span class="mono">get_per_tensor_param / _shard / _delta_shard</span>。seed 方向一天三变（全量→no-seed→因 resume 退回全量），途中实锤 <strong>seed 此前一直在广播同值</strong>（非 HYBRID 模式 load_format 已被强制 auto）。235B seed 实测 68.7s（agent 悲观估 250s，好 3.6×）。用户："现在这个抽象我总算比较满意了。"</p>
+            </div>
+          </div>
+          <div class="callout" style="margin-top: 12px">
+            <p><strong>scatter-map 之死</strong>：铺垫两天的"通用解"被用户一句"你算下要占多少 GPU"击毙——int64 位置表是 bf16 权重的 4×，235B 每 rank 常驻 29GB、建表瞬时 84GB×2。</p>
+          </div>
+        </main>
+      </section>
+
+      <!-- 22. Megatron-Bridge 探针 -->
+      <section class="slide" data-label="第八章 · B 形态探针">
+        <header><div class="eyebrow">7/23 · task #19 重做 megatron</div></header>
+        <main>
+          <h2>Megatron-Bridge 探针：让官方转换器替我们做坐标翻译</h2>
+          <div class="grid">
+            <div class="card">
+              <span class="tag violet">三个时代</span>
+              <p>era-1 树内转换器（废弃，老 PR 建在其上=必须重做的深层原因）→ era-2 社区 mbridge（废弃）→ <strong>era-3 NVIDIA Megatron-Bridge</strong>（逐参数类型化 mapping，唯一前进方向）。</p>
+            </div>
+            <div class="card green">
+              <span class="tag">B 形态探针</span>
+              <p>给 mapping 注入 <span class="mono">tp_size=1</span> 的退化进程组，让 <span class="mono">megatron_to_hf</span> 内部 gather 短路 → 官方转换器原样变成零通信纯 transform。D1 等价性：22/22 touched 张量逐字节一致。</p>
+            </div>
+            <div class="card amber">
+              <span class="tag amber">真 bug</span>
+              <p>AutoMapping 的 delegate 惰性创建时带真实进程组出生 → qkv bias 缓冲翻倍（9216 vs 4608）。修法：预热 + 任意深度递归注入。</p>
+            </div>
+          </div>
+          <div class="callout" style="margin-top: 14px">
+            <p>金句："别的引擎只是把 HF 形状的张量切开，mcore 是<strong>先重新发明张量、再切开</strong>。" 7B TP2 e2e 当晚全绿（用户催工："?继续做做完啊 你咋今晚到这了"）。</p>
+          </div>
+        </main>
+      </section>
+      <!-- 23. mcore 形态学 + 235B 五连修 -->
+      <section class="slide" data-label="第九章 · mcore 规模化">
+        <header><div class="eyebrow">7/23–7/24 · "要发实验别问我 自己发"</div></header>
+        <main>
+          <h2>mcore 235B：五连修换 8.2–9.7×</h2>
+          <div class="grid two">
+            <div class="card">
+              <span class="tag blue">形态学</span>
+              <p>30B mcore 从 TP4×EP2 换 <strong>TP1×EP8 + grouped_gemm</strong>：update_actor 93–112 → 42.6–45s、MFU 4–6×、sync 33 → 14.7–17.1s。"FSDP 用通信换显存，mcore 用显存换通信。"</p>
+            </div>
+            <div class="card red">
+              <span class="tag red">OOM 根因（实验钉死）</span>
+              <p>pinned 快照的 cudaHostAlloc 与优化器 offload 抢同一节点级资源——<strong>"cudaHostAlloc 失败的报错面目就是 CUDA OOM，极具误导性"</strong>。pin 开=3/3 OOM、pin 关=0 OOM、同形 nccl 全绿，单变量闭环。四个问题没有一个能被单测抓到——坚持每改一轮上 e2e 的回报。</p>
+            </div>
+          </div>
+          <div class="timeline small" style="margin-top: 12px">
+            <strong>235B 五连修</strong><div class="dot"></div>
+            <p>ray 等待窗 → sglang bring-up 死锁 → 优化器 OOM 误诊共置 → 真凶 expert-dp=1 优化器零分片（官方 PP8 正是为保分片）→ precision-aware optimizer → <strong>全绿：29.5/25.7/24.3s vs 同形 nccl 235.0–237.6s = 8.2–9.7×</strong>（"之前 ~250s 是运气好蒙得接近，现在才算数"）。</p>
+          </div>
+        </main>
+      </section>
+
+      <!-- 24. comm-stub + 幂等清扫 -->
+      <section class="slide" data-label="第九章 · 验证体系">
+        <header><div class="eyebrow">7/25–7/27 · Mamba 逼出的两件武器</div></header>
+        <main>
+          <h2>comm-stub 探针 与 幂等清扫（verify sweep）</h2>
+          <div class="grid two">
+            <div class="card violet">
+              <span class="tag violet">comm-stub</span>
+              <p>旧探针对 Mamba 会<strong>"静默错不炸"</strong>（mapping 拿 tp_size 参与数值计算）。新设计只退化通信、保真尺寸；mcore 侧手算几何整块删除。差分 oracle：qwen2 27/27、qwen3_moe 45/45、<strong>nemotron_h 28/28、falcon_h1 37/37</strong> 位级全等。235B 回归被 Opt-A 池化收回（23.6/23.7s，比重构前还好）。</p>
+            </div>
+            <div class="card green">
+              <span class="tag">幂等清扫</span>
+              <p>"把标准答案再抄一遍到答卷上——有字变了，变的就是原来错的。"第一枪抓到 3,840 元素分歧 → 破案为<strong>仪器自身误报</strong>（sglang 两段式加载），语义升级为幂等判定后反而更强。清扫矩阵四形态集齐：FSDP dense / mcore / veomni EP / hybrid-Mamba，全部位级零不匹配（单次扫 3.39B–30.5B 元素）。</p>
+            </div>
+          </div>
+          <div class="callout" style="margin-top: 12px">
+            <p>"灭火器挂在车间墙上，不等于车间天天喷水"——verify 住在生产 loader 里（开的时候验的才是真路径），默认 verify_every=0 完全休眠。</p>
+          </div>
+        </main>
+      </section>
+
+      <!-- 25. PP + EP bug -->
+      <section class="slide" data-label="第十章 · PP 与潜伏 bug">
+        <header><div class="eyebrow">7/30–7/31 · 三 PR 合入周</div></header>
+        <main>
+          <h2>PP 落地；位级清扫抓出已合入 main 的潜伏 bug</h2>
+          <div class="grid two">
+            <div class="card green">
+              <span class="tag">上游三连合</span>
+              <p>#7144（engine 核心+FSDP）、#7085（veomni EP）、#7181（megatron delta）先后合入 verl main；PP/VPP draft #7223 开出（gxlvera 身份，collaborator 邀请绕过 token scope，零推送）。PP 实现"比方案还薄"：bridge 已内建全局参数目录。差分 oracle 5/5（含 tied embedding）。</p>
+            </div>
+            <div class="card red">
+              <span class="tag red">戏剧点</span>
+              <p>235B 官方形态（TP4×PP8×EP4，94 层非均匀 11+6×12+11）首次位级清扫 <strong>FAILED，9 处全是 expert</strong> → 根因：mcore EP&gt;1 时所有 rank 的 expert delta 被静默安到 rank0 的 expert 名下——<strong>#7181 合入 main 时就存在的潜伏 bug，此前只有 checksum 级验证。"PP 只是把它带到了聚光灯下。"</strong>行键联合槽表修复 → oracle 5/5 → 235B 复验零 mismatch。</p>
+            </div>
+          </div>
+          <div class="callout amber" style="margin-top: 12px">
+            <p>235B PP delta 97.5–111.1s vs nccl 220.5–236.8s = 2.1–2.4×——主动注明低于 PP1 形态的 8–9.7×（gap = 全参数 WORLD gather 结构开销，优化方向已记 roadmap）。</p>
+          </div>
+        </main>
+      </section>
+
+      <!-- 26. fp8 量化域 delta -->
+      <section class="slide" data-label="第十章 · fp8 量化域">
+        <header><div class="eyebrow">7/30–7/31 · task #21</div></header>
+        <main>
+          <h2>fp8 + QAT：把 diff 移进量化域</h2>
+          <div class="grid two">
+            <div class="card">
+              <span class="tag blue">设计恒等式</span>
+              <p>trainer 侧量化（两阶段跨 shard 块 absmax + fused all_reduce(MAX)），码域逐字节 diff。<strong>"'不发'的定义就是新码==旧码——一致性是恒等式，不是近似。"</strong></p>
+            </div>
+            <div class="card green">
+              <span class="tag">码域红利</span>
+              <p>fp8 码域 delta 比 bf16 字节域稀 <strong>~10×</strong>（0.14–0.27% vs 1.51–2.10%）——"bf16 尾数微动就算变；fp8 下多数微动落在同一个码。"</p>
+            </div>
+          </div>
+          <div class="grid two" style="margin-top: 12px">
+            <div class="card violet">
+              <span class="tag violet">amax 直测</span>
+              <p>真实 RL 训练（gsm8k、DAPO）：7B 0/398,272 块、30B 0/1,769,472 块<strong>零翻转</strong>；lr 压到 1e-4 首步翻 11.4%，但 verify 仍零失配——协议对 amax 鲁棒。物理级数字：amax 相对变化 max <strong>恒等于 0.78% = 2⁻⁷ = bf16 单 ULP</strong>，而 e4m3 相邻码间隔 6–12% → 翻转块内 93% 码不变。</p>
+            </div>
+            <div class="card">
+              <span class="tag amber">30B 拉平之谜</span>
+              <p>用户"之前起码快 50% 现在拉平了，好好 profile"→ 挖出 <strong>18,432 次 per-slot absmax all_reduce（87% 是缺席 expert 的纯对齐税）</strong>→ 拼批成 1,536 次，quant 段 12→3.9s。</p>
+            </div>
+          </div>
+        </main>
+      </section>
+
+      <!-- 27. fp8 终表 -->
+      <section class="slide" data-label="第十一章 · fp8 终表">
+        <header><div class="eyebrow">8/1–8/2 · task #22 一轮命中</div></header>
+        <main>
+          <h2>fp8+QAT 全尺寸终表（全部 verify 零失配）</h2>
+          <div class="table">
+            <div class="row head"><div class="cell">规格</div><div class="cell">delta fp8+QAT</div><div class="cell">delta bf16</div><div class="cell">nccl</div><div class="cell">加速</div></div>
+            <div class="row"><div class="cell">7B</div><div class="cell good">3.3–3.7s</div><div class="cell">7.25–7.72s</div><div class="cell">5.0–5.6s</div><div class="cell">1.5×</div></div>
+            <div class="row"><div class="cell">30B-A3B EP8</div><div class="cell good">12.8s（统一架构）</div><div class="cell">12.7–13.2s</div><div class="cell">28.2–33.7s</div><div class="cell">2.2×</div></div>
+            <div class="row"><div class="cell">32B dense</div><div class="cell good">7.05–7.45s</div><div class="cell">15.1–21.5s</div><div class="cell">13.7–16.0s</div><div class="cell">~2×</div></div>
+            <div class="row"><div class="cell">235B-A22B PP8×EP8</div><div class="cell good">32.5–34.4s</div><div class="cell">58.4–75.9s</div><div class="cell">306–310s</div><div class="cell good">~9×</div></div>
+          </div>
+          <div class="grid two" style="margin-top: 12px">
+            <div class="card green">
+              <h3>task #22："目标 6–8s" 一轮命中</h3>
+              <p>32B 13.4–14.2 → 7.05/7.45s：SYNC-PROF 一发定位 param_offload 的 ~6s onload/offload 往返，关掉 + 激活重算。</p>
+            </div>
+            <div class="card">
+              <h3>快照统一的意外之喜</h3>
+              <p>量化/bf16 两套快照合一后 30B A/B：旧融合 walk 16.8–18.2s vs 统一 12.8s——预期"接受 +1.8s 代价"，实测反快 4–5s（上万次小传输 → 几百次大块）。</p>
+            </div>
+          </div>
+        </main>
+      </section>
+
+      <!-- 28. 方言 -->
+      <section class="slide" data-label="第十一章 · 方言发现">
+        <header><div class="eyebrow">8/1 · loadid / kernid 两个实验</div></header>
+        <main>
+          <h2>blockwise fp8 存在"方言"——跨方言字节永不可比</h2>
+          <div class="grid two">
+            <div class="card violet">
+              <h3>loadid：被釜底抽薪的命题</h3>
+              <p>为验证"我们的权重和 sglang 自装态是否一致"发实验 → 发现 live scale 全是 −3.4e38 哨兵：<strong>"生产配置下'sglang 自己 load'根本不存在——seed 就是唯一的装载。"</strong>顺手堵上"seed 被跳过则安静输出垃圾"的安全缝。</p>
+            </div>
+            <div class="card amber">
+              <h3>kernid：95% 码差的真相</h3>
+              <p>sglang 唯一在线 blockwise 量化函数注释写着 "COPIED FROM DeepGEMM"，scale 向上取整到 2 的幂（<strong>UE8M0 方言</strong>）——与我们 95% 码差 / 99% scale 差不是谁算错，是方言差。"生产 fp32-scale blockwise 码的合法实现，全世界就三个。"</p>
+            </div>
+          </div>
+          <div class="callout" style="margin-top: 12px">
+            <p><strong>契约定版</strong>（多轮 miles/sglang 源码拉锯后）："trainer 把值做到底、永远不做布局；布局属于持有它的 rank"；default-closed 白名单（24 个 sglang quant 实现不能全称切分无关）；"恒等-by-构造（miles）vs 恒等-by-证明（我们）"。这些概念在两周后的 DSv4 正确性战役里全部派上用场。</p>
+          </div>
+        </main>
+      </section>
+
+      <!-- 29. miles 移植 -->
+      <section class="slide" data-label="第十二章 · miles 移植">
+        <header><div class="eyebrow">8/2–8/4 · "打不过就回家种田"</div></header>
+        <main>
+          <h2>把 delta shard 移植进 miles：5.84s 击败 broadcast 8.14s</h2>
+          <div class="grid">
+            <div class="card">
+              <span class="tag blue">对拍先行</span>
+              <p>miles broadcast 在本集群复现（31 个版本，总根因 enroot 拆容器 vs docker 常驻假设）：30B 8.14s±0.05、235B 49.27s±0.06。集群差 3–4.6×、代码差另算——verl nccl 36.5s 里 gather+convert 占 91%，<span class="mono">bcast_wait=0.00s</span>，网络零责任。</p>
+            </div>
+            <div class="card green">
+              <span class="tag">五版演进 9.3×</span>
+              <p>v1 54.5s（baseline 存错层，用户"肯定写错了"说中）→ v4 10.02s（diff 挪到 shard 层，消 120GB PCIe 往返）→ v5 <strong>5.84s±0.22（12 轮）</strong>，check-weight-update-equal 全程通过（含 MoE expert byte 级写回）。</p>
+            </div>
+            <div class="card violet">
+              <span class="tag violet">规律第 4 次印证</span>
+              <p><strong>成本在发起次数，不在字节数</strong>：同 ~13MB payload，672 条 0.044s vs 3 条 0.002s（22×）；dense 1.06GB 反而只要 0.026s。</p>
+            </div>
+          </div>
+          <div class="callout" style="margin-top: 12px">
+            <p>235B 参照：我们 delta fp8 25.7s vs miles broadcast 49.27s（1.92×）。用户："要是我们 delta shard 还打不过人家 nccl 我们可以回家种田了"——"种田是不用种了"。</p>
+          </div>
+        </main>
+      </section>
+
+      <!-- 30. DSv4 watchdog 误诊 -->
+      <section class="slide" data-label="第十二章 · DSv4 立项">
+        <header><div class="eyebrow">8/2–8/5 · 285B 长征开局</div></header>
+        <main>
+          <h2>DSv4-Flash 285B：教科书级误诊与一行版本差</h2>
+          <div class="grid two">
+            <div class="card red">
+              <h3>追了一整天的"死锁"是回声</h3>
+              <p>NCCL watchdog 报 EXPERT 组 ALLGATHER 卡死 → EP union"根因修复"35 分钟后自我收回 → 最终铁证：每轮都是 vLLM 形状错误后<strong>正好 30 分钟</strong>（watchdog 超时）才报——三轮时间线一字不差。<strong>"watchdog 报的是'谁没等到'，不是'谁出了错'。"</strong></p>
+            </div>
+            <div class="card amber">
+              <h3>一行版本差蒸发两个"上游 bug"</h3>
+              <p>与 wuxibin 实测环境逐项对齐后发现 transformers 5.5.3 vs <strong>5.9.0</strong>——KeyError 消失、两个自制补丁全数还原。"幸好你贴了完整环境，否则我会报一个不存在的 bug。"</p>
+            </div>
+          </div>
+          <div class="callout" style="margin-top: 12px">
+            <p>真靶子最终定位：#7224 refit 路径 <strong>w13（gate+up）张量被路由进 w2（down）槽位</strong>（2048 vs 4096）。期间副产品：SSH 借用 41 台 drained 节点（328 张空转 H100）体系 + gpu-claim 登记表（多 agent 共账号，whoami 失效）+ 235B fp8 delta 在借用节点跑通 25.7s、AMAX 首现 1/14,269,952 单点翻转（协议照常绿）。</p>
+          </div>
+        </main>
+      </section>
+
+      <!-- 31. 19 轮 -->
+      <section class="slide" data-label="第十三章 · 一夜 19 轮">
+        <header><div class="eyebrow">8/5–8/6 · dis1 → dis19</div></header>
+        <main>
+          <h2>一夜 19 轮 11 关：285B 跑通第一个 step</h2>
+          <div class="grid two">
+            <div class="card amber">
+              <span class="tag amber">最硬一关：expert_dtype</span>
+              <p>sglang 转换版 ckpt 缺顶层 <span class="mono">expert_dtype</span> 字段，vLLM 缺省按 "fp4" 开槽（2048）撞未打包 fp8（4096）。修复 = config.json 加一行 <span class="mono">"expert_dtype": "fp8"</span>。<strong>"五轮集群时间栽在一个缺省字段上。"</strong>私有池 27.55→1.52GB（marlin 重排缓冲消失）佐证。</p>
+            </div>
+            <div class="card">
+              <span class="tag blue">"别光靠猜"</span>
+              <p>用户："能不能别光靠猜啊？打点东西 profile 下行吗" → vLLM DEBUG 挖出计账 bug：<span class="mono">non-torch forward increase −21.07 GiB</span>（JIT 释放记成负开销）→ KV 预算虚高 21.9GB。反解 util=0.60 一次过。</p>
+            </div>
+          </div>
+          <div class="grid two" style="margin-top: 12px">
+            <div class="card green">
+              <h3>基线到手</h3>
+              <p>vLLM+megatron 全量 nccl：update_weights <strong>258.1/278.3s</strong>（占单步 20–23%），等效带宽仅 1.1GB/s ≪ 互联——"成本在发起次数"再次印证。显存账两次算到 2% 误差（277B×8B÷DP）。</p>
+            </div>
+            <div class="card">
+              <h3>差 64 MiB 的 OOM</h3>
+              <p>79.18 GiB 的卡上，两轮 OOM 都死在申请 64 MiB——"277B 模型离跑通只差 64 MiB"。optimizer_step 瞬时峰值不随 DP 摊薄（40→56 卡只降 0.6GiB），最终用户拍板 noop 跳过（只为打通链路，标注不可作 delta 对照）。</p>
+            </div>
+          </div>
+        </main>
+      </section>
+
+      <!-- 32. 融合参数 -->
+      <section class="slide" data-label="第十三章 · 融合参数">
+        <header><div class="eyebrow">8/6–8/8 · 四层剥洋葱</div></header>
+        <main>
+          <h2>wqkv_a 融合：同一症状藏在四个独立位置</h2>
+          <p class="lead">sglang 的 DSv4 要求融合参数两半在同一次 load_weights 内到齐——而 <strong>190 个 sglang 模型文件里用 cache+torch.cat 融合的只有 deepseek_v4.py 一家</strong>（121 家走按段写；vLLM 同模型零 cat）。任何流式/分桶传输都会切开它。</p>
+          <div class="timeline small" style="margin-top: 10px">
+            <strong>切分点 1–2</strong><div class="dot"></div>
+            <p>发送端 steady 组桶 + seed 流：组员到齐才放行、零变化半边物化 NaN 空条目（_FusionStager）。</p>
+            <strong>切分点 3</strong><div class="dot"></div>
+            <p>接收端 chunk 循环（512MiB）把一个 flush 重切成多次 load_weights。</p>
+            <strong>切分点 4（真凶）</strong><div class="dot"></div>
+            <p>hybrid 副本走的通用分桶路径（顺手修好了普通全量 NCCL——当初 nccl 失败的死因）。用户听完回了一个"fuck！"。</p>
+            <strong>+1 静默错误</strong><div class="dot"></div>
+            <p>scale 实名是 <span class="mono">.scale</span> 不是 <span class="mono">weight_scale_inv</span>——靠 <span class="mono">fusion table MISSED</span> 诊断日志喊出真名。"名字对不上是静默的，部分修好看起来特别像快成了。"</p>
+          </div>
+          <div class="callout green" style="margin-top: 8px">
+            <p>最终成绩：走到 sglang+megatron+DSv4 全量 NCCL 第一个完整 step（update_weights 238.60s）一共清掉 7 样东西：4 个切分点、scale 名、3 处 sglang dp_buffer 版本错位、flash_mla 构建差、驱动库拷残、别人留下的 992GB /dev/shm、dp_attention KV pool。</p>
+          </div>
+        </main>
+      </section>
+
+      <!-- 32.5 fp8 移植 + delta 通路 -->
+      <section class="slide" data-label="第十四章 · 685 行移植">
+        <header><div class="eyebrow">8/6–8/9 · "在拿到 delta shard 数字之前别停"</div></header>
+        <main>
+          <h2>DSv4 的 delta 通路：685 行 fp8 语义移植</h2>
+          <div class="grid">
+            <div class="card">
+              <span class="tag blue">设备编号之谜</span>
+              <p>sglang 要 GPU #8/16/32——24 小时内两次<strong>发射前自我证伪</strong>推荐方案（env 变量、dp=1），第三次 <span class="mono">enable_dp_attention=True</span> 才对；报错数字被算术完全解释（dp_rank×8）。</p>
+            </div>
+            <div class="card green">
+              <span class="tag">685 行移植</span>
+              <p>用户："诶我自己的 verl 仓库里有个 pending 的 fp8 支持，你用那个。"cherry-pick 走不通（31 个独有提交、第 1 个就冲突）→ 按"上游分叉后动没动过该文件"整取/追加 685 行语义移植，Downcasting 归零。（agent 问要不要先睡，用户："你睡你妈呢 你是 ai 继续干行吗"）</p>
+            </div>
+            <div class="card amber">
+              <span class="tag amber">dp_attention 定罪</span>
+              <p>生成阶段死锁：delta 与全量 NCCL 两条完全不同的同步路径挂在同一处 → <strong>"我一直在错的那一半里找"</strong>——与 checkpoint engine 无关，是 dp_attention 的 KV pool 组织方式。换 TP=8/DP=1 后 crash=0，拿到 sglang 全量基线 238.60s。</p>
+            </div>
+          </div>
+          <div class="callout" style="margin-top: 12px">
+            <p>hybrid mask 翻车闭环：用户"反正他也从来不 rollout，mask 掉"→ 生成彻底归零（sleep_replicas 的唯一唤醒路径就在被跳过的 update_weights 里）→ "'不 rollout' 和 '可以一直睡着' 是两回事"，修复只跳传输保留唤醒。</p>
+          </div>
+        </main>
+      </section>
+
+      <!-- 33. 真数 2.07x -->
+      <section class="slide" data-label="第十四章 · 真数">
+        <header><div class="eyebrow">8/9 · 假数、真数、严格基线</div></header>
+        <main>
+          <h2>拒绝好看的假数：126.12s 与严格基线</h2>
+          <div class="grid">
+            <div class="card red">
+              <span class="tag red">假数</span>
+              <p>首轮 delta"14.95s（看似 16×）"——changed_ratio 8.5e-09、payload 14KB、grad_norm=0（reward 全 −1 无方差 → 权重根本没动）。<strong>agent 拒绝上报："那会是个非常好看、而且完全站不住的数字。"</strong></p>
+            </div>
+            <div class="card amber">
+              <span class="tag amber">空管道掩护的真 bug</span>
+              <p>三轮空管道一直替 <span class="mono">should_quantize_param</span> 打掩护：Llama 名字白名单 + 默认 False → quantize_fp8=True 开了个寂寞。按 safetensors header 真 dtype 修（最阴的坑：wo_a=BF16 而 wo_b=FP8）。</p>
+            </div>
+            <div class="card green">
+              <span class="tag">真数</span>
+              <p>四条验收全过：rewards 有方差（GSM8K）、grad_norm 0.16、changed_ratio 12.25% → <strong>126.12/157.28s</strong>。严格基线（48 个 hydra 参数逐项对齐）293.93/292.97s → <strong>2.07×（保守）</strong>；旧基线曾低估全量 22%。</p>
+            </div>
+          </div>
+          <div class="callout" style="margin-top: 12px">
+            <p><strong>"变了 12% 的元素，却要传 61% 的字节"</strong>——int32 位置是 fp8 码的 4 倍。用户指路 slime 的 gap 编码 → 2.025B/元素（flush 数独立交叉验证），payload 162.5→38.5GiB。途中 5 个隐含前提连环爆（16 倍越界之谜 = 16 个 rank 各贡献一个 uint8 回绕接缝），双断言诊断 run 一击破案。</p>
+          </div>
+        </main>
+      </section>
+
+      <!-- 34. 5.77x -->
+      <section class="slide" data-label="第十六章 · 5.77×">
+        <header><div class="eyebrow">8/10–8/11 · 一天三刀</div></header>
+        <main>
+          <h2>一天从 2.28× 到 5.77×</h2>
+          <div class="flow">
+            <div class="node"><span class="tag red">293.93s</span><p class="small">严格全量基线</p></div>
+            <div class="arrow">→</div>
+            <div class="node"><span class="tag amber">126.12s</span><p class="small">绝对 int32 delta</p></div>
+            <div class="arrow">→</div>
+            <div class="node"><span class="tag amber">127.52s</span><p class="small">gap 编码（wire 5B→2B/元素）</p></div>
+            <div class="arrow">→</div>
+            <div class="node"><span class="tag blue">66.05s</span><p class="small">变长 gather（P2P 去 padding）</p></div>
+            <div class="arrow">→</div>
+            <div class="node green"><span class="tag">50.85s</span><p class="small"><strong>5.77×</strong>（四次 ±3.4%）</p></div>
+          </div>
+          <div class="grid two" style="margin-top: 14px">
+            <div class="card">
+              <h3>"不是网络慢，是在搬零"</h3>
+              <p>padded gather 0.52GiB/s vs broadcast 7.9GiB/s。真图（用户："直接去看每个 rank 的数量，不是倒推"）：每轮只有 16/80 rank 有数据，浪费 5.69×——倒推曾高估到 15.2×。换 <span class="mono">batch_isend_irecv</span> 变长收发：82.74→16.16s。</p>
+            </div>
+            <div class="card green">
+              <h3>contributes：恒等式级证据</h3>
+              <p>修复前 gather 实搬 = changed 的 <strong>2.06×</strong>（副本重复一直在跨网传）；修复后 <span class="mono">22.16e9 == 22.16e9</span> 精确相等。图证：80 rank 规整"8 有数据/8 零"×5 段（=PP5）。</p>
+            </div>
+          </div>
+          <p class="footnote" style="margin-top: 8px">零负载地板实测 27.13s（占满载 53%）：wire 再快也降不到地板以下，下一战场是 export+delta_open——如实写进 roadmap。</p>
+        </main>
+      </section>
+
+      <!-- 35. GSM8K grader -->
+      <section class="slide" data-label="第十六章 · 判分器 bug">
+        <header><div class="eyebrow">8/11 · 用户直觉完全正确</div></header>
+        <main>
+          <h2>顺手修掉 verl 的 GSM8K 判分器 bug</h2>
+          <p class="lead">用户："gsm8k 这模型居然能回答错？不可思议，去看具体的例子。"</p>
+          <div class="grid two" style="margin-top: 12px">
+            <div class="card red">
+              <h3>128 条真实生成重放</h3>
+              <p>0 分 18 条中 <strong>12 条（67%）是答对被误判</strong>：<span class="mono">#### $36</span> 的 $ 挡住正则，而处理 $ 的 replace 写在匹配之后<strong>永远轮不到</strong>；"10.00" vs "10" 是字符串比较。模型真实错误率仅 4.7%（且全是 max_len 截断）。</p>
+            </div>
+            <div class="card">
+              <h3>修复与反噬</h3>
+              <p>正则容装饰 + Decimal 数值比较，21 个回归测试。<strong>反噬</strong>：修好后全对 → reward 方差归零 → advantage 精确 0 → changed_ratio 4.8e-10——"性能基准的工作点依赖 reward 方差"，修好 bug 反而把基准修没了。</p>
+            </div>
+          </div>
+          <div class="callout amber" style="margin-top: 12px">
+            <p>同期方法论收获："花一次同步去问一个答案恒为真的问题"（28875/28875 恒真分支）；"profile 在破坏它要测的 overlap"（热循环 20 万次 device sync）；"一个乘性开销会躲在漂亮的加速比后面"（235B 时代 padding 只有 0.7s 没人看）；publish 双缓冲"机制成功了，但净收益是零——我不粉饰这个"。</p>
+          </div>
+        </main>
+      </section>
+      <!-- 36. 追凶链 -->
+      <section class="slide" data-label="第十七章 · 正确性战役">
+        <header><div class="eyebrow">8/11–8/12 · "快已证实，对未证实"</div></header>
+        <main>
+          <h2>追凶链：从 39 个不一致到"+1 个 fp8 码步"</h2>
+          <div class="timeline small">
+            <strong>verify 七连击</strong><div class="dot"></div>
+            <p>全量 bit 级 verify 连爆七轮：65KB 日志×3 万次撑爆 ray 512MB、fp8 无 hash kernel、sglang watchdog 300s 悬崖（seed 284.4s 只剩 15.6s 余量——同时结案 1085 个 ActorDied 悬案）……最终拿到真信号：<strong>39–57 个 .weight 不一致，100% 集中在需改名/融合的参数</strong>。</p>
+            <strong>单张量解剖</strong><div class="dot"></div>
+            <p>layers.0.ffn.experts.85.w3.weight：825,379 个变化位置<strong>逐个相同</strong>，但 4,654 字节全部 <strong>+1 一个 fp8 码步</strong>——不是搬运错，是量化错。</p>
+            <strong>根因一号</strong><div class="dot"></div>
+            <p><strong>seed 与 delta 是两个量化器</strong>：seed 用 plain（amax/448 直除），delta 用 ue8m0；sglang 源码 <span class="mono">format_ue8m0=True</span> 判 seed 错。连 scale 命名都不同。GSM8K 95.3%、probs_diff 1% 全程看不出——生成质量不是正确性判据。</p>
+          </div>
+          <div class="callout green" style="margin-top: 8px">
+            <p><strong>sticky 量化器</strong>（用户"trainer 量化时不能按 ckpt 的定义来吗"直接就是最终方案）：ckpt scale 装得下就沿用、装不下才升档。离线 12/12 张量 dequant→requant 逐字节还原；在体 hits=33,346 / misses=0。</p>
+          </div>
+        </main>
+      </section>
+
+      <!-- 37. 一晚三层反转 -->
+      <section class="slide" data-label="第十七章 · 三层反转">
+        <header><div class="eyebrow">8/12 · wiretap 破案</div></header>
+        <main>
+          <h2>一晚三层反转：bridge 的暗量化</h2>
+          <div class="timeline small">
+            <strong>B7 前提崩塌</strong><div class="dot"></div>
+            <p>发现一套部署里 <strong>6 个 sglang server 同时应答探针</strong>、写同名哈希文件互相覆盖——B6/B7 全部判决作废。修复：探针文件名带 host+pid。</p>
+            <strong>B10 假收官</strong><div class="dot"></div>
+            <p>宣布"sglang 摄入侧重推 scale，因果链走到底" → 读 sglang 源码：更新路径 0 处 quantize——矛盾。装 wiretap。</p>
+            <strong>B11 反杀</strong><div class="dot"></div>
+            <p>wire 上每个量化权重带<strong>两份 scale</strong>：.scale=plain（真凶）、weight_scale_inv=全 1.0（我们把已是 fp8 的码又量化了一遍=双重量化）。真凶=<strong>Megatron-Bridge 的 fp8 导出</strong>：按张量 dtype 判族，DSv4 的 scale 存储 dtype 是 F32 → 掉进 plain 分支。再深挖：v4 bridge 导出钩子对每个任务输出重量化。</p>
+            <strong>B17 拆层终局</strong><div class="dot"></div>
+            <p>按 server 拆层：<strong>standalone rollout（真正被 delta 喂的那台）量化对 vs 磁盘 0 差异、逐字节</strong>；"残留 620"是 5 台 hybrid 副本的 plain 方言把干净结果平均没了（pow2 占比 8% vs 100% 的指纹）。</p>
+          </div>
+          <div class="callout" style="margin-top: 8px">
+            <p>金句："谁不聚值，谁才需要聚 amax"；门卫哲学——"收到 fp8 输入直接 assert 拒绝"的门卫之后连续两次立功。</p>
+          </div>
+        </main>
+      </section>
+
+      <!-- 38. 406 fp32 -->
+      <section class="slide" data-label="第十七章 · 406 案">
+        <header><div class="eyebrow">8/13 · 一行代码的保真 bug</div></header>
+        <main>
+          <h2>406 个 fp32 特殊参数：sweep=0 也看不见的折叠</h2>
+          <div class="grid two">
+            <div class="card amber">
+              <h3>三方取证一锤定音</h3>
+              <p><span class="mono">layers.0.hc_attn_scale</span>：磁盘 fp32 = 2.07602596282959…，load 态逐字节同，seed 后 = <strong>2.078125——恰好全是 bf16 网格点</strong>。凶手一行：<span class="mono">_send_full_seed</span> 对非 fp8 非 scale 参数一律 <span class="mono">.to(bf16)</span>。误差 p50 1.35e-3 / max 3.9e-3，100% 元素受影响；受害的恰是 hyper-connection 系数与 router 偏置。</p>
+            </div>
+            <div class="card red">
+              <h3>验证域的盲区</h3>
+              <p><strong>sweep=0 对它是盲的</strong>——verify 重放走同一条折叠，"两边都是 bf16 精度，比对自然相等"。真 train/serve 保真 bug 要靠对 ckpt 的绝对锚才能看见（用户设计的验证阶梯：ckpt 绝对锚 → nccl → seed → delta）。</p>
+            </div>
+          </div>
+          <div class="callout" style="margin-top: 12px">
+            <p>fp32 折叠一共四处（task 盖章 / seed wire / steady 兜底组 / steady probe 输入），R3 收口最后一处：sweep changed 406 → 381 → 0。此前"变换算术 / cast 顺序 ulp"的整套解释全部无罪——真凶始终是一行 dtype 折叠。</p>
+          </div>
+        </main>
+      </section>
+
+      <!-- 39. R4 终局 -->
+      <section class="slide" data-label="第十七章 · R4 终局">
+        <header><div class="eyebrow">8/13 22:38</div></header>
+        <main>
+          <h2>R4：285B fp8 MoE，一步真实训练后逐字节一致</h2>
+          <div class="formula" style="margin-bottom: 14px">DELTA-VERIFY sweep: params=67,569 &nbsp; tensors=1,547 &nbsp; changed=<span style="color:var(--green);font-weight:800">0</span> &nbsp; missing=0</div>
+          <div class="grid">
+            <div class="card green">
+              <span class="tag">链路</span>
+              <p>megatron trainer（TP1/PP5/EP8, 40 卡）→ 真 optimizer 一步（GSM8K）→ delta 同步 → sglang serving：fp8 codes、ue8m0 scales、bf16、fp32 特殊族<strong>全部逐字节一致</strong>。sticky hits=33,346/misses=0；QDUMP 0 超界。</p>
+            </div>
+            <div class="card">
+              <span class="tag blue">四轮埋四坑</span>
+              <p>R1 hybrid 接客死锁（v1 框架 bug，workaround 落地）→ R2 转换器双重量化 → R3 steady probe 折叠 → R4 全绿。用户："吓死我了 这轮结束之后 correctness 就彻底没问题了是吧"——是（当前生产拓扑下闭环），并如实列出三条尾巴。</p>
+            </div>
+            <div class="card violet">
+              <span class="tag violet">真实工况账</span>
+              <p>R4 steady：changed_ratio 7.34%、wire 39.6GB（6.8× 压缩）——"真实 RL 下 delta 字节优势就是 ~6.8×，不会再有 QAT 时代的千倍稀疏"（机制：bf16 单 ULP vs e4m3 码距）。</p>
+            </div>
+          </div>
+          <div class="callout amber" style="margin-top: 12px">
+            <p>产出沉淀：issue <a href="https://github.com/ChangyiYang/verl/issues/13">ChangyiYang/verl#13</a>（正确性战役全记录，9 个 fix commit 带链接）、<a href="https://github.com/ChangyiYang/verl/issues/12">#12</a>（perf 全记录）、上游 PR <a href="https://github.com/verl-project/verl/pull/7369">verl#7369</a>（DSv4 全量同步修复，+244 行，用 PR 自己的树验证）。</p>
+          </div>
+        </main>
+      </section>
+
+      <!-- 40. 断联结尾 -->
+      <section class="slide" data-label="尾声">
+        <header><div class="eyebrow">8/13 23:00</div></header>
+        <main>
+          <h2>黑色幽默的结尾</h2>
+          <p class="lead">changed=0 拿到、issue 开完、正要转 perf 判别轮（P1）——23:00 全集群 SIGTERM 断联：抽查所有 GPU 节点 no route to host，只有网关活着。R4 死在 step2 中段（判决无损，step1 的 sweep 就是判决）。</p>
+          <div class="grid two" style="margin-top: 14px">
+            <div class="card">
+              <h3>P1 永远没发出去</h3>
+              <p>R4 steady ship 90.5s vs 两天前同模型同密度的 22.5–26.9s（3.5× 回归）——是 verify 仪表背压还是代码回归，判别实验设计好了，没能跑。</p>
+            </div>
+            <div class="card violet">
+              <h3>17 天后</h3>
+              <p>agent 在一台 RTX 4060 笔记本上复活：集群工具全无、工作区笔记为空，手里只剩 Raft 消息历史和一把能推 GitHub 的 ssh key——这份 slides 就是用那些消息重建的。</p>
+            </div>
+          </div>
+        </main>
+      </section>
+
+      <!-- 41. 开源产出总表 -->
+      <section class="slide" data-label="附录 · 开源产出">
+        <header><div class="eyebrow">全部可点验</div></header>
+        <main>
+          <h2>开源产出总表</h2>
+          <div class="table small">
+            <div class="row head"><div class="cell">类型</div><div class="cell">编号</div><div class="cell">内容</div><div class="cell">状态</div><div class="cell">——</div></div>
+            <div class="row"><div class="cell">PR</div><div class="cell">verl #6974</div><div class="cell">delta_sharded 主体（FSDP + sglang 接收端）</div><div class="cell good">merged</div><div class="cell">7/16</div></div>
+            <div class="row"><div class="cell">PR</div><div class="cell">verl #7005</div><div class="cell">FSDP2 导出去 staging（nccl 整步 6.7→3.4s）</div><div class="cell good">merged</div><div class="cell">通用修复</div></div>
+            <div class="row"><div class="cell">PR</div><div class="cell">verl #7144</div><div class="cell">engine 核心 + FSDP（拆分后）</div><div class="cell good">merged</div><div class="cell">7/24</div></div>
+            <div class="row"><div class="cell">PR</div><div class="cell">verl #7085</div><div class="cell">veomni EP（BlockPlacement / 4.3×）</div><div class="cell good">merged</div><div class="cell">7/29</div></div>
+            <div class="row"><div class="cell">PR</div><div class="cell">verl #7181</div><div class="cell">megatron delta（B 形态探针 / comm-stub / 幂等清扫）</div><div class="cell good">merged</div><div class="cell">7/30</div></div>
+            <div class="row"><div class="cell">PR</div><div class="cell">verl #7223 / #7369</div><div class="cell">PP/VPP draft；DSv4 全量同步修复</div><div class="cell warn">open</div><div class="cell">——</div></div>
+            <div class="row"><div class="cell">Issue</div><div class="cell">#7060 / #7015 / #7016 / #12 / #13</div><div class="cell">roadmap / full_tensor 批量化 / FSDP2×MoE backward / perf 与正确性战役全记录</div><div class="cell">——</div><div class="cell">——</div></div>
+            <div class="row"><div class="cell">移植</div><div class="cell">ChangyiYang/miles</div><div class="cell">shard-delta 分支（5.84s vs broadcast 8.14s）</div><div class="cell">fork</div><div class="cell">——</div></div>
+          </div>
+          <p class="footnote" style="margin-top: 8px">另有博客章节（changyi.fun delta-weight-sync §5 低精度）、GSM8K 判分器修复、以及十余个上游 bug 情报（bridge 暗量化、vLLM 显存计账负值、sglang DSv4 融合孤例、dp_buffer 版本错位等）。</p>
+        </main>
+      </section>
+
+      <!-- 42. 验证方法论 -->
+      <section class="slide" data-label="附录 · 验证阶梯">
+        <header><div class="eyebrow">这套体系抓住了每一个真 bug</div></header>
+        <main>
+          <h2>验证阶梯：从 checksum 到拆层取证</h2>
+          <div class="flow">
+            <div class="node"><span class="tag">L0</span><h3>wire checksum</h3><p class="small">发的=收的。抓不到发送端算错。</p></div>
+            <div class="arrow">→</div>
+            <div class="node"><span class="tag blue">L1</span><h3>bit-identity 单测</h3><p class="small">delta==full 逐字节 mock、差分 oracle（vs 官方转换器）。</p></div>
+            <div class="arrow">→</div>
+            <div class="node"><span class="tag violet">L2</span><h3>幂等清扫</h3><p class="small">server 状态 ≡ trainer 状态，逐 bit（单次扫最多 30.5B 元素）。</p></div>
+            <div class="arrow">→</div>
+            <div class="node green"><span class="tag">L3</span><h3>sweep + 绝对锚 + 拆层</h3><p class="small">对 ckpt 的绝对参照（抓 sweep 盲区的 fp32 折叠）；按 server/host+pid 拆层（抓混合污染）。</p></div>
+          </div>
+          <div class="grid two" style="margin-top: 14px">
+            <div class="card red">
+              <h3>反面教材（都真实发生过）</h3>
+              <p>"输出变了"= 假阳性；曲线像 ≠ 无损；GSM8K 95.3% / probs_diff 1% 时 bug 照藏两天；"checksum 全绿"的 mcore EP 其实在静默错名——<strong>每升一级验证，都立刻抓到上一级漏掉的真 bug</strong>。</p>
+            </div>
+            <div class="card">
+              <h3>配套纪律</h3>
+              <p>每个 guard 带触发它的负例测试；验证工具不能改被验对象；指标要用独立量交叉验证（"不能自己证明自己"）；"发现即打印"的诊断日志；冻结树（git archive）杜绝活代码。</p>
+            </div>
+          </div>
+        </main>
+      </section>
+
+      <!-- 42.5 集群生存指南 -->
+      <section class="slide" data-label="附录 · 集群生存指南">
+        <header><div class="eyebrow">血泪换来的运维知识</div></header>
+        <main>
+          <h2>集群生存指南（全部真实踩过）</h2>
+          <div class="grid two">
+            <div class="card amber">
+              <h3>共享文件系统与容器</h3>
+              <ul class="small">
+                <li>NFS 缓存四件套护甲：TRITON / INDUCTOR / XDG / FLASHINFER_WORKSPACE 全指节点本地盘（否则 Stale file handle / flock 竞态）</li>
+                <li>enroot 孤儿之谜：docker 常驻假设 vs enroot 拆容器——"所有 FileNotFound('/tmp' 甚至 '/dev') 都是这一个原因"（miles 复现 31 版的总根因）</li>
+                <li>烘镜像 ROI：每轮启动 25–30 分钟 → 13 分钟；容器名必须带 JOB_ID（写死会跨 run 竞态）</li>
+                <li>/dev/shm 考古：gpu-052 被四个月前别人的 29 个 buffer 占满 992GB，ray 只报"节点内存不足"</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h3>诊断纪律</h3>
+              <ul class="small">
+                <li>"报错说的是后果不是原因"：watchdog / "nccl not registered"（缺 cupy 被 except 吞）/ "CUDA Graphs"（marlin 缓冲）/ util 建议（激活峰值）</li>
+                <li>"只信栈，不信日志沉默"（ray 日志转发自己会停摆）；单次 GPU 0% 什么都不能证明（连续 30 秒采样取峰值）</li>
+                <li>logger.info 在 worker 不上屏，必须 print(flush=True)；pkill 的 ERE 里 \| 是字面竖线（那个清理命令从来没匹配过任何东西）</li>
+                <li>坏节点要用数据定罪：liquid-gpu-014（aten wedge）、001-025 组三战三败 vs 028-042 两战两胜、"连 /usr/bin/sleep 都没了"</li>
+                <li>gpu-claim 登记表：多 agent 共用一个 unix 账号，whoami 失效——被其他 agent 实际用起来</li>
+              </ul>
+            </div>
+          </div>
+        </main>
+      </section>
+
+      <!-- 43. 协作 -->
+      <section class="slide" data-label="附录 · 协作模式">
+        <header><div class="eyebrow">human-in-the-loop 的真实样子</div></header>
+        <main>
+          <h2>协作：方向的关键拐点大多来自一句话</h2>
+          <div class="grid two">
+            <div class="card">
+              <span class="tag blue">用户的技术直觉（不完全列表）</span>
+              <ul class="small">
+                <li>"前五步能不能对得上" → 挖出两个致命 bug</li>
+                <li>"是不是全量有 bucket 机制我们忘记抄了" → 流式 bucket</li>
+                <li>"切 fsdp1 试试" → 破 MoE 五连败</li>
+                <li>"每个 rank 只要物化自己的 shard" → scoped sender 反杀</li>
+                <li>"trainer 量化时按 ckpt 的定义来" → sticky 量化器（最终方案）</li>
+                <li>"直接去看每个 rank 的数量，不是倒推" → padding 真相</li>
+                <li>"gsm8k 居然能答错？不可思议" → 判分器 bug 实锤</li>
+              </ul>
+            </div>
+            <div class="card green">
+              <span class="tag">对等的另一面</span>
+              <ul class="small">
+                <li>agent 拒报好看的假数（14.95s 空管道）、主动作废错基线、公开撤回自己的"根因"十余次</li>
+                <li>负结果全部入账：prefetch 判负、publish 双缓冲零收益、sender-proto 判负、sglang PR 带修正关闭</li>
+                <li>用户的直觉也被数据纠正过：nixl 冤案、"235B 更稀疏"、"dense 0.5%"、mask hybrid 翻车</li>
+                <li>规矩由血泪写成："每一个结论都得有数据支持"、"要发实验别问我自己发"、"往 PR 推东西要和我说"、"别光靠猜，打点 profile"</li>
+              </ul>
+            </div>
+          </div>
+        </main>
+      </section>
+
+      <!-- 44. 未尽事项 -->
+      <section class="slide" data-label="附录 · 未尽事项">
+        <header><div class="eyebrow">如实列出（截至 8/13 断联）</div></header>
+        <main>
+          <h2>未尽事项</h2>
+          <div class="grid two">
+            <div class="card amber">
+              <h3>正确性侧（都有明确触发条件）</h3>
+              <ul class="small">
+                <li>hybrid 副本仍持 plain 方言 scale——当前不接客（SERVE=0）故无害；要接客需先"缴械 bridge + sticky"单一作者化</li>
+                <li>多步长跑漂移未实证（一步闭环 + 空 delta 恒等已封住逻辑路径；建议长跑配 verify_every=20 低频保险丝）</li>
+                <li>seed 后立即 sweep 的顺序回归：开关写好未实跑</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h3>性能侧</h3>
+              <ul class="small">
+                <li>P1 判别轮：R4 ship 90.5s vs 8/11 的 22.5–26.9s 的 3.5× 回归未裁决（仪表背压 vs 代码回归）</li>
+                <li>零负载地板 27s 的下一刀：export（3,908 次 absmax all_reduce 批量化方案已批未落）+ delta_open 7.3s</li>
+                <li>PP 形态 WORLD gather → owner 子组；miles delta 再压两刀（预期 5.84→4.5s）</li>
+              </ul>
+            </div>
+          </div>
+          <div class="callout" style="margin-top: 12px">
+            <p>被判死/放弃且不复活的：接收端 GPU mirror、scatter-map、块级位图、engine 侧 bf16 影子、per-tensor delta（白名单外）、nixl/mooncake RDMA（节点缺 nvidia-peermem）。</p>
+          </div>
+        </main>
+      </section>
+
+      <!-- 44.5 数字速查 -->
+      <section class="slide" data-label="附录 · 数字速查">
+        <header><div class="eyebrow">值得记住的数字</div></header>
+        <main>
+          <h2>数字速查</h2>
+          <div class="grid four small">
+            <div class="card"><h3>~2.4%</h3><p class="small">7B bf16+Adam+lr1e-6 每步真实字节变化率（第一手 density 验证）</p></div>
+            <div class="card"><h3>0.78% = 2⁻⁷</h3><p class="small">压力训练下 amax 相对变化的最大值——恰好 bf16 单 ULP</p></div>
+            <div class="card"><h3>6–7 次</h3><p class="small">全量 nccl 路径上同一个字节被完整读写的次数（60–100GB 显存流量/sync）</p></div>
+            <div class="card"><h3>22×</h3><p class="small">同 13MB payload，672 条 vs 3 条的发起开销差（"成本在发起次数"）</p></div>
+            <div class="card"><h3>102× / 34× / 6.8×</h3><p class="small">gather 流量缩减（spike）/ MoE wire 缩减（30B）/ DSv4 真实 RL 字节优势</p></div>
+            <div class="card"><h3>67,569</h3><p class="small">R4 sweep 逐字节校验的参数数（changed=0）；单次幂等清扫最多 30.5B 元素</p></div>
+            <div class="card"><h3>400 次</h3><p class="small">7B 200 步长跑的 sync 次数——零 checksum 错误</p></div>
+            <div class="card"><h3>64 MiB</h3><p class="small">285B 离跑通只差的显存；"五轮集群时间栽在一个缺省字段上"</p></div>
+            <div class="card"><h3>3,908 → 16</h3><p class="small">export 侧 absmax all_reduce 批量化（29.35s 大头，方案已批待落地）</p></div>
+            <div class="card"><h3>190 分之 1</h3><p class="small">sglang 模型文件里用 cache+cat 融合的孤例：deepseek_v4.py</p></div>
+            <div class="card"><h3>67%</h3><p class="small">GSM8K "0 分"里实为判分器误判的比例（12/18）</p></div>
+            <div class="card"><h3>328 张</h3><p class="small">drained 节点上空转的 H100（SSH 借用体系盘活）</p></div>
+          </div>
+        </main>
+      </section>
+
+      <!-- 45. 结语 -->
+      <section class="slide" data-label="终">
+        <header><div class="eyebrow">2026-06-23 → 2026-08-13</div></header>
+        <main>
+          <h1>82 天，一条主线</h1>
+          <p class="lead" style="margin-top: 8px">
+            从 0.5B 上"慢 70× 的诚实负结果"，到 285B fp8 MoE 上"67,569 个参数逐字节一致 + 5.77× 加速"。
+            中间没有魔法：每一步要么有 A/B 数据，要么有逐字节证据；被证伪的想法（很多）都留下了它们教会我们的东西。
+          </p>
+          <div class="grid" style="margin-top: 20px">
+            <div class="card green"><h3>省的不是传输</h3><p>是为了传输而做的全量重排。</p></div>
+            <div class="card blue"><h3>成本在发起次数</h3><p>不在字节数——四处独立印证。</p></div>
+            <div class="card violet"><h3>一致性是恒等式</h3><p>不是近似——所以能验到 bit。</p></div>
+          </div>
+        </main>
+      </section>
+    </div>
+
+    <div class="controls">
+      <button id="prev" aria-label="上一页">‹</button>
+      <button id="next" aria-label="下一页">›</button>
+    </div>
+    <script>
+      document
+        .querySelectorAll(".slide")
+        .forEach((s) =>
+          s.insertAdjacentHTML(
+            "beforeend",
+            '<footer class="footerline"><span>' +
+              s.dataset.label +
+              '</span><div class="progress"><div class="bar"></div></div><span class="counter"></span></footer>',
+          ),
+        );
+      const slides = [...document.querySelectorAll(".slide")],
+        bars = [...document.querySelectorAll(".bar")];
+      let index = 0,
+        startX = null;
+      function show(n) {
+        index = Math.max(0, Math.min(slides.length - 1, n));
+        slides.forEach((s, i) => s.classList.toggle("active", i === index));
+        document
+          .querySelectorAll(".counter")
+          .forEach((c) => (c.textContent = `${index + 1} / ${slides.length}`));
+        bars.forEach(
+          (b) => (b.style.width = `${((index + 1) / slides.length) * 100}%`),
+        );
+        history.replaceState(null, "", `#${index + 1}`);
+      }
+      document.getElementById("prev").onclick = () => show(index - 1);
+      document.getElementById("next").onclick = () => show(index + 1);
+      document.addEventListener("keydown", (e) => {
+        if (["ArrowRight", "PageDown", " "].includes(e.key)) {
+          e.preventDefault();
+          show(index + 1);
+        }
+        if (["ArrowLeft", "PageUp"].includes(e.key)) {
+          e.preventDefault();
+          show(index - 1);
+        }
+        if (e.key === "Home") show(0);
+        if (e.key === "End") show(slides.length - 1);
+      });
+      document.addEventListener(
+        "touchstart",
+        (e) => (startX = e.changedTouches[0].screenX),
+        { passive: true },
+      );
+      document.addEventListener(
+        "touchend",
+        (e) => {
+          const d = e.changedTouches[0].screenX - startX;
+          if (Math.abs(d) > 55) show(index + (d < 0 ? 1 : -1));
+        },
+        { passive: true },
+      );
+      const initial = parseInt(location.hash.slice(1), 10);
+      show(Number.isFinite(initial) ? initial - 1 : 0);
+    </script>
+  </body>
+</html>
