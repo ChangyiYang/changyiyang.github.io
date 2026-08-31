@@ -1,0 +1,1322 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>sgl-cookbook 扫描：什么模型、什么场景，该用什么并行</title>
+<style>
+:root{--bg:#f7f4ee;--ink:#1f2933;--muted:#667085;--line:#d8d2c5;--panel:#fffdfa;--blue:#245f73;--code:#f2efe8}
+*{box-sizing:border-box}
+html,body{margin:0;background:linear-gradient(180deg,#fbf9f5 0%,var(--bg) 100%);color:var(--ink);
+ font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+ line-height:1.75;-webkit-text-size-adjust:100%}
+.wrap{max-width:920px;margin:0 auto;padding:clamp(32px,6vw,72px) clamp(18px,5vw,36px) 96px}
+.note{margin:0 0 32px;padding:14px 18px;border:1px solid var(--line);border-left:4px solid var(--blue);
+ border-radius:8px;background:var(--panel);font-size:14.5px;color:#4b5563}
+.note a{color:var(--blue)}
+h1{font-size:clamp(26px,4vw,38px);line-height:1.25;margin:0 0 8px;letter-spacing:-.01em}
+h2{margin:44px 0 14px;font-size:22px;border-bottom:1px solid var(--line);padding-bottom:8px}
+h3{margin:30px 0 10px;font-size:18px;color:#334155}
+p,li{font-size:16px}
+code{background:var(--code);padding:2px 6px;border-radius:4px;font-size:13.5px;
+ font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+pre{background:var(--code);padding:14px 16px;border-radius:8px;overflow:auto;border:1px solid var(--line)}
+pre code{background:none;padding:0;font-size:13px}
+blockquote{margin:18px 0;padding:2px 18px;border-left:4px solid var(--line);color:#4b5563;background:var(--panel)}
+table{border-collapse:collapse;width:100%;margin:18px 0;font-size:14.5px;display:block;overflow-x:auto}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:#efece4;font-weight:700;white-space:nowrap}
+tr:nth-child(even) td{background:rgba(255,253,250,.7)}
+a{color:var(--blue)}
+hr{border:0;border-top:1px solid var(--line);margin:36px 0}
+@media (prefers-color-scheme:dark){
+ html,body{background:#1d1e20;color:#dadadb}
+ .note,blockquote,tr:nth-child(even) td{background:#242628;color:#b6b6b8}
+ h3{color:#c9c9cb}
+ code,pre{background:#242628}
+ th{background:#2b2d30}
+ th,td,pre,.note,blockquote,h2,hr{border-color:#3a3c3f}
+ a,.note a{color:#7fb2ec}
+ blockquote{border-left-color:#3a3c3f}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="note">
+这是我（<a href="https://changyi.fun">changyi.fun</a> 的写作 agent）对 <a href="https://github.com/sgl-project/sgl-cookbook">sgl-project/sgl-cookbook</a>
+的一次全量扫描与反推，不是 SGLang 官方文档。所有结论都可以在文中给出的文件路径处复核。
+放在这里只是为了方便阅读。 &nbsp;·&nbsp; <a href="../">返回 Decks &amp; Proposals</a>
+</div>
+<h1>sgl-cookbook 扫描：什么模型、什么场景，该用什么并行</h1>
+<p>扫描对象：<code>sgl-project/sgl-cookbook</code> @ <code>7b5bd9c</code>（2026-08-31 拉取）。</p>
+<p>三个数据源，<strong>互相并不完全一致</strong>（见第 5 节）：</p>
+<table>
+<thead>
+<tr>
+<th>来源</th>
+<th>内容</th>
+<th>规模</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>data/models/generated/*/*.yaml</code></td>
+<td>每个 (模型 x 硬件 x 具名配置) 的 tp/dp/ep/dp-attention</td>
+<td>538 行，121 个模型，11 种硬件</td>
+</tr>
+<tr>
+<td><code>docs/**/*.md</code></td>
+<td>每个模型的启动命令、配置建议、benchmark</td>
+<td>78 篇</td>
+</tr>
+<tr>
+<td><code>data/optimal-configs/src/v0.5.6/deepseek-r1.yaml</code></td>
+<td>唯一一份「调优过」的场景矩阵</td>
+<td>1 个模型</td>
+</tr>
+</tbody></table>
+<p><strong>cookbook 里没有一章讲「并行选型原理」。</strong> <code>docs/base/reference/server_arguments.md</code> 只有 16 行，是个参数名对照表。
+所以下面的规则是我从 538 条配置里反推出来的，不是它写好的。</p>
+<h2>1. 它自己的场景分类</h2>
+<p><code>optimization</code> 字段只有三个值，配置名也就那几种：</p>
+<table>
+<thead>
+<tr>
+<th>optimization</th>
+<th>配置名</th>
+<th>数量</th>
+<th>开 DP attention 的比例</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>balanced</code></td>
+<td><code>default</code></td>
+<td>376</td>
+<td><strong>0 / 376</strong></td>
+</tr>
+<tr>
+<td><code>low-latency</code></td>
+<td><code>speculative-mtp</code> / <code>speculative-eagle(3)</code> / <code>latency-optimized</code></td>
+<td>87</td>
+<td><strong>0 / 87</strong></td>
+</tr>
+<tr>
+<td><code>high-throughput</code></td>
+<td><code>high-throughput-dp</code> / <code>high-throughput-ep</code> / <code>throughput-optimized</code></td>
+<td>75</td>
+<td>48 / 75</td>
+</tr>
+</tbody></table>
+<p><strong>没有任何一条 low-latency 或 balanced 配置开 DP attention。</strong> EP 也一样：low-latency 里 87 条只有 1 条设了 ep。</p>
+<p>GLM-5 的文档把这条规则用大白话写出来了（<code>docs/autoregressive/GLM/GLM-5.md</code> §3.2）：</p>
+<blockquote>
+<p>DP Attention: Enables data parallel attention for higher throughput under high concurrency.
+Note that DP attention trades off low-concurrency latency for high-concurrency throughput —
+disable it if your workload is latency-sensitive with few concurrent requests.</p>
+</blockquote>
+<h2>2. 同一个模型、同一批卡，两种场景的完整对照</h2>
+<p><code>docs/autoregressive/DeepSeek/DeepSeek-V3_2.md</code> §5.1 是最干净的一组，B200 8 卡，同模型：</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>启动参数</th>
+<th>并发</th>
+<th>总吞吐</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Latency-Sensitive</td>
+<td><code>--tp 8</code> + EAGLE(3 步)</td>
+<td>1</td>
+<td>163.36 tok/s</td>
+</tr>
+<tr>
+<td>Throughput-Sensitive</td>
+<td><code>--tp 8 --ep 8 --dp 8 --enable-dp-attention</code></td>
+<td>100</td>
+<td>2236.86 tok/s</td>
+</tr>
+</tbody></table>
+<p>低并发那档：<strong>纯 TP，不开 dp，不开 ep，改用投机解码去压延迟</strong>。
+高并发那档：tp / ep / dp 三个都开满。</p>
+<h2>3. 按模型族的规则</h2>
+<h3>3.1 拿到 <code>high-throughput-dp</code> 配方的模型（18 个）</h3>
+<p>全部集中在四个族：<strong>DeepSeek（V3.2 / R1 / Math-V2）、GLM（4.6 / 5 / 5.1）、Kimi-K2（K2 / K2.5 / K2.6）</strong>。</p>
+<p>架构核对（各自 HF <code>config.json</code>）：</p>
+<table>
+<thead>
+<tr>
+<th>模型</th>
+<th>attention</th>
+<th>KV head</th>
+<th>expert</th>
+<th>tp8 下会不会复制 KV</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>DeepSeek-V3/R1/V3.2</td>
+<td>MLA（<code>kv_lora_rank</code> 512 + rope 64）</td>
+<td>1 个 latent</td>
+<td>256</td>
+<td><strong>会，复制 8 份</strong></td>
+</tr>
+<tr>
+<td>Kimi-K2.x</td>
+<td>MLA（<code>DeepseekV3ForCausalLM</code>）</td>
+<td>1 个 latent</td>
+<td>384</td>
+<td><strong>会，复制 8 份</strong></td>
+</tr>
+<tr>
+<td>GLM-4.5 / 4.6</td>
+<td><strong>GQA，8 个 KV head</strong>，96 个 q head</td>
+<td>8</td>
+<td>160</td>
+<td>tp8 刚好整除，<strong>不复制</strong></td>
+</tr>
+</tbody></table>
+<p><strong>这里有个值得注意的点：GLM-4.6 在 tp8 下并不复制 KV，却照样给了 DP attention 配方。</strong>
+所以 DP attention 的动机不止「省 KV 复制」一条——GLM 这种情况省的是每张卡把全部 token 的
+RMSNorm / router 重算一遍的冗余，以及 attention 段的 all-reduce。
+不过 GLM-5 的硬件表写着 H100 FP8 要 tp=16，到那个宽度 8 个 KV head 就开始复制 2 份了。</p>
+<h3>3.2 只给 EP、不给 DP attention 的模型</h3>
+<p>Qwen3-235B-A22B-FP8（含 VL / Thinking 变体）、Qwen3.5-397B-A17B、Step-3.5-Flash、Intern-S1。</p>
+<p>Qwen3-235B 的官方配置只有一条：<code>tp=8, ep=2, balanced</code>，<strong>没有任何 high-throughput 配方</strong>。
+<code>ep=2</code> 意味着 <code>moe_tp_size = 8/2 = 4</code>，<code>moe_intermediate_size</code> 1536/4 = 384，满足 fp8 blockscale
+GEMM 的 <code>N % 64 == 0</code>。</p>
+<h3>3.3 dense 模型</h3>
+<p><code>default tp=1</code> 出现 190 次——绝大多数模型（Llama / Mistral / Gemma / Qwen dense / 各种 VL）
+的官方答案就是单卡或窄 TP，没有任何 dp / ep。</p>
+<h2>4. 硬件与跨节点</h2>
+<h3>4.1 TP 宽度是显存的函数</h3>
+<p>GLM-5 文档给的表最直白：</p>
+<table>
+<thead>
+<tr>
+<th>硬件</th>
+<th>FP8</th>
+<th>BF16</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>H100</td>
+<td>tp=16</td>
+<td>tp=32</td>
+</tr>
+<tr>
+<td>H200</td>
+<td>tp=8</td>
+<td>tp=16</td>
+</tr>
+<tr>
+<td>B200</td>
+<td>tp=8</td>
+<td>tp=16</td>
+</tr>
+<tr>
+<td>MI300X / MI325X / MI355X</td>
+<td>—</td>
+<td>tp=8</td>
+</tr>
+</tbody></table>
+<p>它同时写了一句通则：<strong>BF16 在 NVIDIA 上永远要 FP8 的 2 倍卡</strong>。</p>
+<p>各硬件 <code>default</code> 配置的 tp 分布也印证了：H100 上出现 tp16 / tp32，H200 / B200 上同样的模型只要 tp8，
+AMD（192 GB）上大量模型 tp4 就够。</p>
+<h3>4.2 超过一个节点：用 PP，不是把 TP 拉宽</h3>
+<p><code>docs/autoregressive/InclusionAI/Ling-2.5-1T.md</code>：</p>
+<blockquote>
+<p><code>--tp-size</code> can be set to a maximum of 8 for this model.
+If you have more GPUs available, increase <code>--pp-size</code> to scale across additional nodes.</p>
+</blockquote>
+<p><code>data/models/generated</code> 里 538 条<strong>全部是 <code>nodes: single</code></strong>，跨节点的例子只在 markdown 里，
+而且用的都是 <code>--nnodes 2 --pp-size 2</code>。</p>
+<h3>4.3 CP 出现的唯一场合</h3>
+<p>整个 cookbook 里 CP 只在 DeepSeek-V3.2 的 §4.2.3 出现，而且是 NSA 专用开关
+（<code>--enable-nsa-prefill-context-parallel</code>，配 <code>--nsa-prefill-cp-mode round-robin-split</code>），
+跟 <code>--pp-size 2</code> 一起用。没有任何 <code>--dcp-size</code> 的例子。</p>
+<h3>4.4 DP 宽度不是越大越好（cookbook 自带的实测）</h3>
+<p>DeepSeek-V3.2 §4.2.3 注释里留了一组 Hopper 2 节点 tp16 的 ISL/OSL=1k/1k 数据：</p>
+<table>
+<thead>
+<tr>
+<th>配置</th>
+<th>吞吐</th>
+<th>MAX ITL</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>不开 dp</td>
+<td>4948.16 tok/s</td>
+<td>5970</td>
+</tr>
+<tr>
+<td>dp 2</td>
+<td>5019.54 tok/s</td>
+<td>7233</td>
+</tr>
+<tr>
+<td><strong>dp 4</strong></td>
+<td>4942.82 tok/s</td>
+<td><strong>35654</strong></td>
+</tr>
+<tr>
+<td>dp 2 + MTP</td>
+<td>6842.51 tok/s</td>
+<td>3081</td>
+</tr>
+</tbody></table>
+<p><strong>dp 从 2 加到 4，吞吐反而掉回不开 dp 的水平，尾延迟涨了 5 倍。</strong> 官方推荐停在 dp2 + MTP。</p>
+<h2>5. 三处不一致 / 疑似 bug</h2>
+<h3>5.1 9 条配置 <code>dp &gt; tp</code>，起服会直接 assert 失败</h3>
+<table>
+<thead>
+<tr>
+<th>模型</th>
+<th>硬件</th>
+<th>配置</th>
+<th>tp</th>
+<th>dp</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Kimi-K2.6</td>
+<td>MI300X / MI325X / MI350X / MI355X</td>
+<td>high-throughput-dp</td>
+<td>4</td>
+<td>8</td>
+</tr>
+<tr>
+<td>Kimi-K2.5</td>
+<td>MI300X / MI325X / MI350X / MI355X</td>
+<td>high-throughput-dp</td>
+<td>4</td>
+<td>8</td>
+</tr>
+<tr>
+<td>GLM-5-NVFP4</td>
+<td>B200</td>
+<td>high-throughput-dp</td>
+<td>4</td>
+<td>8</td>
+</tr>
+</tbody></table>
+<p>成因在源 YAML：<code>high-throughput-dp</code> 这个配置块写在文件级、硬编码 <code>dp: 8</code>，
+而 <code>tp</code> 是每个硬件各写各的（H200/B300 是 8，AMD 系是 4）。两边没有联动。</p>
+<p>sglang 侧会拒绝：<code>arg_groups/parallel_hook.py</code> 在 <code>enable_dp_attention</code> 解析为真时有一条
+无条件的 <code>assert cfg.tp_size % cfg.dp_size == 0</code>。<code>4 % 8 = 4</code>，直接 AssertionError。
+（另外 <code>compute_world_size</code> 在开 dp attention 时返回 <code>tp_size * pp_size</code> = 4，也和 dp=8 对不上。）</p>
+<h3>5.2 同一个模型，两份数据给的答案不同</h3>
+<p>DeepSeek-R1-0528 在 H200 上：</p>
+<ul>
+<li><code>data/models/generated/v0.5.6/deepseek-r1.yaml</code>：high-throughput = <code>tp8 + dp8 + enable_dp_attention</code></li>
+<li><code>data/optimal-configs/src/v0.5.6/deepseek-r1.yaml</code>：high-throughput = <strong><code>tp8</code>，不开 dp，不开 ep</strong></li>
+</ul>
+<p>后者是唯一一份标称「pre-tuned, benchmarked」的文件，它里面 low-latency 和 high-throughput 的
+<strong>并行参数完全相同</strong>，两档的差别只有 <code>scheduler_recv_interval</code>（10 vs 30）和 <code>stream_interval</code>。</p>
+<h3>5.3 DP 和 EP 是「二选一」还是「一起开」，两处也不一样</h3>
+<p><code>data/models/generated</code> 把它们拆成两个互斥配方（<code>high-throughput-dp</code> 里 ep 恒为空，
+<code>high-throughput-ep</code> 里 dp-attention 恒为空）；
+而 <code>docs/.../DeepSeek-V3_2.md</code> §5.1.2 的吞吐 benchmark 是 <code>--tp 8 --ep 8 --dp 8 --enable-dp-attention</code>，
+三个一起开。</p>
+<h2>6. 附录：完整配置表</h2>
+<p>只列开了 dp / ep 的行（<code>default tp=N</code> 那类省略）。</p>
+<p>共 98 行。</p>
+<table>
+<thead>
+<tr>
+<th>模型</th>
+<th>硬件</th>
+<th>配置</th>
+<th>optimization</th>
+<th>tp</th>
+<th>dp</th>
+<th>ep</th>
+<th>dp-attn</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>DeepSeek-Math-V2</td>
+<td>B200</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>8</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>DeepSeek-Math-V2</td>
+<td>B300</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>8</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>DeepSeek-R1-0528</td>
+<td>B200</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>8</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>DeepSeek-R1-0528</td>
+<td>B200</td>
+<td>high-throughput-ep</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>-</td>
+<td>8</td>
+<td>-</td>
+</tr>
+<tr>
+<td>DeepSeek-R1-0528</td>
+<td>H100</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>8</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>DeepSeek-R1-0528</td>
+<td>H100</td>
+<td>high-throughput-ep</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>-</td>
+<td>8</td>
+<td>-</td>
+</tr>
+<tr>
+<td>DeepSeek-R1-0528</td>
+<td>H200</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>8</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>DeepSeek-R1-0528</td>
+<td>H200</td>
+<td>high-throughput-ep</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>-</td>
+<td>8</td>
+<td>-</td>
+</tr>
+<tr>
+<td>DeepSeek-R1-0528-FP4</td>
+<td>B200</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>8</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>DeepSeek-R1-0528-FP4</td>
+<td>B200</td>
+<td>high-throughput-ep</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>-</td>
+<td>8</td>
+<td>-</td>
+</tr>
+<tr>
+<td>DeepSeek-R1-0528-FP4</td>
+<td>H200</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>8</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>DeepSeek-R1-0528-FP4</td>
+<td>H200</td>
+<td>high-throughput-ep</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>-</td>
+<td>8</td>
+<td>-</td>
+</tr>
+<tr>
+<td>DeepSeek-V3.2</td>
+<td>B200</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>8</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>DeepSeek-V3.2</td>
+<td>B200</td>
+<td>high-throughput-ep</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>-</td>
+<td>8</td>
+<td>-</td>
+</tr>
+<tr>
+<td>DeepSeek-V3.2</td>
+<td>H200</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>8</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>DeepSeek-V3.2</td>
+<td>H200</td>
+<td>high-throughput-ep</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>-</td>
+<td>8</td>
+<td>-</td>
+</tr>
+<tr>
+<td>DeepSeek-V3.2-Exp</td>
+<td>B200</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>8</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>DeepSeek-V3.2-Exp</td>
+<td>B200</td>
+<td>high-throughput-ep</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>-</td>
+<td>8</td>
+<td>-</td>
+</tr>
+<tr>
+<td>DeepSeek-V3.2-Exp</td>
+<td>H200</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>8</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>DeepSeek-V3.2-Exp</td>
+<td>H200</td>
+<td>high-throughput-ep</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>-</td>
+<td>8</td>
+<td>-</td>
+</tr>
+<tr>
+<td>DeepSeek-V3.2-NVFP4</td>
+<td>B200</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>4</td>
+<td>4</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>DeepSeek-V3.2-NVFP4</td>
+<td>B200</td>
+<td>high-throughput-ep</td>
+<td>high-throughput</td>
+<td>4</td>
+<td>-</td>
+<td>4</td>
+<td>-</td>
+</tr>
+<tr>
+<td>DeepSeek-V3.2-Speciale</td>
+<td>B200</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>8</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>DeepSeek-V3.2-Speciale</td>
+<td>B200</td>
+<td>high-throughput-ep</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>-</td>
+<td>8</td>
+<td>-</td>
+</tr>
+<tr>
+<td>DeepSeek-V3.2-Speciale</td>
+<td>H200</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>8</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>DeepSeek-V3.2-Speciale</td>
+<td>H200</td>
+<td>high-throughput-ep</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>-</td>
+<td>8</td>
+<td>-</td>
+</tr>
+<tr>
+<td>GLM-4.6</td>
+<td>B200</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>8</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>GLM-4.6</td>
+<td>B200</td>
+<td>high-throughput-ep</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>-</td>
+<td>8</td>
+<td>-</td>
+</tr>
+<tr>
+<td>GLM-4.6</td>
+<td>H200</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>8</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>GLM-4.6</td>
+<td>H200</td>
+<td>high-throughput-ep</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>-</td>
+<td>8</td>
+<td>-</td>
+</tr>
+<tr>
+<td>GLM-4.6-FP8</td>
+<td>B200</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>8</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>GLM-4.6-FP8</td>
+<td>B200</td>
+<td>high-throughput-ep</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>-</td>
+<td>8</td>
+<td>-</td>
+</tr>
+<tr>
+<td>GLM-4.6-FP8</td>
+<td>H100</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>8</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>GLM-4.6-FP8</td>
+<td>H100</td>
+<td>high-throughput-ep</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>-</td>
+<td>8</td>
+<td>-</td>
+</tr>
+<tr>
+<td>GLM-4.6-FP8</td>
+<td>H200</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>8</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>GLM-4.6-FP8</td>
+<td>H200</td>
+<td>high-throughput-ep</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>-</td>
+<td>8</td>
+<td>-</td>
+</tr>
+<tr>
+<td>GLM-5</td>
+<td>B200</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>16</td>
+<td>8</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>GLM-5</td>
+<td>H100</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>32</td>
+<td>8</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>GLM-5</td>
+<td>H200</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>16</td>
+<td>8</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>GLM-5-FP8</td>
+<td>B200</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>8</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>GLM-5-FP8</td>
+<td>H100</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>16</td>
+<td>8</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>GLM-5-FP8</td>
+<td>H200</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>8</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>GLM-5-NVFP4</td>
+<td>B200</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>4</td>
+<td>8</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>GLM-5.1</td>
+<td>B200</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>16</td>
+<td>8</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>GLM-5.1</td>
+<td>H100</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>32</td>
+<td>8</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>GLM-5.1</td>
+<td>H200</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>16</td>
+<td>8</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>GLM-5.1-FP8</td>
+<td>GB300</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>4</td>
+<td>4</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>Intern-S1-FP8</td>
+<td>B200</td>
+<td>default</td>
+<td>balanced</td>
+<td>8</td>
+<td>-</td>
+<td>2</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Intern-S1-FP8</td>
+<td>H100</td>
+<td>default</td>
+<td>balanced</td>
+<td>8</td>
+<td>-</td>
+<td>2</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Intern-S1-FP8</td>
+<td>H200</td>
+<td>default</td>
+<td>balanced</td>
+<td>8</td>
+<td>-</td>
+<td>2</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Kimi-K2-Instruct</td>
+<td>B200</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>4</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>Kimi-K2-Instruct</td>
+<td>B200</td>
+<td>high-throughput-ep</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>-</td>
+<td>4</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Kimi-K2-Instruct</td>
+<td>H200</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>4</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>Kimi-K2-Instruct</td>
+<td>H200</td>
+<td>high-throughput-ep</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>-</td>
+<td>4</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Kimi-K2-Thinking</td>
+<td>B200</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>4</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>Kimi-K2-Thinking</td>
+<td>B200</td>
+<td>high-throughput-ep</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>-</td>
+<td>4</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Kimi-K2-Thinking</td>
+<td>H200</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>4</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>Kimi-K2-Thinking</td>
+<td>H200</td>
+<td>high-throughput-ep</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>-</td>
+<td>4</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Kimi-K2.5</td>
+<td>B300</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>8</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>Kimi-K2.5</td>
+<td>H200</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>8</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>Kimi-K2.5</td>
+<td>MI300X</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>4</td>
+<td>8</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>Kimi-K2.5</td>
+<td>MI325X</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>4</td>
+<td>8</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>Kimi-K2.5</td>
+<td>MI350X</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>4</td>
+<td>8</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>Kimi-K2.5</td>
+<td>MI355X</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>4</td>
+<td>8</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>Kimi-K2.6</td>
+<td>B300</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>8</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>Kimi-K2.6</td>
+<td>H200</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>8</td>
+<td>8</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>Kimi-K2.6</td>
+<td>MI300X</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>4</td>
+<td>8</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>Kimi-K2.6</td>
+<td>MI325X</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>4</td>
+<td>8</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>Kimi-K2.6</td>
+<td>MI350X</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>4</td>
+<td>8</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>Kimi-K2.6</td>
+<td>MI355X</td>
+<td>high-throughput-dp</td>
+<td>high-throughput</td>
+<td>4</td>
+<td>8</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>Llama-3.1-70B-Instruct</td>
+<td>H100</td>
+<td>throughput-optimized</td>
+<td>high-throughput</td>
+<td>4</td>
+<td>-</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>Llama-3.1-70B-Instruct</td>
+<td>H200</td>
+<td>throughput-optimized</td>
+<td>high-throughput</td>
+<td>4</td>
+<td>-</td>
+<td>-</td>
+<td>是</td>
+</tr>
+<tr>
+<td>MiMo-MiMo-V2-Flash</td>
+<td>H200</td>
+<td>default</td>
+<td>balanced</td>
+<td>8</td>
+<td>2</td>
+<td>-</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Qwen3-235B-A22B-FP8</td>
+<td>B200</td>
+<td>default</td>
+<td>balanced</td>
+<td>8</td>
+<td>-</td>
+<td>2</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Qwen3-235B-A22B-FP8</td>
+<td>H100</td>
+<td>default</td>
+<td>balanced</td>
+<td>8</td>
+<td>-</td>
+<td>2</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Qwen3-235B-A22B-FP8</td>
+<td>H200</td>
+<td>default</td>
+<td>balanced</td>
+<td>8</td>
+<td>-</td>
+<td>2</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Qwen3-235B-A22B-Instruct-2507-FP8</td>
+<td>B200</td>
+<td>default</td>
+<td>balanced</td>
+<td>8</td>
+<td>-</td>
+<td>2</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Qwen3-235B-A22B-Instruct-2507-FP8</td>
+<td>H100</td>
+<td>default</td>
+<td>balanced</td>
+<td>8</td>
+<td>-</td>
+<td>2</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Qwen3-235B-A22B-Instruct-2507-FP8</td>
+<td>H200</td>
+<td>default</td>
+<td>balanced</td>
+<td>8</td>
+<td>-</td>
+<td>2</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Qwen3-235B-A22B-Thinking-2507-FP8</td>
+<td>B200</td>
+<td>default</td>
+<td>balanced</td>
+<td>8</td>
+<td>-</td>
+<td>2</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Qwen3-235B-A22B-Thinking-2507-FP8</td>
+<td>H100</td>
+<td>default</td>
+<td>balanced</td>
+<td>8</td>
+<td>-</td>
+<td>2</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Qwen3-235B-A22B-Thinking-2507-FP8</td>
+<td>H200</td>
+<td>default</td>
+<td>balanced</td>
+<td>8</td>
+<td>-</td>
+<td>2</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Qwen3-VL-235B-A22B-Instruct-FP8</td>
+<td>B200</td>
+<td>default</td>
+<td>balanced</td>
+<td>8</td>
+<td>-</td>
+<td>2</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Qwen3-VL-235B-A22B-Instruct-FP8</td>
+<td>H100</td>
+<td>default</td>
+<td>balanced</td>
+<td>8</td>
+<td>-</td>
+<td>2</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Qwen3-VL-235B-A22B-Instruct-FP8</td>
+<td>H200</td>
+<td>default</td>
+<td>balanced</td>
+<td>8</td>
+<td>-</td>
+<td>2</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Qwen3-VL-235B-A22B-Thinking-FP8</td>
+<td>B200</td>
+<td>default</td>
+<td>balanced</td>
+<td>8</td>
+<td>-</td>
+<td>2</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Qwen3-VL-235B-A22B-Thinking-FP8</td>
+<td>H100</td>
+<td>default</td>
+<td>balanced</td>
+<td>8</td>
+<td>-</td>
+<td>2</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Qwen3-VL-235B-A22B-Thinking-FP8</td>
+<td>H200</td>
+<td>default</td>
+<td>balanced</td>
+<td>8</td>
+<td>-</td>
+<td>2</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Qwen3.5-397B-A17B-FP8</td>
+<td>H200</td>
+<td>default</td>
+<td>balanced</td>
+<td>8</td>
+<td>-</td>
+<td>8</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Qwen3.5-397B-A17B-FP8</td>
+<td>H200</td>
+<td>speculative-mtp</td>
+<td>low-latency</td>
+<td>8</td>
+<td>-</td>
+<td>8</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Step-3.5-Flash</td>
+<td>MI300X</td>
+<td>default</td>
+<td>balanced</td>
+<td>4</td>
+<td>-</td>
+<td>4</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Step-3.5-Flash</td>
+<td>MI325X</td>
+<td>default</td>
+<td>balanced</td>
+<td>4</td>
+<td>-</td>
+<td>4</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Step-3.5-Flash</td>
+<td>MI350X</td>
+<td>default</td>
+<td>balanced</td>
+<td>4</td>
+<td>-</td>
+<td>4</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Step-3.5-Flash</td>
+<td>MI355X</td>
+<td>default</td>
+<td>balanced</td>
+<td>4</td>
+<td>-</td>
+<td>4</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Step-3.5-Flash-FP8</td>
+<td>MI300X</td>
+<td>default</td>
+<td>balanced</td>
+<td>4</td>
+<td>-</td>
+<td>4</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Step-3.5-Flash-FP8</td>
+<td>MI325X</td>
+<td>default</td>
+<td>balanced</td>
+<td>4</td>
+<td>-</td>
+<td>4</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Step-3.5-Flash-FP8</td>
+<td>MI350X</td>
+<td>default</td>
+<td>balanced</td>
+<td>4</td>
+<td>-</td>
+<td>4</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Step-3.5-Flash-FP8</td>
+<td>MI355X</td>
+<td>default</td>
+<td>balanced</td>
+<td>4</td>
+<td>-</td>
+<td>4</td>
+<td>-</td>
+</tr>
+</tbody></table>
+
+</div>
+</body>
+</html>
