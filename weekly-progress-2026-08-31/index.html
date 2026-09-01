@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Weekly engineering progress: B300 enablement, DSpark performance, data generation, numerical parity, training parity, and end-to-end evaluation.">
+<title>Weekly Engineering Update — Aug 25–31, 2026</title>
+<style>
+  :root {
+    --bg: #f4f1ea;
+    --paper: #fffdf8;
+    --ink: #18201f;
+    --muted: #66706d;
+    --line: #d8d5cc;
+    --teal: #0f6a63;
+    --teal-soft: #dceee9;
+    --amber: #ad681f;
+    --amber-soft: #f7e9d5;
+    --navy: #24465d;
+    --shadow: 0 14px 40px rgba(35, 43, 41, .08);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    color: var(--ink);
+    background:
+      radial-gradient(circle at 85% 0%, rgba(15, 106, 99, .09), transparent 30rem),
+      linear-gradient(180deg, #faf8f3 0, var(--bg) 34rem);
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { width: min(1120px, calc(100% - 40px)); margin: 0 auto; }
+
+  header { padding: 56px 0 34px; }
+  .topline { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+  .brand, .date { font-size: 12px; font-weight: 760; letter-spacing: .1em; text-transform: uppercase; }
+  .brand { color: var(--teal); }
+  .date { color: var(--muted); }
+  h1 {
+    margin: 58px 0 0;
+    max-width: 850px;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: clamp(44px, 7.2vw, 86px);
+    font-weight: 500;
+    letter-spacing: -.045em;
+    line-height: .98;
+  }
+  .lede {
+    margin: 28px 0 0;
+    max-width: 700px;
+    color: var(--muted);
+    font-size: clamp(17px, 2vw, 21px);
+    line-height: 1.55;
+  }
+
+  .scoreboard {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    margin: 44px 0 0;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    overflow: hidden;
+    background: rgba(255, 253, 248, .78);
+    box-shadow: var(--shadow);
+  }
+  .stat { min-height: 128px; padding: 24px; border-right: 1px solid var(--line); }
+  .stat:last-child { border-right: 0; }
+  .stat strong { display: block; color: var(--navy); font-size: clamp(25px, 3vw, 36px); letter-spacing: -.04em; }
+  .stat span { display: block; margin-top: 8px; color: var(--muted); font-size: 13px; line-height: 1.4; }
+
+  main { padding: 44px 0 72px; }
+  .section-head {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--line);
+  }
+  h2 { margin: 0; font-size: 14px; letter-spacing: .1em; text-transform: uppercase; }
+  .section-head p { margin: 0; color: var(--muted); font-size: 13px; }
+
+  .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+  article {
+    position: relative;
+    min-height: 305px;
+    padding: 28px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: rgba(255, 253, 248, .93);
+    box-shadow: 0 8px 28px rgba(35, 43, 41, .05);
+  }
+  .number {
+    display: inline-grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    color: var(--teal);
+    background: var(--teal-soft);
+    font-size: 13px;
+    font-weight: 800;
+  }
+  article h3 { margin: 22px 0 10px; max-width: 510px; font-size: 25px; line-height: 1.15; letter-spacing: -.025em; }
+  article > p { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.55; }
+  .result {
+    margin-top: 22px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 10px 14px;
+    align-items: baseline;
+  }
+  .result b { color: var(--navy); font-size: 19px; letter-spacing: -.02em; }
+  .result span { color: var(--muted); font-size: 13px; line-height: 1.35; }
+  .tag {
+    position: absolute;
+    top: 28px;
+    right: 28px;
+    padding: 6px 9px;
+    border-radius: 999px;
+    color: var(--teal);
+    background: var(--teal-soft);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+  .tag.finding { color: var(--amber); background: var(--amber-soft); }
+
+  .bottom-line {
+    margin-top: 18px;
+    padding: 28px;
+    border-radius: 14px;
+    color: #eff9f6;
+    background: var(--teal);
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+  .bottom-line h2 { color: #bfe5dc; }
+  .bottom-line p { margin: 0; font-size: 18px; line-height: 1.55; }
+
+  footer {
+    padding: 24px 0 44px;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  footer a { color: var(--teal); text-decoration: none; }
+
+  @media (max-width: 760px) {
+    .wrap { width: min(100% - 26px, 1120px); }
+    header { padding-top: 30px; }
+    h1 { margin-top: 42px; }
+    .scoreboard { grid-template-columns: repeat(2, 1fr); }
+    .stat:nth-child(2) { border-right: 0; }
+    .stat:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+    .grid { grid-template-columns: 1fr; }
+    article { min-height: auto; }
+    .bottom-line { grid-template-columns: 1fr; gap: 12px; }
+  }
+</style>
+</head>
+<body>
+  <header class="wrap">
+    <div class="topline">
+      <div class="brand">Changyi Yang · Engineering Update</div>
+      <div class="date">25–31 August 2026</div>
+    </div>
+    <h1>Six moves that made the system measurable.</h1>
+    <p class="lede">The week focused on turning DSpark from a collection of promising runs into a reproducible, cross-platform system—with aligned data, stable evaluation, and explicit product boundaries.</p>
+
+    <section class="scoreboard" aria-label="Key weekly metrics">
+      <div class="stat"><strong>1.42M</strong><span>Open-PerfectBlend generations fully audited</span></div>
+      <div class="stat"><strong>+26.9%</strong><span>DSpark token-throughput gain in the full agent loop</span></div>
+      <div class="stat"><strong>1.8–1.9×</strong><span>B300 full-stack training speed versus MI325X</span></div>
+      <div class="stat"><strong>0 drift</strong><span>Within-platform AL variation across three clean boots</span></div>
+    </section>
+  </header>
+
+  <main class="wrap">
+    <div class="section-head">
+      <h2>Weekly progress</h2>
+      <p>Six completed or decision-ready workstreams</p>
+    </div>
+
+    <section class="grid">
+      <article>
+        <span class="number">01</span><span class="tag">Enabled</span>
+        <h3>B300 RL stack is operational</h3>
+        <p>VERL, SGLang, Ray, and the multi-turn tool loop now run end to end on B300. The final smoke completed both training steps and exited cleanly after resolving container, attention-backend, and padding compatibility.</p>
+        <div class="result"><b>254 tok/s</b><span>two-step GSM8K tool-agent smoke on 8×B300</span></div>
+      </article>
+
+      <article>
+        <span class="number">02</span><span class="tag">Bounded</span>
+        <h3>DSpark performance now has a product boundary</h3>
+        <p>The AMD hybrid path reduced a speculative step by 16.4%. Repeated concurrency sweeps showed the gain is real for a single low-latency stream, but disappears at concurrency two and degrades further for batched rollout.</p>
+        <div class="result"><b>~1.15× at c=1</b><span>use DSpark for single-stream latency; disable it for high-concurrency rollout</span></div>
+      </article>
+
+      <article>
+        <span class="number">03</span><span class="tag">Delivered</span>
+        <h3>Draft-training corpus generation completed</h3>
+        <p>A 25-node B300 collection run regenerated the Open-PerfectBlend corpus with the 24B always-think target. Dynamic response caps avoided known-wasted generation while preserving every raw row and its audit fields.</p>
+        <div class="result"><b>1,420,909 rows</b><span>22,225 readable Parquet files · 1,200,199 training candidates · 84.47% keep rate</span></div>
+      </article>
+
+      <article>
+        <span class="number">04</span><span class="tag">Reproduced</span>
+        <h3>The AMD–B300 acceptance gap is stable</h3>
+        <p>A shared GitHub harness pinned prompts, token IDs, model files, sampling, request order, cache state, and server identity. Three independent boots per platform produced exactly the same integer counts within each platform.</p>
+        <div class="result"><b>4.080 vs 4.582 AL</b><span>AMD remained 10.96% lower after controllable factors were aligned</span></div>
+      </article>
+
+      <article>
+        <span class="number">05</span><span class="tag finding">Finding</span>
+        <h3>Numerical differences were isolated—not overclaimed</h3>
+        <p>Frozen-input replay proved that the exact AITER CK stage-2 operator is not bitwise deterministic. Separately, matched effective-BF16 target rescoring found systematic AMD/AITER versus B300/FlashInfer token differences. Neither result alone proves the direction of the AL gap.</p>
+        <div class="result"><b>16.11% top-1 mismatch</b><span>teacher-forced target positions; deterministic within each platform, causal attribution still open</span></div>
+      </article>
+
+      <article>
+        <span class="number">06</span><span class="tag">Validated</span>
+        <h3>Training and product evaluation moved beyond microbenchmarks</h3>
+        <p>A symmetric 2×2 continuation study found no stable directional quality shift between the stacks at the measured endpoint, while B300 trained materially faster. The full 150-task ClawEnv loop also showed that DSpark improves token throughput even when longer natural trajectories reduce tasks per second.</p>
+        <div class="result"><b>1.269× token throughput</b><span>canonical DSpark versus no-spec in the complete VERL agent loop</span></div>
+      </article>
+    </section>
+
+    <section class="bottom-line">
+      <h2>Bottom line</h2>
+      <p>We now have a working B300 stack, a production-scale draft corpus, a reproducible cross-platform gap, and evaluation that separates kernel speed from real agent behavior. The next decisions can be made from measured boundaries rather than one-off runs.</p>
+    </section>
+  </main>
+
+  <footer class="wrap">
+    Internal engineering summary. Metrics are tied to their stated protocols and should not be compared across unmatched workloads.<br>
+    <a href="../">Back to Changyi Yang’s decks and proposals</a>
+  </footer>
+</body>
+</html>
