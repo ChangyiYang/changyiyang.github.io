@@ -202,9 +202,9 @@
 
       <article>
         <span class="number">02</span><span class="tag">Bounded</span>
-        <h3>DSpark performance now has a product boundary</h3>
-        <p>The AMD hybrid path reduced a speculative step by 16.4%. Repeated concurrency sweeps showed the gain is real for a single low-latency stream, but disappears at concurrency two and degrades further for batched rollout.</p>
-        <div class="result"><b>~1.15× at c=1</b><span>use DSpark for single-stream latency; disable it for high-concurrency rollout</span></div>
+        <h3>DSpark behaves differently on AMD and B300</h3>
+        <p>AMD was faster at plain decode (3.95 vs 4.40 ms/token), yet its speculative step was 11.76 ms versus 8.20 ms on B300. The gap was concentrated in target verification: AMD verify alone took 8.49 ms—slightly more than the entire B300 speculative step. Break-even AL therefore moved from 1.86 on B300 to about 2.98 on AMD.</p>
+        <div class="result"><b>1.15× → 0.81×</b><span>AMD hybrid versus no-spec at concurrency 1 → 2; B300 retains substantially more speculative headroom</span></div>
       </article>
 
       <article>
