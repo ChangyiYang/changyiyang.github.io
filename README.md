@@ -5,6 +5,7 @@ Changyi Yang 的 decks & proposals 总站。
 👉 <https://changyiyang.github.io/>
 
 ## 目录
+- [`minicpm-routing-audit/`](https://changyiyang.github.io/minicpm-routing-audit/) — MiniCPM-o 4.5 实时升级路由器：27 轮 probe-only 实验、严格因果读出与失败边界（18 slides）
 - [`weekly-progress-2026-08-31/`](https://changyiyang.github.io/weekly-progress-2026-08-31/) — concise English weekly engineering update: six measurable moves across B300, AMD, DSpark, data, parity, and E2E evaluation
 - [`lfm2-exact-speed/`](https://changyiyang.github.io/lfm2-exact-speed/) — LFM2 24B MoE exact SGLang rollout 性能优化：术语、逐步改动、收益与未保留实验（41 slides）
 - [`lfm2-logits-alignment/`](https://changyiyang.github.io/lfm2-logits-alignment/) — LFM2 24B MoE 训推 logits exact alignment：术语、完整定位与未采用方案（64 slides）

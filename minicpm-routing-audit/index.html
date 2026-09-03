@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="MiniCPM-o 4.5 实时升级路由器：从离线 probe 到严格因果读出的完整实验记录。" />
+<title>MiniCPM-o 4.5 实时升级路由器：27 轮实验复盘</title>
+<style>
+  :root {
+    --bg:#f3f0e8; --paper:#fffdf8; --ink:#162321; --muted:#65716d;
+    --line:#d8d4c9; --teal:#0d6d64; --teal2:#dcefeb; --navy:#25445b;
+    --amber:#b2681f; --amber2:#faead5; --red:#a33d38; --red2:#fae7e5;
+    --violet:#654f91; --violet2:#eee9f7; --shadow:0 14px 42px rgba(34,42,39,.09);
+  }
+  *{box-sizing:border-box} html,body{margin:0;width:100%;height:100%;overflow:hidden}
+  body{color:var(--ink);font-family:Inter,"PingFang SC","Microsoft YaHei",ui-sans-serif,system-ui,sans-serif;background:radial-gradient(circle at 90% 0,rgba(13,109,100,.10),transparent 35rem),linear-gradient(160deg,#fbfaf6,var(--bg))}
+  .deck{width:100vw;height:100vh;position:relative}.slide{position:absolute;inset:0;display:none;padding:clamp(26px,4vw,58px);overflow:hidden}.slide.active{display:grid;grid-template-rows:auto 1fr auto;gap:18px}
+  header,main,footer{position:relative;z-index:1}.eyebrow{font-size:clamp(11px,.9vw,14px);font-weight:800;letter-spacing:.11em;text-transform:uppercase;color:var(--teal)}
+  h1,h2,h3,p{margin:0}h1,h2{line-height:1.08;text-wrap:balance}h1{font-family:Georgia,"Songti SC",serif;font-size:clamp(38px,5.7vw,78px);font-weight:560;letter-spacing:-.035em;max-width:1060px}h2{font-size:clamp(30px,3.8vw,54px);letter-spacing:-.025em;max-width:1050px}h3{font-size:clamp(17px,1.5vw,24px);line-height:1.18}.lead{margin-top:20px;font-size:clamp(18px,1.7vw,27px);line-height:1.42;color:#344640;max-width:1050px}p{font-size:clamp(14px,1.15vw,19px);line-height:1.48;color:var(--muted)}
+  .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;align-items:stretch}.grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}.grid.four{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .card{background:rgba(255,253,248,.92);border:1px solid var(--line);border-radius:12px;padding:18px;box-shadow:var(--shadow);min-height:128px}.card h3{margin-bottom:10px}.card p,.card li{font-size:clamp(13px,1vw,17px);line-height:1.45;color:#4d5b57}.card.good{border-top:4px solid var(--teal)}.card.bad{border-top:4px solid var(--red)}.card.warn{border-top:4px solid var(--amber)}.card.info{border-top:4px solid var(--navy)}
+  ul{margin:0;padding-left:1.15em}li+li{margin-top:7px}.tag{display:inline-flex;align-items:center;height:27px;padding:0 10px;border-radius:999px;background:var(--teal2);color:var(--teal);font-size:12px;font-weight:800}.tag.red{background:var(--red2);color:var(--red)}.tag.amber{background:var(--amber2);color:var(--amber)}.tag.violet{background:var(--violet2);color:var(--violet)}
+  .metric{font-size:clamp(30px,4vw,58px);font-weight:850;letter-spacing:-.045em;color:var(--navy);line-height:1}.metric.green{color:var(--teal)}.metric.red{color:var(--red)}.caption{margin-top:8px;color:var(--muted);font-size:clamp(12px,.95vw,16px);line-height:1.4}
+  .table{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--paper);box-shadow:var(--shadow)}.row{display:grid;grid-template-columns:1.1fr repeat(4,.72fr);border-bottom:1px solid var(--line)}.row:last-child{border:0}.cell{padding:11px 13px;border-right:1px solid var(--line);font-size:clamp(12px,.92vw,16px);line-height:1.35;color:#45534f}.cell:last-child{border:0}.head .cell{background:#eee9de;font-weight:800;color:var(--ink)}.ok{color:var(--teal);font-weight:800}.no{color:var(--red);font-weight:800}.maybe{color:var(--amber);font-weight:800}
+  .flow{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;align-items:center}.step{min-height:128px;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--paper);box-shadow:var(--shadow);position:relative}.step:not(:last-child)::after{content:"→";position:absolute;right:-18px;top:43%;z-index:2;color:var(--teal);font-size:24px;font-weight:800}.step b{display:block;color:var(--teal);font-size:12px;letter-spacing:.08em;margin-bottom:9px}.step span{font-size:clamp(13px,1vw,17px);line-height:1.38}
+  .bars{display:grid;gap:14px}.barrow{display:grid;grid-template-columns:210px 1fr 92px;gap:12px;align-items:center}.barlabel{font-size:clamp(12px,1vw,16px);color:#45534f}.track{height:18px;border-radius:999px;background:#e5e0d6;overflow:hidden}.fill{height:100%;border-radius:999px;background:var(--teal)}.fill.red{background:var(--red)}.fill.amber{background:var(--amber)}.barval{font-variant-numeric:tabular-nums;font-weight:800;color:var(--navy)}
+  .callout{padding:18px 22px;border-left:5px solid var(--teal);border-radius:0 10px 10px 0;background:rgba(255,253,248,.82);box-shadow:var(--shadow);font-size:clamp(17px,1.55vw,24px);line-height:1.4;color:#2e423c}.callout.red{border-color:var(--red)}
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:center}.big-number{font-size:clamp(72px,12vw,170px);font-weight:900;line-height:.8;color:var(--teal);letter-spacing:-.08em}.watermark{position:absolute;right:3vw;bottom:2vh;font-size:28vw;font-weight:900;line-height:.8;color:rgba(13,109,100,.035);z-index:0}
+  .footerline{display:grid;grid-template-columns:auto 1fr auto;gap:15px;align-items:center;color:var(--muted);font-size:12px}.progress{height:3px;background:#ddd8cd}.progress i{display:block;height:100%;background:var(--teal)}
+  .nav{position:fixed;right:18px;bottom:18px;z-index:10;display:flex;gap:8px}.nav button{width:42px;height:42px;border:1px solid var(--line);border-radius:50%;background:rgba(255,253,248,.9);color:var(--ink);font-size:19px;cursor:pointer;box-shadow:var(--shadow)}
+  .note{color:var(--teal);font-weight:800}.source{font-size:11px;color:#818985}.mini{font-size:clamp(12px,.9vw,15px)!important}
+  @media(max-width:780px){.slide{padding:24px 18px}.grid,.grid.two,.grid.four,.split{grid-template-columns:1fr}.grid{gap:10px}.card{min-height:0;padding:14px}.flow{grid-template-columns:1fr}.step{min-height:0}.step:not(:last-child)::after{content:"↓";right:10px;top:auto;bottom:-22px}.barrow{grid-template-columns:120px 1fr 70px}.slide{overflow:auto}.nav{display:none}}
+</style>
+</head>
+<body>
+<div class="deck">
+
+  <section class="slide active">
+    <header><div class="eyebrow">MiniCPM-o 4.5 · Failure Routing Audit</div></header>
+    <main class="split">
+      <div>
+        <h1>从一个 gate，<br>到一套可审计的实验系统</h1>
+        <p class="lead">实时语音回答何时该升级给专家模型？27 轮 probe-only 尝试、失败边界与可复用结论。</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:28px"><span class="tag">5,400-row 扩展集</span><span class="tag violet">8×B300</span><span class="tag amber">严格因果读出</span><span class="tag red">线上零改动</span></div>
+      </div>
+      <div><div class="big-number">27</div><p class="lead" style="margin-top:22px">轮有冻结协议、有结果收据、可复现的迭代</p></div>
+    </main>
+    <footer class="footerline"><span>2026 · Changyi Yang</span><div class="progress"><i></i></div><span class="counter"></span></footer><div class="watermark">27</div>
+  </section>
+
+  <section class="slide">
+    <header><div class="eyebrow">Problem</div></header>
+    <main>
+      <h2>不是“模型会不会答”，而是“什么时候值得升级”</h2>
+      <div class="flow" style="margin-top:30px">
+        <div class="step"><b>01 · 输入</b><span>用户语音与已有对话上下文</span></div>
+        <div class="step"><b>02 · 本地模型</b><span>MiniCPM-o 4.5 先生成回答</span></div>
+        <div class="step"><b>03 · Gate</b><span>只用当下可得信号估计失败风险</span></div>
+        <div class="step"><b>04 · 路由</b><span>固定预算内挑最值得升级的样本</span></div>
+        <div class="step"><b>05 · 专家</b><span>提升质量，同时控制延迟与伤害</span></div>
+      </div>
+      <div class="callout" style="margin-top:26px">核心指标不是单一 AUC：必须同时看 <b>native failure AUC、专家增益 routing、15/30/50% 精确预算 cascade、语言与来源广度</b>。</div>
+    </main>
+    <footer class="footerline"><span>问题定义</span><div class="progress"><i></i></div><span class="counter"></span></footer>
+  </section>
+
+  <section class="slide">
+    <header><div class="eyebrow">Rules of evidence</div></header>
+    <main>
+      <h2>先冻结，再看答案</h2>
+      <div class="grid four" style="margin-top:28px">
+        <div class="card info"><h3>分组交叉验证</h3><p>按 source family 划分，避免同源题目跨 fold 泄漏。</p></div>
+        <div class="card info"><h3>一次性外部集</h3><p>先固定公式、超参和阈值，再打开新的 source-disjoint 数据。</p></div>
+        <div class="card info"><h3>完整门槛</h3><p>宏观指标变好不够；pooled、语言和 broad-pool floor 也必须同时过。</p></div>
+        <div class="card info"><h3>安全隔离</h3><p>所有候选默认 shadow-only；AST 测试证明它不能影响线上 fired。</p></div>
+      </div>
+      <div class="callout red" style="margin-top:25px">负结果也入库：不能因为某个诊断项好看，就在看完数据后把它升级成主模型。</div>
+    </main>
+    <footer class="footerline"><span>证据规则</span><div class="progress"><i></i></div><span class="counter"></span></footer>
+  </section>
+
+  <section class="slide">
+    <header><div class="eyebrow">Starting point</div></header>
+    <main>
+      <h2>基线先被重新对齐：随机切分的漂亮数字不等于可泛化</h2>
+      <div class="grid three" style="margin-top:28px">
+        <div class="card"><div class="metric">5,228</div><div class="caption">官方 native 训练行，全部与导出标签对齐</div></div>
+        <div class="card"><div class="metric">0.8477</div><div class="caption">row-random OOF AUC</div></div>
+        <div class="card bad"><div class="metric red">0.8346</div><div class="caption">source-grouped OOF AUC：更真实，也更难</div></div>
+      </div>
+      <p class="lead" style="margin-top:30px">重训后的 aligned head 在五个外部池上反而从 <b>.755 降到 .743</b>。第一条结论：<span class="note">数据/切分协议比“再训一次”更重要</span>。</p>
+    </main>
+    <footer class="footerline"><span>基线</span><div class="progress"><i></i></div><span class="counter"></span></footer>
+  </section>
+
+  <section class="slide">
+    <header><div class="eyebrow">P2–P4 · Heads &amp; labels</div></header>
+    <main>
+      <h2>换目标、做特征工程、加非线性：都没越过门槛</h2>
+      <div class="grid three" style="margin-top:26px">
+        <div class="card bad"><span class="tag red">P2</span><h3 style="margin-top:12px">直接预测专家增益</h3><p>1,500 条 GPT 专家/裁判标签；gain head 的 routing 目标 +.1671，仍低于 live +.1816，五外部池 benefit AUC 全降。</p></div>
+        <div class="card warn"><span class="tag amber">P3</span><h3 style="margin-top:12px">特征 conditioning</h3><p>eot_mean8 + user_mean 带来外部 native AUC +.0087，但 cascade 几乎不动；PCA 与非线性 residual 都被淘汰。</p></div>
+        <div class="card bad"><span class="tag red">P24</span><h3 style="margin-top:12px">更大的 probe</h3><p>0.41M / 1.59M / 6.30M 参数 residual MLP，完整 nested procedure 比线性基线宏观 AUC 低 .0325。</p></div>
+      </div>
+      <div class="callout" style="margin-top:24px">容量不是瓶颈。当前数据规模下，更大的 head 更擅长记住 source，而不是学到稳定 failure signal。</div>
+    </main>
+    <footer class="footerline"><span>Probe 容量</span><div class="progress"><i></i></div><span class="counter"></span></footer>
+  </section>
+
+  <section class="slide">
+    <header><div class="eyebrow">P4–P7 · Answer-aware signals</div></header>
+    <main>
+      <h2>最强离线提升，来自“看第二次答案”和“让模型自评”</h2>
+      <div class="grid three" style="margin-top:26px">
+        <div class="card good"><h3>两次采样的语义分歧</h3><div class="metric green">+.0240</div><div class="caption">五池平均 native AUC</div><p style="margin-top:10px">k=2 是质量/成本拐点；k=3 没有更好。</p></div>
+        <div class="card good"><h3>RTJ 自评 p(True)</h3><div class="metric green">0.90s</div><div class="caption">外部集平均附加延迟</div><p style="margin-top:10px">音频→转写→自评，1,000/1,138 全部成功。</p></div>
+        <div class="card good"><h3>冻结三路融合</h3><div class="metric green">+.0334</div><div class="caption">五池平均 native AUC</div><p style="margin-top:10px">.50 P3a + .25 semantic + .25 RTJ，五个池全部改善。</p></div>
+      </div>
+      <p class="lead" style="margin-top:25px">这是整个项目里最强的质量信号，但还不是可上线方案。</p>
+    </main>
+    <footer class="footerline"><span>最强信号</span><div class="progress"><i></i></div><span class="counter"></span></footer>
+  </section>
+
+  <section class="slide">
+    <header><div class="eyebrow">P8–P10 · Latency &amp; distillation</div></header>
+    <main>
+      <h2>质量赢了，实时延迟输了；于是把教师蒸馏回单次前向</h2>
+      <div class="split" style="margin-top:26px">
+        <div class="card bad">
+          <h3>同步调用不可接受</h3>
+          <div class="bars" style="margin-top:22px">
+            <div class="barrow"><span class="barlabel">2-sample semantic</span><div class="track"><div class="fill red" style="width:72%"></div></div><span class="barval">7.21s</span></div>
+            <div class="barrow"><span class="barlabel">semantic + RTJ</span><div class="track"><div class="fill red" style="width:81%"></div></div><span class="barval">8.14s</span></div>
+          </div>
+          <p style="margin-top:18px">p90 分别达到 25.52s / 30.08s。</p>
+        </div>
+        <div class="card good">
+          <h3>单次前向 shadow distillation</h3>
+          <div class="metric green" style="margin-top:20px">+.0213</div>
+          <div class="caption">五池平均 native AUC</div>
+          <p style="margin-top:16px">33/33 leave-one-source-family-out 教师拟合都保持正增益；候选被冻结为 shadow-only。</p>
+        </div>
+      </div>
+    </main>
+    <footer class="footerline"><span>蒸馏</span><div class="progress"><i></i></div><span class="counter"></span></footer>
+  </section>
+
+  <section class="slide">
+    <header><div class="eyebrow">P11–P14 · Safety &amp; prospective check</div></header>
+    <main>
+      <h2>先把候选安全地“放进系统”，再谈上线</h2>
+      <div class="grid four" style="margin-top:26px">
+        <div class="card good"><h3>Shadow wiring</h3><p>只写 shadow_score，不能进入 fired 赋值。</p></div>
+        <div class="card good"><h3>AST contract</h3><p>28 个 gate check + 15 个 shadow safety check。</p></div>
+        <div class="card good"><h3>Fail-closed analyzer</h3><p>缺字段、重复行、漂移、样本不足都会拒绝分析。</p></div>
+        <div class="card warn"><h3>FreshQA 60</h3><p>native AUC +.0207，但置信区间跨 0；只能算支持性证据。</p></div>
+      </div>
+      <div class="callout" style="margin-top:25px">工程成果不只是一个权重文件，而是一条能证明“候选没有悄悄改变线上决策”的证据链。</div>
+    </main>
+    <footer class="footerline"><span>安全集成</span><div class="progress"><i></i></div><span class="counter"></span></footer>
+  </section>
+
+  <section class="slide">
+    <header><div class="eyebrow">P15–P17 · Source-disjoint tests</div></header>
+    <main>
+      <h2>每次换新来源，都会暴露“平均值掩盖的回归”</h2>
+      <div class="table" style="margin-top:26px">
+        <div class="row head"><div class="cell">阶段</div><div class="cell">数据</div><div class="cell">宏观 ΔAUC</div><div class="cell">关键回归</div><div class="cell">结论</div></div>
+        <div class="row"><div class="cell">P15 · distilled-only</div><div class="cell">WinoGrande / SciQ</div><div class="cell">+.0098</div><div class="cell no">SciQ −.0122</div><div class="cell no">淘汰</div></div>
+        <div class="row"><div class="cell">P16 · z-score ensemble</div><div class="cell">BoolQ / HellaSwag / QASC</div><div class="cell ok">+.01424</div><div class="cell">三源全正</div><div class="cell maybe">差门槛 .00076</div></div>
+        <div class="row"><div class="cell">P17 · alpha=2</div><div class="cell">SNLI / SST-2 / WiC</div><div class="cell">+.01469</div><div class="cell no">SST-2 −.0445</div><div class="cell no">淘汰</div></div>
+      </div>
+      <p class="lead" style="margin-top:26px">P16 是最稳的单次前向 shadow 候选，但没有被“差一点”诱导成线上变更。</p>
+    </main>
+    <footer class="footerline"><span>外部泛化</span><div class="progress"><i></i></div><span class="counter"></span></footer>
+  </section>
+
+  <section class="slide">
+    <header><div class="eyebrow">P18–P20 · Multi-turn</div></header>
+    <main>
+      <h2>进入多轮后，单轮 probe 的坐标系会移动</h2>
+      <div class="grid three" style="margin-top:26px">
+        <div class="card warn"><h3>观测先行</h3><p>增加 turn_index、has_context、prior_escalations；上下文字段只用于分析，不能进入 fired。</p></div>
+        <div class="card bad"><h3>P19 · 120 对控制回放</h3><div class="metric red">.473</div><div class="caption">live 分数 standalone→context 相关</div><p style="margin-top:10px">25/120 本地 adequacy 翻转，P16 宏观 AUC 几乎为零增益。</p></div>
+        <div class="card bad"><h3>P20 · 零前向校正</h3><p>current − .5×prior 在独立 119 条上 pooled AUC −.0228；停止调 context scalar。</p></div>
+      </div>
+      <div class="callout red" style="margin-top:24px">多轮不是给单轮分数加一个系数；context 会改变隐藏状态、回答策略和失败类型。</div>
+    </main>
+    <footer class="footerline"><span>多轮漂移</span><div class="progress"><i></i></div><span class="counter"></span></footer>
+  </section>
+
+  <section class="slide">
+    <header><div class="eyebrow">P21–P23 · Genuine dependency</div></header>
+    <main>
+      <h2>换成真正依赖上文的中英任务，负结果更明确</h2>
+      <div class="table" style="margin-top:26px">
+        <div class="row head"><div class="cell">阶段</div><div class="cell">规模</div><div class="cell">任务</div><div class="cell">宏观 ΔAUC</div><div class="cell">结论</div></div>
+        <div class="row"><div class="cell">P21 · contextual refit</div><div class="cell">960 可评分</div><div class="cell">18 个官方 target pools</div><div class="cell no">−.01744</div><div class="cell no">淘汰</div></div>
+        <div class="row"><div class="cell">P22 · bilingual dependent</div><div class="cell">120</div><div class="cell">链接查找 / 约束 / 状态更新</div><div class="cell no">−.03681</div><div class="cell no">淘汰</div></div>
+        <div class="row"><div class="cell">P23 · context-block mix</div><div class="cell">120</div><div class="cell">时间 / 算术 / 座位交换</div><div class="cell">+.00405</div><div class="cell no">中英不一致</div></div>
+      </div>
+      <p class="lead" style="margin-top:26px">结论：<span class="note">停止 context-block 系数搜索</span>。需要新的因果读出，而不是继续修补旧表示。</p>
+    </main>
+    <footer class="footerline"><span>依赖型上下文</span><div class="progress"><i></i></div><span class="counter"></span></footer>
+  </section>
+
+  <section class="slide">
+    <header><div class="eyebrow">P25 · Structured reads &amp; data expansion</div></header>
+    <main>
+      <h2>更多特征、更多数据，仍然不能替代正确的读出时刻</h2>
+      <div class="split" style="margin-top:26px">
+        <div class="card bad"><span class="tag red">P25-A</span><h3 style="margin-top:12px">同一前向的结构化特征</h3><p>L14/18/22/26/30 的 EOT、turn mean、chunk mean/delta 与 onset wait。P21 宏观 AUC −.01425，P22 −.04664。</p></div>
+        <div class="card bad"><span class="tag red">P25-B</span><h3 style="margin-top:12px">5,400 条扩展数据</h3><p>74 个 source families、3,000 单轮 + 2,400 真多轮、中英 + 400 条真实语音。最终 5,195 可评分，1.585M 参数 MLP 仍只带来宏观 routing +.00277。</p></div>
+      </div>
+      <div class="grid three" style="margin-top:18px">
+        <div class="card"><div class="metric">7,400</div><div class="caption">生成语音</div></div>
+        <div class="card"><div class="metric">$56.48</div><div class="caption">P25-B 增量 API 成本（含保守 reserve）</div></div>
+        <div class="card"><div class="metric red">0</div><div class="caption">通过完整上线门槛的候选</div></div>
+      </div>
+    </main>
+    <footer class="footerline"><span>扩展数据</span><div class="progress"><i></i></div><span class="counter"></span></footer>
+  </section>
+
+  <section class="slide">
+    <header><div class="eyebrow">P26 · Strictly causal read</div></header>
+    <main>
+      <h2>把读出点移到“第一次说话前”</h2>
+      <div class="flow" style="margin-top:28px;grid-template-columns:1fr 1fr 1fr 1fr">
+        <div class="step"><b>STREAMING PREFILL</b><span>处理完当前语音 chunk</span></div>
+        <div class="step"><b>SNAPSHOT</b><span>L18/22/26/30；不增加 forward</span></div>
+        <div class="step"><b>FIRST SPEAK</b><span>下一次 generate 才真正开始说话</span></div>
+        <div class="step"><b>REPLAY QC</b><span>3,000/3,000 答案、onset、EOT 完全一致</span></div>
+      </div>
+      <div class="grid two" style="margin-top:24px">
+        <div class="card bad"><h3>单层 probe · L22/full</h3><p>宏观 routing <b class="ok">+.00522</b>，宏观 AUC <b class="ok">+.02200</b>；但 pooled AUC <b class="no">−.00142</b>、英文 routing <b class="no">−.00200</b>。</p></div>
+        <div class="card bad"><h3>稀疏 score fusion</h3><p>宏观 routing <b class="ok">+.00615</b>，宏观 AUC <b class="ok">+.01888</b>；但 pooled AUC <b class="no">−.00375</b>。固定主模型失败。</p></div>
+      </div>
+    </main>
+    <footer class="footerline"><span>因果读出</span><div class="progress"><i></i></div><span class="counter"></span></footer>
+  </section>
+
+  <section class="slide">
+    <header><div class="eyebrow">P27 · Temporal trajectory</div></header>
+    <main>
+      <h2>最后一个当前方向：只训练 probe，看 prefill 内部轨迹</h2>
+      <div class="grid four" style="margin-top:26px">
+        <div class="card info"><h3>last</h3><p>当前 prefill 的最后 token。</p></div>
+        <div class="card info"><h3>mean8</h3><p>当前 prefill 尾部 8 token 均值。</p></div>
+        <div class="card info"><h3>last − previous</h3><p>相邻 prefill 的方向变化。</p></div>
+        <div class="card info"><h3>running mean</h3><p>截至说话前的累计状态。</p></div>
+      </div>
+      <div class="callout" style="margin-top:24px"><b>4 层 × 4 视图 × 4 个强 L2 C</b>，5×3 source-family nested selection；最终选中 L22 / prefill-mean8 / C=3e-4。</div>
+      <div class="grid three" style="margin-top:18px">
+        <div class="card bad"><div class="metric red">+.00278</div><div class="caption">宏观 routing；低于 +.005 门槛</div></div>
+        <div class="card bad"><div class="metric red">−.00053</div><div class="caption">宏观 native AUC</div></div>
+        <div class="card bad"><div class="metric red">−.00778</div><div class="caption">pooled native AUC</div></div>
+      </div>
+    </main>
+    <footer class="footerline"><span>P27-T · 淘汰</span><div class="progress"><i></i></div><span class="counter"></span></footer>
+  </section>
+
+  <section class="slide">
+    <header><div class="eyebrow">Scorecard</div></header>
+    <main>
+      <h2>所有尝试放在一张图里</h2>
+      <div class="table" style="margin-top:24px">
+        <div class="row head"><div class="cell">方向</div><div class="cell">最好信号</div><div class="cell">可实时</div><div class="cell">跨源稳定</div><div class="cell">状态</div></div>
+        <div class="row"><div class="cell">语义分歧 + RTJ</div><div class="cell ok">native +.0334</div><div class="cell no">7–30s</div><div class="cell ok">五池全正</div><div class="cell maybe">教师</div></div>
+        <div class="row"><div class="cell">单前向蒸馏 P9/P16</div><div class="cell ok">+.0213 / +.0142</div><div class="cell ok">是</div><div class="cell maybe">接近门槛</div><div class="cell maybe">shadow-only</div></div>
+        <div class="row"><div class="cell">上下文校正 P19–P23</div><div class="cell">不稳定</div><div class="cell ok">是</div><div class="cell no">中英/任务冲突</div><div class="cell no">淘汰</div></div>
+        <div class="row"><div class="cell">容量/扩展数据 P24–P25</div><div class="cell">≤ +.0058</div><div class="cell ok">是</div><div class="cell no">未过门槛</div><div class="cell no">淘汰</div></div>
+        <div class="row"><div class="cell">严格因果 prefill P26</div><div class="cell ok">macro +.0220</div><div class="cell ok">是</div><div class="cell no">pooled / EN 失败</div><div class="cell no">淘汰</div></div>
+        <div class="row"><div class="cell">因果轨迹 P27-T</div><div class="cell">routing +.0028</div><div class="cell ok">是</div><div class="cell no">AUC 双负</div><div class="cell no">淘汰</div></div>
+      </div>
+    </main>
+    <footer class="footerline"><span>全局对比</span><div class="progress"><i></i></div><span class="counter"></span></footer>
+  </section>
+
+  <section class="slide">
+    <header><div class="eyebrow">What we learned</div></header>
+    <main>
+      <h2>六条真正可复用的结论</h2>
+      <div class="grid three" style="margin-top:25px">
+        <div class="card"><h3>01 · Macro ≠ pooled</h3><p>多个候选提升家族平均值，却损伤大池整体排序；两者必须同时守门。</p></div>
+        <div class="card"><h3>02 · Failure ≠ expert gain</h3><p>本地会错，不代表专家一定能补救；routing 目标必须显式惩罚 harmful escalation。</p></div>
+        <div class="card"><h3>03 · Multi-turn 是分布变换</h3><p>不是在单轮分数上做线性修正，而是新的状态与失败机制。</p></div>
+        <div class="card"><h3>04 · 更大 probe 会过拟合 source</h3><p>从线性到 6.3M 参数，没有换来稳定泛化。</p></div>
+        <div class="card"><h3>05 · 最强信号常常最慢</h3><p>answer-aware 语义与自评很强，但实时路径需要蒸馏或异步使用。</p></div>
+        <div class="card"><h3>06 · 失败也要可审计</h3><p>冻结协议、哈希、逐阶段 issue 记录，防止“结果驱动规则”。</p></div>
+      </div>
+    </main>
+    <footer class="footerline"><span>经验</span><div class="progress"><i></i></div><span class="counter"></span></footer>
+  </section>
+
+  <section class="slide">
+    <header><div class="eyebrow">Current state</div></header>
+    <main class="split">
+      <div>
+        <h2>今天的正确状态：<br>有更好的 shadow，<br>没有足够证据改 live</h2>
+        <p class="lead">线上 gate 与阈值保持不变；最稳的单次前向候选仍是 P16，继续等待真实 shadow traffic 验证。</p>
+      </div>
+      <div class="grid two">
+        <div class="card good"><div class="metric green">28 / 28</div><div class="caption">live gate checks</div></div>
+        <div class="card good"><div class="metric green">15 / 15</div><div class="caption">shadow safety checks</div></div>
+        <div class="card"><div class="metric">$90.54</div><div class="caption">保守累计 API 记账 / $500 上限</div></div>
+        <div class="card"><div class="metric">0</div><div class="caption">未经完整证据门槛的部署</div></div>
+      </div>
+    </main>
+    <footer class="footerline"><span>当前结论</span><div class="progress"><i></i></div><span class="counter"></span></footer>
+  </section>
+
+  <section class="slide">
+    <header><div class="eyebrow">Next</div></header>
+    <main>
+      <h2>下一步只做能改变结论的证据</h2>
+      <div class="grid three" style="margin-top:28px">
+        <div class="card good"><span class="tag">1</span><h3 style="margin-top:12px">真实 shadow traffic</h3><p>按 first-turn / follow-up、语言、source 分层；这是 P16 是否值得继续的决定性证据。</p></div>
+        <div class="card info"><span class="tag violet">2</span><h3 style="margin-top:12px">因果低秩 readout</h3><p>base model 冻结，只在 fold 内学习监督低秩投影，控制维度与 source 过拟合。</p></div>
+        <div class="card warn"><span class="tag amber">3</span><h3 style="margin-top:12px">异步 answer-aware teacher</h3><p>把 semantic/RTJ 用于日志标注与再蒸馏，而不是阻塞实时响应。</p></div>
+      </div>
+      <div class="callout" style="margin-top:26px">停止继续扫同一批 opened pools 的权重；下一轮必须带来新的信号、新的分布，或新的因果时刻。</div>
+    </main>
+    <footer class="footerline"><span>下一步</span><div class="progress"><i></i></div><span class="counter"></span></footer>
+  </section>
+
+</div>
+<nav class="nav" aria-label="幻灯片导航"><button id="prev" aria-label="上一页">←</button><button id="next" aria-label="下一页">→</button></nav>
+<script>
+  const slides=[...document.querySelectorAll('.slide')]; let index=0, touchX=null;
+  function show(n){index=Math.max(0,Math.min(slides.length-1,n));slides.forEach((s,i)=>s.classList.toggle('active',i===index));document.querySelectorAll('.counter').forEach(x=>x.textContent=`${index+1} / ${slides.length}`);document.querySelectorAll('.progress i').forEach(x=>x.style.width=`${(index+1)/slides.length*100}%`);history.replaceState(null,'',`#${index+1}`)}
+  prev.onclick=()=>show(index-1);next.onclick=()=>show(index+1);
+  addEventListener('keydown',e=>{if(['ArrowRight','PageDown',' '].includes(e.key)){e.preventDefault();show(index+1)}if(['ArrowLeft','PageUp'].includes(e.key)){e.preventDefault();show(index-1)}if(e.key==='Home')show(0);if(e.key==='End')show(slides.length-1)});
+  addEventListener('touchstart',e=>touchX=e.changedTouches[0].clientX,{passive:true});addEventListener('touchend',e=>{if(touchX===null)return;const d=e.changedTouches[0].clientX-touchX;if(Math.abs(d)>45)show(index+(d<0?1:-1));touchX=null},{passive:true});
+  const initial=parseInt(location.hash.slice(1),10);show(Number.isFinite(initial)?initial-1:0);
+</script>
+</body>
+</html>
