@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<meta name="description" content="MiniCPM-o 4.5 实时升级路由器：从离线 probe 到严格因果读出的完整实验记录。" />
-<title>MiniCPM-o 4.5 实时升级路由器：27 轮实验复盘</title>
+<meta name="description" content="MiniCPM-o 4.5 实时升级判断器：从离线轻量探针到严格因果读出的完整实验记录。" />
+<title>MiniCPM-o 4.5 实时升级判断：28 轮实验复盘</title>
 <style>
   :root {
     --bg:#f3f0e8; --paper:#fffdf8; --ink:#162321; --muted:#65716d;
@@ -36,43 +36,43 @@
 <div class="deck">
 
   <section class="slide active">
-    <header><div class="eyebrow">MiniCPM-o 4.5 · Failure Routing Audit</div></header>
+    <header><div class="eyebrow">MiniCPM-o 4.5 · 回答升级判断审计</div></header>
     <main class="split">
       <div>
-        <h1>从一个 gate，<br>到一套可审计的实验系统</h1>
-        <p class="lead">实时语音回答何时该升级给专家模型？27 轮 probe-only 尝试、失败边界与可复用结论。</p>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:28px"><span class="tag">5,400-row 扩展集</span><span class="tag violet">8×B300</span><span class="tag amber">严格因果读出</span><span class="tag red">线上零改动</span></div>
+        <h1>从一个升级开关，<br>到一套可审计的实验系统</h1>
+        <p class="lead">实时语音回答何时该交给更强的专家模型？28 轮只训练轻量判断器、不改基础模型的尝试，以及它们揭示的边界。</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:28px"><span class="tag">5,400 条扩展数据</span><span class="tag violet">8×B300</span><span class="tag amber">说话前读取信号</span><span class="tag red">线上零改动</span></div>
       </div>
-      <div><div class="big-number">27</div><p class="lead" style="margin-top:22px">轮有冻结协议、有结果收据、可复现的迭代</p></div>
+      <div><div class="big-number">28</div><p class="lead" style="margin-top:22px">轮先写规则、再看结果，并保留可复现记录的迭代</p></div>
     </main>
-    <footer class="footerline"><span>2026 · Changyi Yang</span><div class="progress"><i></i></div><span class="counter"></span></footer><div class="watermark">27</div>
+    <footer class="footerline"><span>2026 · Changyi Yang</span><div class="progress"><i></i></div><span class="counter"></span></footer><div class="watermark">28</div>
   </section>
 
   <section class="slide">
-    <header><div class="eyebrow">Problem</div></header>
+    <header><div class="eyebrow">我们要解决什么</div></header>
     <main>
       <h2>不是“模型会不会答”，而是“什么时候值得升级”</h2>
       <div class="flow" style="margin-top:30px">
         <div class="step"><b>01 · 输入</b><span>用户语音与已有对话上下文</span></div>
         <div class="step"><b>02 · 本地模型</b><span>MiniCPM-o 4.5 先生成回答</span></div>
-        <div class="step"><b>03 · Gate</b><span>只用当下可得信号估计失败风险</span></div>
+        <div class="step"><b>03 · 判断器</b><span>只用当下已有信号估计回答出错的风险</span></div>
         <div class="step"><b>04 · 路由</b><span>固定预算内挑最值得升级的样本</span></div>
         <div class="step"><b>05 · 专家</b><span>提升质量，同时控制延迟与伤害</span></div>
       </div>
-      <div class="callout" style="margin-top:26px">核心指标不是单一 AUC：必须同时看 <b>native failure AUC、专家增益 routing、15/30/50% 精确预算 cascade、语言与来源广度</b>。</div>
+      <div class="callout" style="margin-top:26px">不能只问“错误题排得准不准”：还要看它是否真的把有限的专家名额给了最能获益的问题，以及英文、中文和不同题源是否都没有明显退步。<span class="mini">技术指标：失败 AUC、专家增益排序、15/30/50% 预算下的整体质量。</span></div>
     </main>
     <footer class="footerline"><span>问题定义</span><div class="progress"><i></i></div><span class="counter"></span></footer>
   </section>
 
   <section class="slide">
-    <header><div class="eyebrow">Rules of evidence</div></header>
+    <header><div class="eyebrow">证据规则</div></header>
     <main>
       <h2>先冻结，再看答案</h2>
       <div class="grid four" style="margin-top:28px">
-        <div class="card info"><h3>分组交叉验证</h3><p>按 source family 划分，避免同源题目跨 fold 泄漏。</p></div>
-        <div class="card info"><h3>一次性外部集</h3><p>先固定公式、超参和阈值，再打开新的 source-disjoint 数据。</p></div>
-        <div class="card info"><h3>完整门槛</h3><p>宏观指标变好不够；pooled、语言和 broad-pool floor 也必须同时过。</p></div>
-        <div class="card info"><h3>安全隔离</h3><p>所有候选默认 shadow-only；AST 测试证明它不能影响线上 fired。</p></div>
+        <div class="card info"><h3>同一家族不能两头出现</h3><p>相似来源的题必须整体放在训练侧或验证侧，不能拆开，否则模型可能只是在认题型。<span class="mini">即按来源家族分组交叉验证。</span></p></div>
+        <div class="card info"><h3>新数据只打开一次</h3><p>先固定公式、参数和及格线，再看从未参与调试的新来源；看完后不能反过来改规则。</p></div>
+        <div class="card info"><h3>所有人群都要过线</h3><p>不能只靠大数据集拉高平均分；整体、各来源、中文和英文都必须守住底线。</p></div>
+        <div class="card info"><h3>候选只能旁路观察</h3><p>它可以记录“如果由我决定会怎样”，但不能真的改变线上升级结果；自动检查会锁死这条边界。</p></div>
       </div>
       <div class="callout red" style="margin-top:25px">负结果也入库：不能因为某个诊断项好看，就在看完数据后把它升级成主模型。</div>
     </main>
@@ -80,80 +80,81 @@
   </section>
 
   <section class="slide">
-    <header><div class="eyebrow">Starting point</div></header>
+    <header><div class="eyebrow">起点</div></header>
     <main>
       <h2>基线先被重新对齐：随机切分的漂亮数字不等于可泛化</h2>
       <div class="grid three" style="margin-top:28px">
-        <div class="card"><div class="metric">5,228</div><div class="caption">官方 native 训练行，全部与导出标签对齐</div></div>
-        <div class="card"><div class="metric">0.8477</div><div class="caption">row-random OOF AUC</div></div>
-        <div class="card bad"><div class="metric red">0.8346</div><div class="caption">source-grouped OOF AUC：更真实，也更难</div></div>
+        <div class="card"><div class="metric">5,228</div><div class="caption">官方训练样本，全部与最终标签逐条对齐</div></div>
+        <div class="card"><div class="metric">0.8477</div><div class="caption">随机拆散题目后，错误排序看起来很好</div></div>
+        <div class="card bad"><div class="metric red">0.8346</div><div class="caption">把相似题源整体隔开后，成绩下降但更可信</div></div>
       </div>
-      <p class="lead" style="margin-top:30px">重训后的 aligned head 在五个外部池上反而从 <b>.755 降到 .743</b>。第一条结论：<span class="note">数据/切分协议比“再训一次”更重要</span>。</p>
+      <p class="lead" style="margin-top:30px">把训练样本与最终标签重新逐条对齐后，轻量判断器在五个外部数据集上反而从 <b>.755 降到 .743</b>。第一条结论：<span class="note">数据怎么划分，比“再训练一次”更重要</span>。</p>
     </main>
     <footer class="footerline"><span>基线</span><div class="progress"><i></i></div><span class="counter"></span></footer>
   </section>
 
   <section class="slide">
-    <header><div class="eyebrow">P2–P4 · Heads &amp; labels</div></header>
+    <header><div class="eyebrow">P2–P4 · 换目标与模型容量</div></header>
     <main>
       <h2>换目标、做特征工程、加非线性：都没越过门槛</h2>
       <div class="grid three" style="margin-top:26px">
-        <div class="card bad"><span class="tag red">P2</span><h3 style="margin-top:12px">直接预测专家增益</h3><p>1,500 条 GPT 专家/裁判标签；gain head 的 routing 目标 +.1671，仍低于 live +.1816，五外部池 benefit AUC 全降。</p></div>
-        <div class="card warn"><span class="tag amber">P3</span><h3 style="margin-top:12px">特征 conditioning</h3><p>eot_mean8 + user_mean 带来外部 native AUC +.0087，但 cascade 几乎不动；PCA 与非线性 residual 都被淘汰。</p></div>
-        <div class="card bad"><span class="tag red">P24</span><h3 style="margin-top:12px">更大的 probe</h3><p>0.41M / 1.59M / 6.30M 参数 residual MLP，完整 nested procedure 比线性基线宏观 AUC 低 .0325。</p></div>
+        <div class="card bad"><span class="tag red">P2</span><h3 style="margin-top:12px">直接预测“专家能否救回来”</h3><p>用 1,500 条由强模型回答并裁判的数据训练。新判断器挑人的效果仍低于线上版本，而且五个外部数据集全部变差。</p></div>
+        <div class="card warn"><span class="tag amber">P3</span><h3 style="margin-top:12px">换一种方式汇总内部信号</h3><p>加入回答结尾和用户输入的平均内部状态后，识别错误略有提升，但有限专家预算下的最终质量几乎不动；压缩特征和非线性修正也无效。</p></div>
+        <div class="card bad"><span class="tag red">P24</span><h3 style="margin-top:12px">把轻量判断器做得更大</h3><p>从 41 万到 630 万参数逐级测试，并在每轮里独立选择配置；最终仍比简单线性版本低 .0325。</p></div>
       </div>
-      <div class="callout" style="margin-top:24px">容量不是瓶颈。当前数据规模下，更大的 head 更擅长记住 source，而不是学到稳定 failure signal。</div>
+      <div class="callout" style="margin-top:24px">容量不是瓶颈。当前数据规模下，更大的判断器更容易记住题目来自哪里，而不是学会跨题源识别“这次回答可能错了”。</div>
     </main>
-    <footer class="footerline"><span>Probe 容量</span><div class="progress"><i></i></div><span class="counter"></span></footer>
+    <footer class="footerline"><span>判断器容量</span><div class="progress"><i></i></div><span class="counter"></span></footer>
   </section>
 
   <section class="slide">
-    <header><div class="eyebrow">P4–P7 · Answer-aware signals</div></header>
+    <header><div class="eyebrow">P4–P7 · 利用回答本身</div></header>
     <main>
-      <h2>最强离线提升，来自“看第二次答案”和“让模型自评”</h2>
+      <h2>最有效的办法很直观：让模型再答一次，再检查一次</h2>
       <div class="grid three" style="margin-top:26px">
-        <div class="card good"><h3>两次采样的语义分歧</h3><div class="metric green">+.0240</div><div class="caption">五池平均 native AUC</div><p style="margin-top:10px">k=2 是质量/成本拐点；k=3 没有更好。</p></div>
-        <div class="card good"><h3>RTJ 自评 p(True)</h3><div class="metric green">0.90s</div><div class="caption">外部集平均附加延迟</div><p style="margin-top:10px">音频→转写→自评，1,000/1,138 全部成功。</p></div>
-        <div class="card good"><h3>冻结三路融合</h3><div class="metric green">+.0334</div><div class="caption">五池平均 native AUC</div><p style="margin-top:10px">.50 P3a + .25 semantic + .25 RTJ，五个池全部改善。</p></div>
+        <div class="card good"><h3>① 同一个问题，再独立回答一遍</h3><div class="metric green">+.0240</div><div class="caption">在五个数据集上，识别错误答案的能力平均提升</div><p style="margin-top:10px">如果两次回答表达的意思差很多，说明第一次回答不稳定，更值得交给专家重答。第三次回答没有继续带来明显收益。</p></div>
+        <div class="card good"><h3>② 把原回答交给模型自己检查</h3><div class="metric green">0.90s</div><div class="caption">这次自检平均增加的时间</div><p style="margin-top:10px">把“问题 + 第一次回答”重新喂给本地模型，直接问：这个回答正确吗？模型给出的把握越低，失败风险越高。</p></div>
+        <div class="card good"><h3>③ 把三条线索合在一起</h3><div class="metric green">+.0334</div><div class="caption">五个数据集平均提升，而且每个数据集都变好</div><p style="margin-top:10px">综合原来的风险分数、两次回答是否一致、模型自检是否有把握，得到整个项目中最强的离线结果。</p></div>
       </div>
-      <p class="lead" style="margin-top:25px">这是整个项目里最强的质量信号，但还不是可上线方案。</p>
+      <p class="mini" style="margin-top:18px">代码术语对照：第二次回答 = k=2；比较两次意思 = semantic disagreement；让模型判断“正确吗” = RTJ / p(True)。</p>
+      <p class="lead" style="margin-top:12px">问题也很直接：它需要额外生成和额外检查，太慢，不能阻塞实时回答。</p>
     </main>
     <footer class="footerline"><span>最强信号</span><div class="progress"><i></i></div><span class="counter"></span></footer>
   </section>
 
   <section class="slide">
-    <header><div class="eyebrow">P8–P10 · Latency &amp; distillation</div></header>
+    <header><div class="eyebrow">P8–P10 · 延迟与模仿学习</div></header>
     <main>
-      <h2>质量赢了，实时延迟输了；于是把教师蒸馏回单次前向</h2>
+      <h2>慢方法判断得更准，但不适合实时；于是把规律教给轻量探针</h2>
       <div class="split" style="margin-top:26px">
         <div class="card bad">
           <h3>同步调用不可接受</h3>
           <div class="bars" style="margin-top:22px">
-            <div class="barrow"><span class="barlabel">2-sample semantic</span><div class="track"><div class="fill red" style="width:72%"></div></div><span class="barval">7.21s</span></div>
-            <div class="barrow"><span class="barlabel">semantic + RTJ</span><div class="track"><div class="fill red" style="width:81%"></div></div><span class="barval">8.14s</span></div>
+            <div class="barrow"><span class="barlabel">让模型再答一次</span><div class="track"><div class="fill red" style="width:72%"></div></div><span class="barval">7.21s</span></div>
+            <div class="barrow"><span class="barlabel">再回答 + 自检</span><div class="track"><div class="fill red" style="width:81%"></div></div><span class="barval">8.14s</span></div>
           </div>
-          <p style="margin-top:18px">p90 分别达到 25.52s / 30.08s。</p>
+          <p style="margin-top:18px">较慢的 10% 请求甚至分别要 25.52 秒和 30.08 秒。</p>
         </div>
         <div class="card good">
-          <h3>单次前向 shadow distillation</h3>
+          <h3>让轻量探针模仿慢方法的判断</h3>
           <div class="metric green" style="margin-top:20px">+.0213</div>
-          <div class="caption">五池平均 native AUC</div>
-          <p style="margin-top:16px">33/33 leave-one-source-family-out 教师拟合都保持正增益；候选被冻结为 shadow-only。</p>
+          <div class="caption">五个数据集上，识别错误答案的能力平均提升</div>
+          <p style="margin-top:16px">先让慢方法产出“这次回答是否可靠”的示范，再训练轻量探针模仿。实际使用时只运行一次 MiniCPM；33 次“留出一个题源再验证”全部提升，但仍只做旁路观察。</p>
         </div>
       </div>
     </main>
-    <footer class="footerline"><span>蒸馏</span><div class="progress"><i></i></div><span class="counter"></span></footer>
+    <footer class="footerline"><span>把慢方法教给快探针</span><div class="progress"><i></i></div><span class="counter"></span></footer>
   </section>
 
   <section class="slide">
-    <header><div class="eyebrow">P11–P14 · Safety &amp; prospective check</div></header>
+    <header><div class="eyebrow">P11–P14 · 安全接入与新数据检查</div></header>
     <main>
       <h2>先把候选安全地“放进系统”，再谈上线</h2>
       <div class="grid four" style="margin-top:26px">
-        <div class="card good"><h3>Shadow wiring</h3><p>只写 shadow_score，不能进入 fired 赋值。</p></div>
-        <div class="card good"><h3>AST contract</h3><p>28 个 gate check + 15 个 shadow safety check。</p></div>
-        <div class="card good"><h3>Fail-closed analyzer</h3><p>缺字段、重复行、漂移、样本不足都会拒绝分析。</p></div>
-        <div class="card warn"><h3>FreshQA 60</h3><p>native AUC +.0207，但置信区间跨 0；只能算支持性证据。</p></div>
+        <div class="card good"><h3>只记录，不接管</h3><p>候选分数写进日志供比较，但真正的线上开关只能读取原有分数。</p></div>
+        <div class="card good"><h3>代码结构也要自动验</h3><p>28 项线上逻辑检查 + 15 项旁路隔离检查，防止一次重构绕过安全边界。</p></div>
+        <div class="card good"><h3>数据不完整就拒绝结论</h3><p>日志缺字段、有重复、分布漂移或样本不足时，分析程序直接停止。</p></div>
+        <div class="card warn"><h3>60 条全新时效问答</h3><p>错误识别提升 .0207，但样本太少，统计范围仍包含“没有提升”，所以只能算初步支持。</p></div>
       </div>
       <div class="callout" style="margin-top:25px">工程成果不只是一个权重文件，而是一条能证明“候选没有悄悄改变线上决策”的证据链。</div>
     </main>
@@ -161,60 +162,60 @@
   </section>
 
   <section class="slide">
-    <header><div class="eyebrow">P15–P17 · Source-disjoint tests</div></header>
+    <header><div class="eyebrow">P15–P17 · 用全新题源验泛化</div></header>
     <main>
       <h2>每次换新来源，都会暴露“平均值掩盖的回归”</h2>
       <div class="table" style="margin-top:26px">
-        <div class="row head"><div class="cell">阶段</div><div class="cell">数据</div><div class="cell">宏观 ΔAUC</div><div class="cell">关键回归</div><div class="cell">结论</div></div>
-        <div class="row"><div class="cell">P15 · distilled-only</div><div class="cell">WinoGrande / SciQ</div><div class="cell">+.0098</div><div class="cell no">SciQ −.0122</div><div class="cell no">淘汰</div></div>
-        <div class="row"><div class="cell">P16 · z-score ensemble</div><div class="cell">BoolQ / HellaSwag / QASC</div><div class="cell ok">+.01424</div><div class="cell">三源全正</div><div class="cell maybe">差门槛 .00076</div></div>
-        <div class="row"><div class="cell">P17 · alpha=2</div><div class="cell">SNLI / SST-2 / WiC</div><div class="cell">+.01469</div><div class="cell no">SST-2 −.0445</div><div class="cell no">淘汰</div></div>
+        <div class="row head"><div class="cell">阶段</div><div class="cell">全新数据</div><div class="cell">各题源等权后的提升</div><div class="cell">暴露的问题</div><div class="cell">结论</div></div>
+        <div class="row"><div class="cell">P15 · 只用模仿分数</div><div class="cell">WinoGrande / SciQ</div><div class="cell">+.0098</div><div class="cell no">SciQ −.0122</div><div class="cell no">淘汰</div></div>
+        <div class="row"><div class="cell">P16 · 合并原分数与模仿分数</div><div class="cell">BoolQ / HellaSwag / QASC</div><div class="cell ok">+.01424</div><div class="cell">三个题源都提升</div><div class="cell maybe">距门槛 .00076</div></div>
+        <div class="row"><div class="cell">P17 · 加重模仿分数</div><div class="cell">SNLI / SST-2 / WiC</div><div class="cell">+.01469</div><div class="cell no">SST-2 −.0445</div><div class="cell no">淘汰</div></div>
       </div>
-      <p class="lead" style="margin-top:26px">P16 是最稳的单次前向 shadow 候选，但没有被“差一点”诱导成线上变更。</p>
+      <p class="lead" style="margin-top:26px">P16 是最稳的“一次运行即可算出”候选，但它只在旁路记录；我们没有因为“差一点及格”就改线上逻辑。</p>
     </main>
     <footer class="footerline"><span>外部泛化</span><div class="progress"><i></i></div><span class="counter"></span></footer>
   </section>
 
   <section class="slide">
-    <header><div class="eyebrow">P18–P20 · Multi-turn</div></header>
+    <header><div class="eyebrow">P18–P20 · 多轮对话</div></header>
     <main>
-      <h2>进入多轮后，单轮 probe 的坐标系会移动</h2>
+      <h2>同一道题放进多轮对话，原来的风险分数会失去尺度</h2>
       <div class="grid three" style="margin-top:26px">
-        <div class="card warn"><h3>观测先行</h3><p>增加 turn_index、has_context、prior_escalations；上下文字段只用于分析，不能进入 fired。</p></div>
-        <div class="card bad"><h3>P19 · 120 对控制回放</h3><div class="metric red">.473</div><div class="caption">live 分数 standalone→context 相关</div><p style="margin-top:10px">25/120 本地 adequacy 翻转，P16 宏观 AUC 几乎为零增益。</p></div>
-        <div class="card bad"><h3>P20 · 零前向校正</h3><p>current − .5×prior 在独立 119 条上 pooled AUC −.0228；停止调 context scalar。</p></div>
+        <div class="card warn"><h3>先把场景记清楚</h3><p>日志新增“第几轮、是否有上文、此前升级过几次”，但这些字段只用于分析，不能控制线上开关。</p></div>
+        <div class="card bad"><h3>P19 · 120 对控制回放</h3><div class="metric red">.473</div><div class="caption">同一问题单独问与放进对话时，风险分数相关性很低</div><p style="margin-top:10px">25/120 个回答的合格与否发生翻转；P16 按题源等权后的提升几乎为零。</p></div>
+        <div class="card bad"><h3>P20 · 用上一轮分数校正</h3><p>尝试“当前风险减去一半上一轮风险”，却在独立 119 条上让整体排序下降 .0228，因此停止继续调这个系数。</p></div>
       </div>
-      <div class="callout red" style="margin-top:24px">多轮不是给单轮分数加一个系数；context 会改变隐藏状态、回答策略和失败类型。</div>
+      <div class="callout red" style="margin-top:24px">多轮不是给单轮分数加一个系数就能解决：上文会同时改变模型内部状态、回答策略和出错方式。</div>
     </main>
     <footer class="footerline"><span>多轮漂移</span><div class="progress"><i></i></div><span class="counter"></span></footer>
   </section>
 
   <section class="slide">
-    <header><div class="eyebrow">P21–P23 · Genuine dependency</div></header>
+    <header><div class="eyebrow">P21–P23 · 必须记住上文才能回答</div></header>
     <main>
       <h2>换成真正依赖上文的中英任务，负结果更明确</h2>
       <div class="table" style="margin-top:26px">
-        <div class="row head"><div class="cell">阶段</div><div class="cell">规模</div><div class="cell">任务</div><div class="cell">宏观 ΔAUC</div><div class="cell">结论</div></div>
-        <div class="row"><div class="cell">P21 · contextual refit</div><div class="cell">960 可评分</div><div class="cell">18 个官方 target pools</div><div class="cell no">−.01744</div><div class="cell no">淘汰</div></div>
-        <div class="row"><div class="cell">P22 · bilingual dependent</div><div class="cell">120</div><div class="cell">链接查找 / 约束 / 状态更新</div><div class="cell no">−.03681</div><div class="cell no">淘汰</div></div>
-        <div class="row"><div class="cell">P23 · context-block mix</div><div class="cell">120</div><div class="cell">时间 / 算术 / 座位交换</div><div class="cell">+.00405</div><div class="cell no">中英不一致</div></div>
+        <div class="row head"><div class="cell">阶段</div><div class="cell">规模</div><div class="cell">任务</div><div class="cell">各任务等权后的提升</div><div class="cell">结论</div></div>
+        <div class="row"><div class="cell">P21 · 用多轮数据重新训练</div><div class="cell">960 可评分</div><div class="cell">18 类官方任务</div><div class="cell no">−.01744</div><div class="cell no">淘汰</div></div>
+        <div class="row"><div class="cell">P22 · 中英双语依赖任务</div><div class="cell">120</div><div class="cell">链接查找 / 约束 / 状态更新</div><div class="cell no">−.03681</div><div class="cell no">淘汰</div></div>
+        <div class="row"><div class="cell">P23 · 调整上文信号占比</div><div class="cell">120</div><div class="cell">时间 / 算术 / 座位交换</div><div class="cell">+.00405</div><div class="cell no">中英表现相反</div></div>
       </div>
-      <p class="lead" style="margin-top:26px">结论：<span class="note">停止 context-block 系数搜索</span>。需要新的因果读出，而不是继续修补旧表示。</p>
+      <p class="lead" style="margin-top:26px">结论：<span class="note">停止继续调“上文信号占多少”</span>。需要在模型开口前读取新的内部证据，而不是继续修补旧分数。</p>
     </main>
     <footer class="footerline"><span>依赖型上下文</span><div class="progress"><i></i></div><span class="counter"></span></footer>
   </section>
 
   <section class="slide">
-    <header><div class="eyebrow">P25 · Structured reads &amp; data expansion</div></header>
+    <header><div class="eyebrow">P25 · 多看内部状态，再扩数据</div></header>
     <main>
       <h2>更多特征、更多数据，仍然不能替代正确的读出时刻</h2>
       <div class="split" style="margin-top:26px">
-        <div class="card bad"><span class="tag red">P25-A</span><h3 style="margin-top:12px">同一前向的结构化特征</h3><p>L14/18/22/26/30 的 EOT、turn mean、chunk mean/delta 与 onset wait。P21 宏观 AUC −.01425，P22 −.04664。</p></div>
-        <div class="card bad"><span class="tag red">P25-B</span><h3 style="margin-top:12px">5,400 条扩展数据</h3><p>74 个 source families、3,000 单轮 + 2,400 真多轮、中英 + 400 条真实语音。最终 5,195 可评分，1.585M 参数 MLP 仍只带来宏观 routing +.00277。</p></div>
+        <div class="card bad"><span class="tag red">P25-A</span><h3 style="margin-top:12px">从一次运行中多取几种快照</h3><p>同时查看 5 个网络层，并汇总回答结尾、整轮平均、语音片段变化和开口前等待状态；在两组多轮数据上反而分别下降 .01425 和 .04664。</p></div>
+        <div class="card bad"><span class="tag red">P25-B</span><h3 style="margin-top:12px">把数据扩到 5,400 条</h3><p>覆盖 74 类来源、3,000 条单轮、2,400 条真多轮、中英文及 400 条真实语音；最终 5,195 条可评分，更大的判断器仍只把有限预算下的质量提高 .00277。</p></div>
       </div>
       <div class="grid three" style="margin-top:18px">
         <div class="card"><div class="metric">7,400</div><div class="caption">生成语音</div></div>
-        <div class="card"><div class="metric">$56.48</div><div class="caption">P25-B 增量 API 成本（含保守 reserve）</div></div>
+        <div class="card"><div class="metric">$56.48</div><div class="caption">P25-B 新增 API 成本（含保守预留）</div></div>
         <div class="card"><div class="metric red">0</div><div class="caption">通过完整上线门槛的候选</div></div>
       </div>
     </main>
@@ -222,86 +223,84 @@
   </section>
 
   <section class="slide">
-    <header><div class="eyebrow">P26 · Strictly causal read</div></header>
+    <header><div class="eyebrow">P26 · 严格在开口前读信号</div></header>
     <main>
       <h2>把读出点移到“第一次说话前”</h2>
       <div class="flow" style="margin-top:28px;grid-template-columns:1fr 1fr 1fr 1fr">
-        <div class="step"><b>STREAMING PREFILL</b><span>处理完当前语音 chunk</span></div>
-        <div class="step"><b>SNAPSHOT</b><span>L18/22/26/30；不增加 forward</span></div>
-        <div class="step"><b>FIRST SPEAK</b><span>下一次 generate 才真正开始说话</span></div>
-        <div class="step"><b>REPLAY QC</b><span>3,000/3,000 答案、onset、EOT 完全一致</span></div>
+        <div class="step"><b>处理输入</b><span>模型听完当前一小段语音，但还没有开始回答</span></div>
+        <div class="step"><b>保存快照</b><span>从第 18/22/26/30 层读取内部状态，不额外运行模型</span></div>
+        <div class="step"><b>开始回答</b><span>只有下一步才真正生成第一段语音</span></div>
+        <div class="step"><b>核对回放</b><span>3,000 条的答案、开口时刻和结束位置全部与原运行一致</span></div>
       </div>
       <div class="grid two" style="margin-top:24px">
-        <div class="card bad"><h3>单层 probe · L22/full</h3><p>宏观 routing <b class="ok">+.00522</b>，宏观 AUC <b class="ok">+.02200</b>；但 pooled AUC <b class="no">−.00142</b>、英文 routing <b class="no">−.00200</b>。</p></div>
-        <div class="card bad"><h3>稀疏 score fusion</h3><p>宏观 routing <b class="ok">+.00615</b>，宏观 AUC <b class="ok">+.01888</b>；但 pooled AUC <b class="no">−.00375</b>。固定主模型失败。</p></div>
+        <div class="card bad"><h3>只用第 22 层</h3><p>各来源等权时，有限预算质量 <b class="ok">+.00522</b>、错误识别 <b class="ok">+.02200</b>；但把所有样本放在一起后错误识别 <b class="no">−.00142</b>，英文也 <b class="no">−.00200</b>。</p></div>
+        <div class="card bad"><h3>合并多个快照的分数</h3><p>各来源等权时两项分别 <b class="ok">+.00615</b> 和 <b class="ok">+.01888</b>；但整体错误识别 <b class="no">−.00375</b>，所以仍然淘汰。</p></div>
       </div>
     </main>
     <footer class="footerline"><span>因果读出</span><div class="progress"><i></i></div><span class="counter"></span></footer>
   </section>
 
   <section class="slide">
-    <header><div class="eyebrow">P27 · Temporal trajectory</div></header>
+    <header><div class="eyebrow">P27–P28 · 从时间轨迹到低维读出</div></header>
     <main>
-      <h2>最后一个当前方向：只训练 probe，看 prefill 内部轨迹</h2>
-      <div class="grid four" style="margin-top:26px">
-        <div class="card info"><h3>last</h3><p>当前 prefill 的最后 token。</p></div>
-        <div class="card info"><h3>mean8</h3><p>当前 prefill 尾部 8 token 均值。</p></div>
-        <div class="card info"><h3>last − previous</h3><p>相邻 prefill 的方向变化。</p></div>
-        <div class="card info"><h3>running mean</h3><p>截至说话前的累计状态。</p></div>
+      <h2>只挑一个时间点不够；让训练数据找出少数有用方向后，六项门槛首次全过</h2>
+      <div class="grid two" style="margin-top:26px">
+        <div class="card bad"><span class="tag red">P27 · 淘汰</span><h3 style="margin-top:12px">手工比较四种时间摘要</h3><p>分别查看开口前最后位置、最后 8 个位置的平均、相邻语音片段的变化和全程平均。最佳方案在有限专家预算下只提升 <b>+.00278</b>，错误识别反而下降。</p></div>
+        <div class="card good"><span class="tag">P28 · 六项全过</span><h3 style="margin-top:12px">让每个训练折只提炼 8 个方向</h3><p>不改基础模型；从完整开口前快照中找出与“会不会错、专家能否补救、升级是否有害”最相关的少数方向，再与原线上分数保守合并。</p></div>
       </div>
-      <div class="callout" style="margin-top:24px"><b>4 层 × 4 视图 × 4 个强 L2 C</b>，5×3 source-family nested selection；最终选中 L22 / prefill-mean8 / C=3e-4。</div>
       <div class="grid three" style="margin-top:18px">
-        <div class="card bad"><div class="metric red">+.00278</div><div class="caption">宏观 routing；低于 +.005 门槛</div></div>
-        <div class="card bad"><div class="metric red">−.00053</div><div class="caption">宏观 native AUC</div></div>
-        <div class="card bad"><div class="metric red">−.00778</div><div class="caption">pooled native AUC</div></div>
+        <div class="card good"><div class="metric green">+.00831</div><div class="caption">各来源等权后的有限预算质量提升</div></div>
+        <div class="card good"><div class="metric green">+.02083</div><div class="caption">各来源等权后的错误识别提升</div></div>
+        <div class="card good"><div class="metric green">+.00763</div><div class="caption">所有样本合并后的错误识别提升</div></div>
       </div>
+      <p class="mini" style="margin-top:14px">技术名词：折内监督低秩投影，最多 8 个因子；主分数 = 原线上标准化分数 + 0.5 × 新读出标准化分数。</p>
     </main>
-    <footer class="footerline"><span>P27-T · 淘汰</span><div class="progress"><i></i></div><span class="counter"></span></footer>
+    <footer class="footerline"><span>P28 · 通过开发门槛，不等于上线</span><div class="progress"><i></i></div><span class="counter"></span></footer>
   </section>
 
   <section class="slide">
-    <header><div class="eyebrow">Scorecard</div></header>
+    <header><div class="eyebrow">总表</div></header>
     <main>
       <h2>所有尝试放在一张图里</h2>
       <div class="table" style="margin-top:24px">
         <div class="row head"><div class="cell">方向</div><div class="cell">最好信号</div><div class="cell">可实时</div><div class="cell">跨源稳定</div><div class="cell">状态</div></div>
-        <div class="row"><div class="cell">语义分歧 + RTJ</div><div class="cell ok">native +.0334</div><div class="cell no">7–30s</div><div class="cell ok">五池全正</div><div class="cell maybe">教师</div></div>
-        <div class="row"><div class="cell">单前向蒸馏 P9/P16</div><div class="cell ok">+.0213 / +.0142</div><div class="cell ok">是</div><div class="cell maybe">接近门槛</div><div class="cell maybe">shadow-only</div></div>
+        <div class="row"><div class="cell">再回答一次 + 自检</div><div class="cell ok">错误识别 +.0334</div><div class="cell no">7–30 秒</div><div class="cell ok">五个数据集全正</div><div class="cell maybe">慢但准</div></div>
+        <div class="row"><div class="cell">用快探针模仿慢方法 P9/P16</div><div class="cell ok">+.0213 / +.0142</div><div class="cell ok">是</div><div class="cell maybe">接近门槛</div><div class="cell maybe">只旁路观察</div></div>
         <div class="row"><div class="cell">上下文校正 P19–P23</div><div class="cell">不稳定</div><div class="cell ok">是</div><div class="cell no">中英/任务冲突</div><div class="cell no">淘汰</div></div>
         <div class="row"><div class="cell">容量/扩展数据 P24–P25</div><div class="cell">≤ +.0058</div><div class="cell ok">是</div><div class="cell no">未过门槛</div><div class="cell no">淘汰</div></div>
-        <div class="row"><div class="cell">严格因果 prefill P26</div><div class="cell ok">macro +.0220</div><div class="cell ok">是</div><div class="cell no">pooled / EN 失败</div><div class="cell no">淘汰</div></div>
-        <div class="row"><div class="cell">因果轨迹 P27-T</div><div class="cell">routing +.0028</div><div class="cell ok">是</div><div class="cell no">AUC 双负</div><div class="cell no">淘汰</div></div>
+        <div class="row"><div class="cell">开口前单层/多分数 P26</div><div class="cell ok">按来源等权 +.0220</div><div class="cell ok">是</div><div class="cell no">整体 / 英文失败</div><div class="cell no">淘汰</div></div>
+        <div class="row"><div class="cell">开口前低维读出 P28</div><div class="cell ok">+.0208 / +.0076</div><div class="cell ok">是</div><div class="cell ok">六项开发门槛全过</div><div class="cell maybe">进入多轮复采</div></div>
       </div>
     </main>
     <footer class="footerline"><span>全局对比</span><div class="progress"><i></i></div><span class="counter"></span></footer>
   </section>
 
   <section class="slide">
-    <header><div class="eyebrow">What we learned</div></header>
+    <header><div class="eyebrow">我们学到了什么</div></header>
     <main>
       <h2>六条真正可复用的结论</h2>
       <div class="grid three" style="margin-top:25px">
-        <div class="card"><h3>01 · Macro ≠ pooled</h3><p>多个候选提升家族平均值，却损伤大池整体排序；两者必须同时守门。</p></div>
-        <div class="card"><h3>02 · Failure ≠ expert gain</h3><p>本地会错，不代表专家一定能补救；routing 目标必须显式惩罚 harmful escalation。</p></div>
-        <div class="card"><h3>03 · Multi-turn 是分布变换</h3><p>不是在单轮分数上做线性修正，而是新的状态与失败机制。</p></div>
-        <div class="card"><h3>04 · 更大 probe 会过拟合 source</h3><p>从线性到 6.3M 参数，没有换来稳定泛化。</p></div>
-        <div class="card"><h3>05 · 最强信号常常最慢</h3><p>answer-aware 语义与自评很强，但实时路径需要蒸馏或异步使用。</p></div>
-        <div class="card"><h3>06 · 失败也要可审计</h3><p>冻结协议、哈希、逐阶段 issue 记录，防止“结果驱动规则”。</p></div>
+        <div class="card"><h3>01 · 小题源与大题源都要过线</h3><p>有些方案提高了各题源的平均成绩，却让样本最多的部分变差；两种统计都必须检查。</p></div>
+        <div class="card"><h3>02 · 会错，不等于专家能救</h3><p>本地模型答错时，专家也可能答错；升级判断必须奖励真正的改善，并惩罚越帮越忙。</p></div>
+        <div class="card"><h3>03 · 多轮不是单轮加个系数</h3><p>上文会改变内部状态、回答策略和出错方式，因此需要单独验证。</p></div>
+        <div class="card"><h3>04 · 判断器更大不一定更聪明</h3><p>从线性到 630 万参数都没有稳定泛化；大模型更容易记住题源特征。</p></div>
+        <div class="card"><h3>05 · 最强信号常常最慢</h3><p>再回答一次和自检很有效，但实时系统只能让快探针模仿，或把慢步骤放到后台。</p></div>
+        <div class="card"><h3>06 · 失败也必须留证据</h3><p>先写规则、记录文件指纹、逐阶段公开结果，才能防止看到结果后临时改及格线。</p></div>
       </div>
     </main>
     <footer class="footerline"><span>经验</span><div class="progress"><i></i></div><span class="counter"></span></footer>
   </section>
 
   <section class="slide">
-    <header><div class="eyebrow">Current state</div></header>
+    <header><div class="eyebrow">当前状态</div></header>
     <main class="split">
       <div>
-        <h2>今天的正确状态：<br>有更好的 shadow，<br>没有足够证据改 live</h2>
-        <p class="lead">线上 gate 与阈值保持不变；最稳的单次前向候选仍是 P16，继续等待真实 shadow traffic 验证。</p>
+        <h2>今天的正确状态：<br>开口前新方案过了开发门槛，<br>但还没有足够证据改线上</h2>
+        <p class="lead">线上升级开关和阈值保持不变。P28 现在可以进入中英多轮复采；它仍需新的真实分布证据，不能直接启用。</p>
       </div>
       <div class="grid two">
-        <div class="card good"><div class="metric green">28 / 28</div><div class="caption">live gate checks</div></div>
-        <div class="card good"><div class="metric green">15 / 15</div><div class="caption">shadow safety checks</div></div>
+        <div class="card good"><div class="metric green">6 / 6</div><div class="caption">P28 离线开发门槛全部通过</div></div>
+        <div class="card good"><div class="metric green">43 / 43</div><div class="caption">线上逻辑与旁路隔离检查全部通过</div></div>
         <div class="card"><div class="metric">$90.54</div><div class="caption">保守累计 API 记账 / $500 上限</div></div>
         <div class="card"><div class="metric">0</div><div class="caption">未经完整证据门槛的部署</div></div>
       </div>
@@ -310,15 +309,15 @@
   </section>
 
   <section class="slide">
-    <header><div class="eyebrow">Next</div></header>
+    <header><div class="eyebrow">下一步</div></header>
     <main>
       <h2>下一步只做能改变结论的证据</h2>
       <div class="grid three" style="margin-top:28px">
-        <div class="card good"><span class="tag">1</span><h3 style="margin-top:12px">真实 shadow traffic</h3><p>按 first-turn / follow-up、语言、source 分层；这是 P16 是否值得继续的决定性证据。</p></div>
-        <div class="card info"><span class="tag violet">2</span><h3 style="margin-top:12px">因果低秩 readout</h3><p>base model 冻结，只在 fold 内学习监督低秩投影，控制维度与 source 过拟合。</p></div>
-        <div class="card warn"><span class="tag amber">3</span><h3 style="margin-top:12px">异步 answer-aware teacher</h3><p>把 semantic/RTJ 用于日志标注与再蒸馏，而不是阻塞实时响应。</p></div>
+        <div class="card good"><span class="tag">1</span><h3 style="margin-top:12px">按新时刻复采多轮任务</h3><p>在模型第一次开口前，重新采集 P22/P23 的中英依赖任务；检查 P28 的单轮提升能否迁移到多轮。</p></div>
+        <div class="card info"><span class="tag violet">2</span><h3 style="margin-top:12px">真实旁路流量</h3><p>把第一轮与后续轮次、中文与英文、不同题源分开看；这是候选是否值得继续的决定性证据。</p></div>
+        <div class="card warn"><span class="tag amber">3</span><h3 style="margin-top:12px">把慢而准的方法当老师</h3><p>在后台用“再回答一次 + 自检”给日志打标签，再教给实时轻量探针；不要让慢步骤阻塞用户。</p></div>
       </div>
-      <div class="callout" style="margin-top:26px">停止继续扫同一批 opened pools 的权重；下一轮必须带来新的信号、新的分布，或新的因果时刻。</div>
+      <div class="callout" style="margin-top:26px">不再根据已经看过的数据反复调权重；下一轮必须带来新的信号、新的数据分布，或新的读取时刻。</div>
     </main>
     <footer class="footerline"><span>下一步</span><div class="progress"><i></i></div><span class="counter"></span></footer>
   </section>
