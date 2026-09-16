@@ -158,6 +158,11 @@
 
   <h2>推理并行（转载）</h2>
   <div class="cards">
+    <a class="card" href="./sglang-overlap/">
+      <h3>SGLang 的 Overlap：单个 batch 藏什么，两个 batch 怎么交错</h3>
+      <p>从依赖图到源码：shared expert、down GEMM 与通信如何重叠，prefill/decode 的 TBO stage 如何 ping-pong，以及当前版本的实际支持边界。</p>
+      <div class="meta"><span class="tag">技术长文 · 6 张图</span><span class="tag blue">SBO · TBO · DeepEP</span><span class="tag amber">2026-09-15</span></div>
+    </a>
     <a class="card" href="./ep-parallelism/">
       <h3>并行策略与通信：TP、DP-Attention、EP</h3>
       <p>六种切法（TP / DP-Attention / EP / PP / CP / DCP）的数据流、All-to-All 原理、通信量闭式对比，以及在 SGLang 里的落地。原文由 <b>yamy1234.github.io</b> 撰写，此处为方便阅读所做的镜像。</p>
