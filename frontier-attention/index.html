@@ -25,7 +25,7 @@
     h1{font:600 clamp(42px,7.6vw,104px)/.95 var(--serif);letter-spacing:-.055em;margin:0;max-width:850px}
     .deck{max-width:720px;font-size:clamp(17px,2vw,23px);color:#d9d3c8;margin:28px 0 0;line-height:1.5}
     .hero-meta{display:flex;gap:18px;flex-wrap:wrap;margin-top:28px;font:600 12px/1 var(--mono);color:#bdb7ad}
-    .layout{display:grid;grid-template-columns:220px minmax(0,820px);gap:64px;max-width:1180px;margin:0 auto;padding:86px 30px 120px}
+    .layout{display:grid;grid-template-columns:220px minmax(0,900px);gap:64px;max-width:1260px;margin:0 auto;padding:86px 30px 120px}
     .toc{position:sticky;top:24px;align-self:start;border-top:2px solid var(--ink);padding-top:14px}
     .toc b{font:750 11px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase}.toc a{display:block;text-decoration:none;color:var(--muted);font-size:13px;padding:6px 0}.toc a:hover{color:var(--orange)}
     main{min-width:0}.lede{font:500 clamp(25px,3vw,38px)/1.42 var(--serif);letter-spacing:-.02em;margin:0 0 58px}.lede em{color:var(--orange);font-style:normal}
@@ -47,8 +47,21 @@
     .truth{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);margin:30px 0}.truth div{background:#f9f5ed;padding:23px}.truth b{display:block;font:650 19px/1.2 var(--serif);margin-bottom:8px}.truth span{font-size:13px;color:var(--muted)}
     .infra{counter-reset:item;list-style:none;padding:0}.infra li{counter-increment:item;display:grid;grid-template-columns:34px 1fr;gap:12px;padding:18px 0;border-bottom:1px solid var(--line)}.infra li:before{content:counter(item,decimal-leading-zero);font:700 11px/1.8 var(--mono);color:var(--orange)}.infra b{display:block}.infra span{font-size:14px;color:var(--muted)}
     .sources a{display:block;border-top:1px solid var(--line);padding:15px 0;text-decoration:none}.sources a:hover{color:var(--orange)}.sources b{font:700 11px/1 var(--mono);display:inline-block;width:110px;color:var(--muted)}
+    .eq{background:#17191b;color:#f5efe5;padding:22px 24px;margin:20px 0;border-radius:3px;overflow:auto;font:500 14px/1.9 var(--mono)}
+    .eq .dim{color:#9fa6a9}.eq .accent{color:#f3a36f}.eq .comment{color:#8f9698}.eq strong{color:#fff}
+    .steps{counter-reset:mechanism;display:grid;gap:1px;background:var(--line);border:1px solid var(--line);margin:24px 0}
+    .step{counter-increment:mechanism;display:grid;grid-template-columns:48px 1fr;background:#faf7f0;padding:18px 20px;gap:10px}
+    .step:before{content:counter(mechanism,decimal-leading-zero);font:700 11px/1.7 var(--mono);color:var(--c,var(--orange))}.step b{display:block;margin-bottom:4px}.step p{margin:0;color:var(--muted);font-size:14px}
+    .note{margin:24px 0;padding:18px 20px;background:#e9e3d9;border:1px solid var(--line);font-size:14px}.note b{font-family:var(--mono);font-size:11px;letter-spacing:.08em;margin-right:8px;color:var(--c,var(--orange))}
+    .danger{border-left:4px solid #a13c35;background:#f1ded9;padding:18px 20px;margin:24px 0;font-size:14px}.danger b{color:#8d302b}
+    .mechanism-title{display:flex;align-items:center;gap:12px;margin:40px 0 14px}.mechanism-title .badge{font:700 10px/1 var(--mono);color:#fff;background:var(--c,var(--ink));border-radius:99px;padding:7px 9px;white-space:nowrap}.mechanism-title h4{font:650 22px/1.25 var(--serif);margin:0}
+    .shape-row{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0}.shape{font:650 11px/1.4 var(--mono);border:1px solid var(--line);background:#fffaf1;padding:7px 9px;border-radius:3px}.shape em{font-style:normal;color:var(--c,var(--orange))}
+    .compare{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin:24px 0}.compare>div{border:1px solid var(--line);background:#faf7f0;padding:18px}.compare h4{font:700 12px/1.3 var(--mono);color:var(--c,var(--orange));margin:0 0 10px}.compare p{font-size:14px;margin:0;color:var(--muted)}
+    .complexity{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);margin:24px 0}.complexity div{background:#faf7f0;padding:18px}.complexity small{display:block;font:700 10px/1 var(--mono);color:var(--muted);margin-bottom:8px}.complexity strong{font:650 19px/1.2 var(--serif);display:block;margin-bottom:5px}.complexity span{font-size:12px;color:var(--muted)}
+    .trace{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:22px 0}.trace div{position:relative;min-height:84px;background:#fffaf1;border:1px solid var(--line);padding:12px;font-size:12px}.trace b{display:block;font:700 10px/1.2 var(--mono);color:var(--c,var(--orange));margin-bottom:7px}.trace div:not(:last-child):after{content:"→";position:absolute;right:-9px;top:31px;z-index:2;color:var(--muted);font-weight:800}
+    .correction{border:1px solid var(--line);background:#fffaf1;padding:22px;margin:26px 0}.correction h4{margin:0 0 10px;font:650 21px/1.2 var(--serif)}.correction p:last-child{margin-bottom:0}
     footer{background:#151719;color:#b8b5af;padding:34px clamp(22px,5vw,64px);display:flex;justify-content:space-between;gap:20px;font-size:12px}footer a{color:#fff}
-    @media(max-width:860px){.layout{grid-template-columns:1fr;padding-top:58px}.toc{display:none}.model-grid{grid-template-columns:1fr}.truth{grid-template-columns:1fr}.thesis{grid-template-columns:1fr}.hero{min-height:680px}.hero-copy{padding:34px 22px 52px}.model-head{display:block}.model .num{display:none}.bar{grid-template-columns:108px 1fr 38px}.nav .stamp{display:none}}
+    @media(max-width:860px){.layout{grid-template-columns:1fr;padding-top:58px}.toc{display:none}.model-grid{grid-template-columns:1fr}.truth,.complexity{grid-template-columns:1fr}.thesis,.compare{grid-template-columns:1fr}.trace{grid-template-columns:1fr}.trace div:not(:last-child):after{content:"↓";right:auto;left:18px;top:auto;bottom:-13px}.hero{min-height:680px}.hero-copy{padding:34px 22px 52px}.model-head{display:block}.model .num{display:none}.bar{grid-template-columns:108px 1fr 38px}.nav .stamp{display:none}.step{grid-template-columns:34px 1fr}.eq{font-size:12px;padding:17px 15px}}
   </style>
 </head>
 <body>
@@ -59,7 +72,7 @@
     <div class="hero-copy">
       <div class="kicker">Frontier Attention Field Guide / 01</div>
       <h1>新 Attention<br>已经分成四条路</h1>
-      <p class="deck">Kimi、Qwen、DeepSeek、GLM 正在把“读完整个历史”改写成：压缩状态、稀疏检索、潜变量缓存，以及跨层路由。</p>
+      <p class="deck">从一次 state update 到一次 top-k gather：逐式拆解 Kimi KDA、Qwen QSA、DeepSeek DSA 与 GLM hybrid 的计算、缓存、训练和推理路径。</p>
       <div class="hero-meta"><span>KDA · GDN</span><span>QSA · DSA</span><span>MLA</span><span>AttnRes · mHC</span></div>
     </div>
   </header>
@@ -67,117 +80,228 @@
   <div class="layout">
     <aside class="toc">
       <b>Contents</b>
-      <a href="#map">01 / 一张地图</a><a href="#mechanics">02 / 三种机制</a><a href="#kimi">03 / Kimi</a><a href="#qwen">04 / Qwen</a><a href="#deepseek">05 / DeepSeek</a><a href="#glm">06 / GLM</a><a href="#infra">07 / 推理侧结论</a><a href="#sources">08 / 一手资料</a>
+      <a href="#map">01 / 结论与边界</a><a href="#baseline">02 / 四个基线概念</a><a href="#kimi">03 / Kimi · KDA</a><a href="#qwen">04 / Qwen · GDN/QSA</a><a href="#deepseek">05 / DeepSeek · DSA</a><a href="#glm">06 / GLM · Hybrid</a><a href="#compare">07 / 逐路径对照</a><a href="#infra">08 / 推理侧结论</a><a href="#sources">09 / 一手资料</a>
     </aside>
 
     <main>
-      <p class="lede">结论先说：没有一个“最强 attention”。真正收敛的是一种<em>混合配方</em>——大约 3 层常数状态的线性注意力，穿插 1 层能精确回看的稀疏/潜变量 attention；再把跨层信息流一并重做。</p>
+      <p class="lede">这不是四个缩写的名单。下面追到每个模型一次 token mixing 的具体计算：<em>读什么、写什么、缓存什么、如何并行，以及省下的复杂度究竟转移到了哪里。</em></p>
 
       <section id="map">
-        <div class="section-no">01 / THE MAP</div><h2>四家，四个主攻方向</h2>
+        <div class="section-no">01 / VERDICT &amp; SCOPE</div><h2>结论：行业不是选出一种 Attention，而是在组合三种记忆</h2>
+        <p>截至 2026 年 9 月，四家前沿开源模型已经形成相当清楚的分工：递归状态承担便宜的连续记忆，稀疏检索负责从长历史中找候选，MLA/softmax 负责在候选上做精确内容寻址。所谓“新 attention”，真正的新意不在一个公式，而在三种记忆的比例和接口。</p>
         <div class="thesis">
-          <article style="--c:var(--orange)"><span>KIMI · K3</span><h3>KDA + Gated MLA</h3><p>把大部分历史压成固定状态，周期性用 MLA 做“精确回看”；再用 AttnRes 解决跨深度的信息稀释。</p></article>
-          <article style="--c:var(--teal)"><span>QWEN · 3.8 FLASH NEXT</span><h3>GDN + QSA</h3><p>线性状态负责连续记忆，QSA 的轻量 indexer 在 micro-block 粒度挑回重要上下文。</p></article>
-          <article style="--c:var(--blue)"><span>DEEPSEEK · V3.2 → V4.1</span><h3>DSA on MLA</h3><p>保留 MLA 的低秩 KV 压缩，再加 lightning indexer，只让主 attention 读取 top-k token。</p></article>
-          <article style="--c:var(--violet)"><span>GLM · 5.3 FLASH</span><h3>KDA + DSA + mHC</h3><p>最直接的“集大成”路线：3:1 的 linear/sparse hybrid，加上多分支跨层信息流。</p></article>
+          <article style="--c:var(--orange)"><span>KIMI K3 · 93 LAYERS</span><h3>69 KDA + 24 Gated MLA</h3><p>KDA 用逐通道衰减的 delta-rule state；每个 block 的第四层用 NoPE MLA 恢复全局、逐 token 的内容访问。</p></article>
+          <article style="--c:var(--teal)"><span>QWEN3.8-FLASH-NEXT · 48 LAYERS</span><h3>36 GDN + 12 QSA</h3><p>GDN 用每 head 一个标量衰减；QSA 把历史压成 4-token micro-block，选 512 块后展开为 2,048 token。</p></article>
+          <article style="--c:var(--blue)"><span>DEEPSEEK V3.2 → V4.1</span><h3>DSA over MLA</h3><p>额外缓存一份窄 index key；lightning indexer 逐 token 选 top-2,048，core attention 仍是精确 MLA。</p></article>
+          <article style="--c:var(--violet)"><span>GLM-5.3-FLASH · 45 LAYERS</span><h3>34 KDA + 11 pooled DSA</h3><p>KDA 与 K3 同样使用 −5 下界；DSA 再做 4-token 可学习逐通道池化，整个 global path 使用 NoPE。</p></article>
         </div>
-        <div class="callout">共同答案不是“彻底杀死 softmax”，而是让昂贵的精确检索变成低频事件。</div>
+        <div class="callout">真正的共同答案：让多数层不再保存逐 token KV；让少数仍保存 KV 的层不再读取全部 KV。</div>
         <div class="table-wrap"><table>
-          <thead><tr><th>MODEL</th><th>LAYER MIX</th><th>历史怎么存</th><th>每步读多少历史</th><th>最关键的代价</th></tr></thead>
+          <thead><tr><th>MODEL</th><th>LINEAR PATH</th><th>EXACT PATH</th><th>INDEX GRANULARITY</th><th>随上下文增长的东西</th></tr></thead>
           <tbody>
-            <tr><td><b>Kimi K3</b></td><td>69 KDA + 24 Gated MLA</td><td>KDA 固定 state；MLA 压缩 KV</td><td>KDA 与 L 无关；MLA 全量</td><td>scan kernel + 两种 cache</td></tr>
-            <tr><td><b>Qwen3.8-Flash-Next</b></td><td>36 GDN + 12 QSA</td><td>GDN state；QSA 压缩索引与 KV</td><td>QSA budget 2,048</td><td>micro-block 选择 + gather</td></tr>
-            <tr><td><b>DeepSeek DSA</b></td><td>稀疏 MLA</td><td>MLA latent KV + index K</td><td>top-k 2,048</td><td>indexer 仍需扫历史</td></tr>
-            <tr><td><b>GLM-5.3-Flash</b></td><td>34 KDA + 11 DSA</td><td>固定 state + sparse MLA cache</td><td>DSA top-k 2,048</td><td>KDA / DSA 双后端</td></tr>
+            <tr><td><b>Kimi K3</b></td><td>KDA：state <span class="pill">d<sub>k</sub>×d<sub>v</sub>/head</span></td><td>Gated MLA，全量 global</td><td>无 indexer</td><td>只在 24 个 MLA 层增长</td></tr>
+            <tr><td><b>Qwen3.8-Flash-Next</b></td><td>GDN：state <span class="pill">d<sub>k</sub>×d<sub>v</sub>/head</span></td><td>QSA 的 GQA core</td><td>4-token block，512 blocks</td><td>12 个 QSA 层的 KV + block index</td></tr>
+            <tr><td><b>DeepSeek DSA</b></td><td>无 linear path</td><td>稀疏 MLA，top-2,048</td><td>单 token</td><td>每层 latent KV + index K</td></tr>
+            <tr><td><b>GLM-5.3-Flash</b></td><td>KDA：64×128×128 state</td><td>稀疏 NoPE MLA</td><td>4-token learned pool，512 pools</td><td>11 个 DSA 层的 latent KV + pooled index</td></tr>
           </tbody>
         </table></div>
-        <p class="small">注：layer mix 来自公开模型配置；“每步读多少”描述主 attention 的预算，不等于 indexer 自身完全没有 O(L) 工作。</p>
+        <div class="danger"><b>口径边界：</b>DeepSeek V4/V4.1 的官方 DeepSelect 仓库确认继续使用 DSA，但公开、可逐式核对的机制报告来自 V3.2-Exp；所以下文用 V3.2-Exp 的论文和参考实现解释 DSA，不臆造 V4.1 未公开的结构细节。</div>
       </section>
 
-      <section id="mechanics">
-        <div class="section-no">02 / MECHANICS</div><h2>先把三个容易混的东西拆开</h2>
-        <h3>线性注意力：把历史“写进”状态</h3>
-        <div class="formula">Sₜ = update(Sₜ₋₁, kₜ, vₜ, gateₜ)　→　oₜ = read(qₜ, Sₜ)</div>
-        <p>KDA / GDN 不再保存可逐 token 随机访问的完整 KV，而是维护固定大小的递归状态。decode 的历史成本不随上下文长度增长；代价是有限状态会覆盖旧信息，且 prefill 依赖 chunkwise scan，而不是普通 FlashAttention。</p>
-        <h3>稀疏注意力：先便宜地找，再昂贵地读</h3>
-        <div class="flow"><span class="node">query</span><span class="arrow">→</span><span class="node">light indexer</span><span class="arrow">→</span><span class="node">top-k positions</span><span class="arrow">→</span><span class="node">sparse MLA / softmax</span></div>
-        <p>DSA / QSA 没有把历史消失掉：它们仍保留可回看的缓存，只是主 attention 不再扫描全部位置。收益取决于 indexer 能否又快又准，以及 top-k gather 是否能在 GPU 上保持规则访问。</p>
-        <h3>纵向 attention：在“层”之间选信息</h3>
-        <p>AttnRes、Gated Residual、mHC 解决的是另一维：当前层该从哪些早期表示读取、往哪些 residual stream 写。它们不是长上下文 attention，但与新 attention 一起出现，因为横向压缩更激进后，纵向的信息保真变得更重要。</p>
-        <div class="truth"><div><b>Linear ≠ sparse</b><span>前者压成 state；后者保留历史、只挑一部分读。</span></div><div><b>MLA ≠ linear</b><span>MLA 压低每 token KV 宽度，但 cache 仍随 L 增长。</span></div><div><b>Residual ≠ context</b><span>AttnRes / mHC 在深度轴路由，不直接替代 token attention。</span></div></div>
+      <section id="baseline">
+        <div class="section-no">02 / BASELINES</div><h2>先固定四个基线，否则所有“线性、稀疏、压缩”都会混成一团</h2>
+        <div class="mechanism-title"><span class="badge">A</span><h4>标准 softmax attention：缓存每个 token 的 K/V，读取整段历史</h4></div>
+        <div class="eq">score<sub>t,s</sub> = q<sub>t</sub><sup>⊤</sup>k<sub>s</sub> / √d　;　o<sub>t</sub> = Σ<sub>s≤t</sub> softmax(score<sub>t,:</sub>)<sub>s</sub>v<sub>s</sub></div>
+        <p>Decode 每来一个 token，要从 HBM 读一遍此前所有 KV。缓存是 O(L·d<sub>kv</sub>)，单步读取也是 O(L·d<sub>kv</sub>)；prefill 则是 O(L²d)。FlashAttention 改变 IO 路径，不改变“每个 query 看全部历史”这个语义。</p>
+
+        <div class="mechanism-title"><span class="badge">B</span><h4>MLA：压窄每个 token 的 KV，但 token 数没有减少</h4></div>
+        <div class="eq">c<sub>s</sub><sup>KV</sup> = W<sup>DKV</sup>x<sub>s</sub> <span class="dim">∈ R<sup>d<sub>c</sub></sup></span><br>K<sub>s</sub>, V<sub>s</sub> = up-project(c<sub>s</sub><sup>KV</sup>)　<span class="comment">// cache latent c, not full per-head K/V</span></div>
+        <p>MLA 把每个位置的多头 K/V 压成一个共享 latent，再通过可吸收到 query/output projection 的矩阵恢复计算。它显著缩小 cache 宽度，但 cache 仍随 L 线性增长；如果不加 DSA，每个 query 仍读全部 L 个 latent。</p>
+
+        <div class="mechanism-title"><span class="badge">C</span><h4>Delta-rule linear attention：不保留 token，而是维护关联矩阵</h4></div>
+        <div class="eq">ê<sub>t</sub> = v<sub>t</sub> − S̃<sub>t−1</sub><sup>⊤</sup>k<sub>t</sub><br>S<sub>t</sub> = S̃<sub>t−1</sub> + β<sub>t</sub>k<sub>t</sub>ê<sub>t</sub><sup>⊤</sup>　;　o<sub>t</sub> = S<sub>t</sub><sup>⊤</sup>q<sub>t</sub></div>
+        <p>S 是一个 d<sub>k</sub>×d<sub>v</sub> 的 fast-weight associative memory。先问 state“这个 key 已经映射到什么 value”，再只写预测误差。缓存大小与 L 无关，但历史被压进有限维矩阵，不能保证任意旧 token 的精确随机访问。</p>
+
+        <div class="mechanism-title"><span class="badge">D</span><h4>Indexer-based sparse attention：历史还在，只把主 attention 的读取缩到 k</h4></div>
+        <div class="eq">i<sub>t,s</sub> = cheap_score(q̂<sub>t</sub>, k̂<sub>s</sub>)<br>𝒮<sub>t</sub> = TopK(i<sub>t,:</sub>, k)　;　o<sub>t</sub> = ExactAttention(q<sub>t</sub>, K<sub>𝒮t</sub>, V<sub>𝒮t</sub>)</div>
+        <p>主 attention 从 O(L) 降到 O(k)，但 indexer 仍需判断哪些位置重要。DSA 用窄 token index；QSA/GLM-5.3 进一步先把历史按 4-token pool 压缩，减少 indexer 自己的扫描长度。</p>
+        <div class="truth"><div><b>MLA 不是 linear attention</b><span>它是低秩 KV 表示；每个 token 仍有 cache entry。</span></div><div><b>Sparse 不等于少存</b><span>它主要减少读取和乘加；被索引的历史通常仍需保存。</span></div><div><b>AttnRes / mHC 不是 token attention</b><span>它们在网络深度轴组织 residual stream，不能拿来替代 KDA/DSA。</span></div></div>
       </section>
 
       <section class="model" id="kimi" style="--c:var(--orange)">
-        <div class="model-head"><div><div class="section-no">03 / KIMI</div><h3>KDA：目前最完整的线性路线</h3><p class="sub">Kimi Linear 做机制验证，Kimi K3 把它扩到 2.8T 参数与 1M context。</p></div><div class="num">K</div></div>
-        <div class="model-grid"><div>
-          <p>KDA 是对 Gated DeltaNet 的细粒度门控改造。直觉上，它不是把新 KV 一股脑累加进 state，而是先根据 key 检查“这个槽位已经写了什么”，用 delta rule 做定向擦除/改写；更细的 gate 决定每个通道忘多少。</p>
-          <div class="flow"><span class="node">3 × KDA</span><span class="arrow">→</span><span class="node">1 × Gated MLA</span><span class="arrow">→</span><span class="node">repeat</span></div>
-          <p>这解释了 hybrid 的必要性：KDA 提供便宜的连续记忆，Gated MLA 保留精确 token 级回看。Kimi Linear 报告 KV cache 最多下降 75%、1M context 相对 MLA 的 TPOT 最多快 6.3×；K3 使用 69 KDA + 24 Gated MLA。</p>
-        </div><div class="spec"><div><span>Flagship</span><code>Kimi K3</code></div><div><span>Layers</span><code>93</code></div><div><span>Mix</span><code>69 + 24</code></div><div><span>Context</span><code>1,048,576</code></div><div><span>Vertical path</span><code>AttnRes</code></div></div></div>
-        <div class="verdict"><b>最适合：</b>超长 decode、agent trajectory、KV 容量是主瓶颈的场景。<br><b>最难的点：</b>KDA state 不可像 KV token 那样直接做 DCP；prefill 需要高质量 chunk/scan kernel。</div>
+        <div class="model-head"><div><div class="section-no">03 / KIMI K3</div><h3>KDA：先忘、再纠错、最后读取</h3><p class="sub">Kimi Linear 给出 KDA；Kimi K3 修改 decay 参数化和 kernel 路径，并用 3:1 KDA/Gated-MLA 扩到 93 层、1M context。</p></div><div class="num">K</div></div>
+        <div class="model-grid"><div><p>KDA 的核心不是“RNN 化”三个字，而是对 fast-weight 矩阵做一次有明确含义的在线回归更新。对单个 head，state S<sub>t</sub>∈R<sup>d<sub>k</sub>×d<sub>v</sub></sup> 表示从 key space 到 value space 的暂时映射。</p></div><div class="spec"><div><span>Layers</span><code>69 KDA + 24 MLA</code></div><div><span>Block pattern</span><code>3 : 1 + final MLA</code></div><div><span>KDA state</span><code>d_k × d_v / head</code></div><div><span>Decay lower bound</span><code>g_min = −5</code></div><div><span>MLA position</span><code>NoPE</code></div></div></div>
+
+        <div class="mechanism-title"><span class="badge">KDA-1</span><h4>一次 decode update 的完整五步</h4></div>
+        <div class="eq"><span class="comment">// ① channel-wise decay</span><br>S̃<sub>t−1</sub> = Diag(α<sub>t</sub>) S<sub>t−1</sub><br><br><span class="comment">// ② read existing association at current key</span><br>v̂<sub>t</sub> = S̃<sub>t−1</sub><sup>⊤</sup> k<sub>t</sub><br><br><span class="comment">// ③ residual error; ④ rank-1 corrective write</span><br>e<sub>t</sub> = v<sub>t</sub> − v̂<sub>t</sub><br>S<sub>t</sub> = S̃<sub>t−1</sub> + β<sub>t</sub> k<sub>t</sub> e<sub>t</sub><sup>⊤</sup><br><br><span class="comment">// ⑤ query the updated state</span><br>õ<sub>t</sub> = S<sub>t</sub><sup>⊤</sup> q<sub>t</sub></div>
+        <p>把第 ②–④ 步展开，就得到论文的等价式：</p>
+        <div class="eq">S<sub>t</sub> = (I − β<sub>t</sub>k<sub>t</sub>k<sub>t</sub><sup>⊤</sup>) Diag(α<sub>t</sub>)S<sub>t−1</sub> + β<sub>t</sub>k<sub>t</sub>v<sub>t</sub><sup>⊤</sup></div>
+        <div class="steps">
+          <div class="step"><div><b>Decay 不是一个 head 一个数</b><p>α<sub>t</sub>∈(0,1)<sup>d<sub>k</sub></sup>，state 的每个 key channel 有独立 retention。GDN 的 α<sub>t</sub> 是 scalar；这就是 KDA 比 GDN 更细的地方。</p></div></div>
+          <div class="step"><div><b>Delta rule 不盲目累加</b><p>普通 linear attention 写 k<sub>t</sub>v<sub>t</sub><sup>⊤</sup>，相似 key 会持续叠加并互相污染；KDA 只写 v − S̃<sup>⊤</sup>k，重复 key 会纠正已有映射。</p></div></div>
+          <div class="step"><div><b>β 是写入步长</b><p>β<sub>t</sub>=sigmoid(W<sub>β</sub>x<sub>t</sub>)。β≈0 时几乎不改 state；β≈1 时强力把当前 key 的映射拉向 v<sub>t</sub>。</p></div></div>
+          <div class="step"><div><b>q/k 不是裸 projection</b><p>q、k、v 先过 depthwise causal ShortConv 与 Swish；q/k 再做 L2Norm，限制 rank-1 transition 的谱，避免 state 爆炸。</p></div></div>
+          <div class="step"><div><b>输出还有一层内容 gate</b><p>y<sub>t</sub>=W<sub>o</sub>[sigmoid(W<sub>g</sub>x<sub>t</sub>)⊙RMSNorm(õ<sub>t</sub>)]。K3 从 Kimi Linear 的低秩 gate 改为 full-rank gate。</p></div></div>
+        </div>
+
+        <div class="mechanism-title"><span class="badge">KDA-2</span><h4>为什么训练时不是逐 token for-loop：chunkwise UT/WY 形式</h4></div>
+        <p>Decode 可以直接 recurrent update；训练/prefill 若逐 token 扫描则 GPU 利用率很差。KDA 把长度 L 切成大小 C 的 chunk：chunk 之间递归，chunk 内把一串 rank-1 transition 压成 dense matrix 运算。</p>
+        <div class="eq">S<sub>[c+1]</sub> = Diag(γ<sub>[c]</sub><sup>C</sup>)S<sub>[c]</sub> + (Γ<sub>[c]</sub>⊙K<sub>[c]</sub>)<sup>⊤</sup>(U<sub>[c]</sub> − W<sub>[c]</sub>S<sub>[c]</sub>)<br><br>O<sub>[c]</sub> = (Γ<sub>[c]</sub>⊙Q<sub>[c]</sub>)S<sub>[c]</sub> + Tril((Γ⊙Q)(K/Γ)<sup>⊤</sup>)(U−WS)</div>
+        <p>第一项读前面所有 chunk 压成的 incoming state；第二项计算当前 chunk 内的 causal interaction。U/W 来自 UT transform，把序列 rank-1 updates 变成 Tensor Core 友好的矩阵乘。Kimi Linear 给出的单 head FLOPs 是 6Td<sub>h</sub>² + 3TCd<sub>h</sub> + TC²，而 full attention 主项是 2T²d<sub>h</sub>。</p>
+
+        <div class="mechanism-title"><span class="badge">K3 CHANGE</span><h4>K3 为什么把 log-decay 限制在 (−5, 0)</h4></div>
+        <div class="compare"><div><h4>KIMI LINEAR</h4><p>g=−exp(A)·softplus(z)，下界是 −∞。chunk 内需要除累计 retention Γ；1/Γ 可能溢出，因此 diagonal tile 需显式 position-pair 计算。</p></div><div><h4>KIMI K3</h4><p>g=−5·sigmoid(exp(A)z)，α=exp(g)。16-token tile 的累计 log-decay 大于 −80，1/Γ 留在 BF16 动态范围，diagonal/off-diagonal tile 都能走 dense Tensor Core GEMM。</p></div></div>
+        <div class="eq">g<sub>t,j</sub> = g<sub>min</sub>·sigmoid(exp(A<sub>h</sub>)z<sub>t,j</sub>) ∈ (−5,0)<br>α<sub>t,j</sub> = exp(g<sub>t,j</sub>) ∈ (e<sup>−5</sup>,1)</div>
+
+        <div class="mechanism-title"><span class="badge">GLOBAL PATH</span><h4>Gated MLA 在 3:1 hybrid 中到底补什么</h4></div>
+        <p>KDA 的 state 是固定容量，擅长统计、连续状态和反复更新，但无法保证从一百万 token 中精确复制任意一次出现。于是每三层 KDA 插一层 MLA。MLA 为每个 token 缓存低维 latent c<sub>s</sub>，仍能做全局 token-to-token softmax；K3 的 MLA 完全使用 NoPE，把位置/近因偏置交给相邻 KDA，并在 MLA 输出上加 full-rank channel gate。</p>
+        <div class="trace"><div><b>LAYER 1</b>KDA<br>更新固定 state</div><div><b>LAYER 2</b>KDA<br>更新固定 state</div><div><b>LAYER 3</b>KDA<br>更新固定 state</div><div><b>LAYER 4</b>Gated MLA<br>全局读取 latent KV</div><div><b>REPEAT</b>最后额外一层 MLA</div></div>
+
+        <div class="mechanism-title"><span class="badge">SERVING</span><h4>推理侧不是只有“KV 少 75%”</h4></div>
+        <ul>
+          <li><b>Decode：</b>KDA 每层只维护一个 d<sub>k</sub>×d<sub>v</sub>/head state，单步成本不随 L 增长；MLA 层仍随 L 读 cache。</li>
+          <li><b>Context parallel：</b>KDA segment 不能只算 S=0 的局部 state 再相加。每段必须产出 affine fragment (M, S̃)，用结合律做 prefix scan；K3 的 KCP 用一次 fixed-size all-gather 交换两者。</li>
+          <li><b>Prefix cache：</b>命中 MLA 前缀还不够，命中边界必须有对应 KDA state checkpoint。K3 将细粒度 hash block 与粗粒度 physical page 解耦，只在可复用端点稀疏保存 state。</li>
+          <li><b>Cache manager：</b>MLA 是 per-token pages，KDA 是 per-request state；K3 把两类对象放进同一 byte-size page pool，统一 allocation/refcount/eviction。</li>
+        </ul>
+        <div class="verdict"><b>一句话判断：</b>KDA 是四家里对“常数状态线性注意力”解释、训练 kernel、跨卡 CP 和 serving cache 都公开得最完整的一条路线；它的代价不是 recall 完全免费，而是必须保留周期性 global MLA，并让推理引擎真正理解两种 cache。</div>
       </section>
 
       <section class="model" id="qwen" style="--c:var(--teal)">
-        <div class="model-head"><div><div class="section-no">04 / QWEN</div><h3>QSA：从 token top-k 走向 micro-block</h3><p class="sub">Qwen3-Next 的 GDN hybrid 已成为主干；Qwen3.8-Flash-Next 又把全局层换成 QSA。</p></div><div class="num">Q</div></div>
-        <div class="model-grid"><div>
-          <p>QSA 的关键不是“又一个 top-k”，而是让轻量 indexer 先压缩历史，并在 micro-block 粒度选候选区，再让主 attention 精读。相比逐 token 索引，这更贴近 GPU 连续访存，也更容易把 selector 的成本摊薄。</p>
-          <div class="flow"><span class="node">3 × GDN</span><span class="arrow">→</span><span class="node">1 × QSA</span><span class="arrow">→</span><span class="node">GR × 4 streams</span></div>
-          <p>公开配置是 48 层、每 4 层一个 QSA：36 个 GDN + 12 个 QSA。indexer budget 为 2,048，压缩比 4。Residual 同时升级成四分支 Gated Residual——这是 Qwen 这条路线真正“体系化”的地方。</p>
-        </div><div class="spec"><div><span>Preview</span><code>Qwen4 arch</code></div><div><span>Layers</span><code>48</code></div><div><span>Mix</span><code>36 + 12</code></div><div><span>QSA budget</span><code>2,048</code></div><div><span>Index compress</span><code>4×</code></div></div></div>
-        <div class="verdict"><b>最适合：</b>既要长上下文精确 recall，又希望访问更规整、可被硬件高效执行。<br><b>最难的点：</b>micro-block 选择会引入粒度误差；QSA kernel 和 indexer/gather 的融合决定实际收益。</div>
+        <div class="model-head"><div><div class="section-no">04 / QWEN3.8-FLASH-NEXT</div><h3>GDN 压缩连续历史，QSA 按 micro-block 找回离散证据</h3><p class="sub">Qwen 的关键不是单个 QSA，而是把“3 个 GDN + 1 个 QSA”做成可重复的 token-mixing block。</p></div><div class="num">Q</div></div>
+        <div class="model-grid"><div><p>Qwen 的 linear path 是 Gated DeltaNet。它和 KDA 共用 delta rule，但忘记机制更粗：每个 head、每个 token 只有一个 scalar α，而不是 KDA 的 d<sub>k</sub> 维 vector。</p></div><div class="spec"><div><span>Layers</span><code>36 GDN + 12 QSA</code></div><div><span>Pattern</span><code>3 : 1</code></div><div><span>Indexer</span><code>4Q × 1KV, dim 128</code></div><div><span>Pool / budget</span><code>r=4 / K=2048</code></div><div><span>Core attention</span><code>GQA, partial RoPE</code></div></div></div>
+
+        <div class="mechanism-title"><span class="badge">GDN</span><h4>GDN 的 erase-and-write recurrence</h4></div>
+        <div class="eq">S̃<sub>t−1</sub> = α<sub>t</sub>S<sub>t−1</sub><br>e<sub>t</sub> = v<sub>t</sub> − S̃<sub>t−1</sub><sup>⊤</sup>k<sub>t</sub><br>S<sub>t</sub> = S̃<sub>t−1</sub> + β<sub>t</sub>k<sub>t</sub>e<sub>t</sub><sup>⊤</sup><br>y<sub>t</sub> = S<sub>t</sub><sup>⊤</sup>q<sub>t</sub></div>
+        <p>α<sub>t</sub>=exp[−exp(A)·softplus(W<sub>α</sub>x<sub>t</sub>+b<sub>α</sub>)] 控制整个 head 的 memory lifetime，β<sub>t</sub>=σ(W<sub>β</sub>x<sub>t</sub>) 控制写强度。q/k/v 同样经过 ShortConv；q/k L2-normalize；输出是 W<sub>o</sub>[σ(W<sub>z</sub>x)⊙RMSNorm(y)]。Qwen 的改动之一是把原 GDN 的 SiLU output gate 换成 bounded sigmoid。</p>
+        <div class="note"><b>KDA vs GDN</b>KDA 的 α<sub>t,j</sub> 能让某些 key channel 长记、某些快忘；GDN 的 α<sub>t</sub> 对整个 head 一起衰减。KDA 更有表达力，GDN 的 recurrence 与 kernel 更简单。</div>
+
+        <div class="mechanism-title"><span class="badge">QSA-1</span><h4>Indexer 先把 4 个 token 压成一个 block key</h4></div>
+        <div class="steps">
+          <div class="step"><div><b>轻量 projection</b><p>每个 query token 产生 H=4 个 index query：q̂<sub>i</sub><sup>h</sup>=RMSNorm(W<sub>Q</sub><sup>h</sup>x<sub>i</sub>)；历史每个 token 只产生一个共享 index key k<sub>j</sub>=W<sub>K</sub>x<sub>j</sub>。这是 4Q×1KV 的 MQA indexer。</p></div></div>
+          <div class="step"><div><b>先 average-pool，再加位置</b><p>把不重叠的 r=4 个 key 做平均：k̂<sub>b</sub>=RMSNorm(AvgPool(k<sub>4b:4b+3</sub>))。池化发生在 RoPE 之前，避免把不同 rotary phase 的向量直接平均。</p></div></div>
+          <div class="step"><div><b>partial RoPE</b><p>128 维 index head 中只有 64 维做 RoPE。query 保留位置 i；block key 使用块起点 p<sub>b</sub>=4b。一个 block 因此只有一个内容摘要和一个块级位置。</p></div></div>
+          <div class="step"><div><b>block-causal score</b><p>只有整个 block 已经位于 query 之前时才可选；未完整可见的 block score 为 −∞。</p></div></div>
+        </div>
+        <div class="eq">I<sub>i,b</sub> = Σ<sub>h=1..4</sub> ReLU(⟨q<sub>i</sub><sup>h</sup>, k̄<sub>b</sub>⟩),　if 4b+3 ≤ i<br>B<sub>i</sub> = TopK<sub>⌈2048/4⌉=512</sub>({I<sub>i,b</sub>})</div>
+
+        <div class="mechanism-title"><span class="badge">QSA-2</span><h4>选的是 block，真正算 softmax 时仍回到完整 token</h4></div>
+        <p>TopK 返回最多 512 个 block。QSA 把每个 block 展开回原始 4 个 token，截断到 K=2,048；当前尚未凑满 4 个 token 的 tail block 不参加 indexer，但它的可见 token 被无条件加入集合。然后 core GQA 用完整 q/k/v 在这些原始 token 上计算真正的 softmax attention。</p>
+        <div class="trace"><div><b>HISTORY</b>L 个 token keys</div><div><b>COMPRESS</b>L/4 block keys</div><div><b>SELECT</b>top 512 blocks</div><div><b>EXPAND</b>≤2,048 raw tokens + tail</div><div><b>CORE</b>exact GQA softmax</div></div>
+        <div class="correction"><h4>Block sparse 的实际偏差是什么？</h4><p>如果一个重要 token 所在 block 的平均表示不显著，整个 block 都可能漏掉；反过来，一个 token 拉高 block 分数后，其余三个普通 token 也被读入。这是用 4× indexer 降本换来的召回粒度。Qwen 的 ablation 显示 r=4 是质量/延迟平衡点，而 r=8/16 更便宜但 retrieval 下降。</p></div>
+
+        <div class="mechanism-title"><span class="badge">TRAINING</span><h4>QSA 不能插上就用：先蒸馏 indexer，再让 backbone 适应 sparse mask</h4></div>
+        <div class="compare"><div><h4>STAGE 1 · DENSE DISTILLATION</h4><p>保留 full attention。把 teacher 各 head 的 softmax distribution 求和并 L1 normalize；对每 4-token block 做 max-pool，保留块内最显著 token；以 KL 训练 indexer。1,000 steps，约 2B tokens。</p></div><div><h4>STAGE 2 · SPARSE TRAINING</h4><p>启用 top-block mask，backbone 与 indexer 联合训练。KL 只在被选 blocks 内计算，teacher probability 重新归一化。8,000 steps，约 200B tokens。</p></div></div>
+        <p>为什么 teacher 聚合用 max-pool，而 index key 用 avg-pool？前者是监督信号，要防止重要单 token 被块平均稀释；后者是实际索引表示，要保持平滑稳定并便于 kernel。</p>
+
+        <div class="complexity"><div><small>PREFILL INDEXER</small><strong>O(L²/r)</strong><span>r=4，不是线性；只是把 key 轴缩短 4×。</span></div><div><small>PREFILL CORE</small><strong>O(LK)</strong><span>K=2,048，替代 full GQA 的 O(L²)。</span></div><div><small>DECODE</small><strong>O(L/r + K)</strong><span>先扫 L/4 blocks，再读最多 2,048 token。</span></div></div>
+        <p>论文报告的是 <b>attention module</b> kernel-level 数据：1M context 下 prefill 7.6×、decode 4.9×，包含 indexer 与 sparse core，但不是整模型端到端加速。多步 MTP 可复用 top-k indices，避免每个 draft step 重跑 selector。</p>
+        <div class="verdict"><b>一句话判断：</b>QSA 的技术核心不是“稀疏”二字，而是把 DSA 的 token indexer 改造成硬件更规整的 block indexer，同时用两阶段训练让模型学会这套有损候选生成。</div>
       </section>
 
       <section class="model" id="deepseek" style="--c:var(--blue)">
-        <div class="model-head"><div><div class="section-no">05 / DEEPSEEK</div><h3>DSA：给 MLA 加一层“检索门”</h3><p class="sub">从 V3.2-Exp 验证，到 V4 / V4.1 延续；它是对既有 MLA 栈改动最小的一条稀疏化路径。</p></div><div class="num">D</div></div>
-        <div class="model-grid"><div>
-          <p>DSA 保留 MLA 的 latent KV cache，在主 attention 前增加 lightning indexer。Indexer 用较小的 key 表示为每个位置打分，选 top-k 位置，再在这些位置上执行精确 MLA。V3.2-Exp 的公开配置是 64 个 index heads、128 维 index key、top-k 2,048。</p>
-          <div class="flow"><span class="node">latent KV cache</span><span class="arrow">+</span><span class="node">FP8 index K</span><span class="arrow">→</span><span class="node">top-2048 MLA</span></div>
-          <p>它的优势是路径清楚：MLA 已经压低 cache 宽度，DSA 再压低每次读取的长度。但别把 top-k 当成 O(1)：原始 indexer 仍要对历史打分，只是维度更窄、可用 FP8，并由 DeepSelect / DeepGEMM 专门优化。</p>
-        </div><div class="spec"><div><span>Debut</span><code>V3.2-Exp</code></div><div><span>Used by</span><code>V4 / V4.1</code></div><div><span>Top-k</span><code>2,048</code></div><div><span>Index dim</span><code>128</code></div><div><span>Base cache</span><code>MLA rank 512</code></div></div></div>
-        <div class="verdict"><b>最适合：</b>已经围绕 MLA / FlashMLA / DP-Attention 建好推理栈，希望以较小迁移成本获得长上下文稀疏收益。<br><b>最难的点：</b>TopK + 不规则 gather；而且 indexer RoPE 与 MLA RoPE 的布局不同，官方曾专门修过这一实现陷阱。</div>
+        <div class="model-head"><div><div class="section-no">05 / DEEPSEEK DSA</div><h3>DSA：用窄 index cache 筛选宽 latent KV cache</h3><p class="sub">DSA 没有 linear recurrence。它保留每个 token 的 MLA latent，用另一套更便宜的 index representation 决定本次只读哪 2,048 个。</p></div><div class="num">D</div></div>
+        <div class="model-grid"><div><p>要理解 DSA，必须先理解它是在 MLA 的 MQA decode 形式上实例化的：selection 发生在 token latent c<sub>s</sub> 之前；所有 query heads 共享同一组被选 token，才能让 sparse gather 和 kernel 有足够复用。</p></div><div class="spec"><div><span>Public spec</span><code>V3.2-Exp</code></div><div><span>Main heads</span><code>128</code></div><div><span>Q / KV rank</span><code>1536 / 512</code></div><div><span>Indexer</span><code>64 × 128</code></div><div><span>Selection</span><code>token top-2048</code></div></div></div>
+
+        <div class="mechanism-title"><span class="badge">MLA</span><h4>主 cache 到底存什么</h4></div>
+        <div class="shape-row"><span class="shape">q residual <em>1536</em></span><span class="shape">latent KV c<sub>s</sub> <em>512</em></span><span class="shape">shared RoPE key <em>64</em></span><span class="shape">per-head q<sub>nope</sub> <em>128</em></span><span class="shape">per-head value <em>128</em></span></div>
+        <p>每个历史 token 缓存 c<sub>s</sub><sup>KV</sup>∈R<sup>512</sup> 和共享的 k<sub>s</sub><sup>R</sup>∈R<sup>64</sup>，而不是 64 份完整 K/V。Decode 时，W<sup>UK</sup> 可以吸收到 query 一侧：q<sub>nope</sub> 先变换到 latent 维，与 c<sub>s</sub> 直接点积；softmax 后得到 latent 加权和，再通过 W<sup>UV</sup> 产生各 head 输出。这样被选 token 的 latent 一次读取可服务全部 query heads。</p>
+        <div class="eq">score<sub>t,s,h</sub> = ⟨q′<sub>t,h</sub>, c<sub>s</sub><sup>KV</sup>⟩ + ⟨q<sub>t,h</sub><sup>R</sup>, k<sub>s</sub><sup>R</sup>⟩<br>z<sub>t,h</sub> = Σ<sub>s∈𝒮t</sub> softmax(score<sub>t,𝒮t,h</sub>)<sub>s</sub> c<sub>s</sub><sup>KV</sup><br>o<sub>t,h</sub> = W<sub>h</sub><sup>UV</sup> z<sub>t,h</sub></div>
+
+        <div class="mechanism-title"><span class="badge">INDEXER</span><h4>Lightning indexer 的精确打分式</h4></div>
+        <div class="eq">I<sub>t,s</sub> = Σ<sub>j=1..H<sub>I</sub></sub> w<sub>t,j</sub><sup>I</sup> · ReLU((q<sub>t,j</sub><sup>I</sup>)<sup>⊤</sup>k<sub>s</sub><sup>I</sup>)<br>𝒮<sub>t</sub> = {s | I<sub>t,s</sub> ∈ TopK(I<sub>t,:</sub>, 2048)}</div>
+        <div class="steps">
+          <div class="step"><div><b>Query 端</b><p>复用 MLA 的 q low-rank residual，经 W<sub>q</sub><sup>I</sup> 产生 H<sub>I</sub>=64 个 128 维 index queries；同一个 hidden state 还产生 64 个 learned scalar weights w<sub>t,j</sub><sup>I</sup>。</p></div></div>
+          <div class="step"><div><b>Key 端</b><p>每个历史 token 另存一个共享 128 维 index key k<sub>s</sub><sup>I</sup>。官方参考实现对 q/k 做 Hadamard rotation 并以 FP8 缓存 index key 与 scale。</p></div></div>
+          <div class="step"><div><b>非负匹配后加权合头</b><p>每个 index head 的 dot product 先 ReLU；随后乘 query-dependent w<sub>t,j</sub> 再跨 head 求和，得到所有主 attention heads 共用的一份 token ranking。</p></div></div>
+          <div class="step"><div><b>TopK 后才进入 MLA</b><p>选出的 2,048 个位置用于构造 sparse mask；主 attention 对这些位置运行真正的 MLA softmax，不直接把 index score 当 attention weight。</p></div></div>
+        </div>
+        <div class="note"><b>为什么 ReLU</b>论文明确给出的理由是 throughput。Indexer 的职责是排序而不是概率建模；ReLU 比 softmax/复杂 kernel 更容易 FP8 化和融合。</div>
+
+        <div class="mechanism-title"><span class="badge">TRAINING</span><h4>Indexer 的监督来自主 attention，而不是语言模型 loss</h4></div>
+        <div class="compare"><div><h4>DENSE WARM-UP</h4><p>主模型冻结，仍跑 dense MLA。把主 attention 各 head 分数求和、沿序列 L1 normalize 成 teacher p<sub>t,:</sub>；最小化 KL(p || softmax(I))。1,000 steps × 16 × 128K，约 2.1B tokens。</p></div><div><h4>SPARSE TRAINING</h4><p>启用 top-2,048，并训练全模型 15,000 steps，约 943.7B tokens。Indexer 输入从主图 detach；indexer 只收 KL gradient，backbone 只收 LM loss，防止 selector 与主干通过捷径共同漂移。</p></div></div>
+
+        <div class="mechanism-title"><span class="badge">COST</span><h4>DSA 把最贵的 O(L²) 换成两个不等价的部分</h4></div>
+        <div class="complexity"><div><small>LIGHTNING INDEXER</small><strong>O(L²d<sub>I</sub>) prefill</strong><span>仍是 dense token-to-token 打分，但 d<sub>I</sub> 小、FP8、heads 少。</span></div><div><small>CORE ATTENTION</small><strong>O(Lk·d)</strong><span>k=2,048，替代 MLA 的 O(L²d)。</span></div><div><small>DECODE CACHE READ</small><strong>O(Ld<sub>I</sub> + kd<sub>c</sub>)</strong><span>扫窄 index K，再 gather 2,048 个 latent KV。</span></div></div>
+        <p>因此 DSA 的瓶颈会从 dense MLA 迁移到三件事：index logits、TopK、以及对 latent KV 的不规则 gather。DeepGEMM/DeepSelect 专门优化前两者，FlashMLA 承担 sparse core。TopK indices 在 TP ranks 间必须一致；参考实现由 rank 0 广播并断言一致。</p>
+        <div class="danger"><b>实现陷阱：</b>DSA indexer 的 RoPE 使用 non-interleaved layout，而 MLA 的 RoPE 使用 interleaved layout。DeepSeek 官方 2025-11-17 专门修复过参考实现中的这一差异；这不是可忽略的格式细节，错了会直接损伤模型质量。</div>
+        <div class="verdict"><b>一句话判断：</b>DSA 是对既有 MLA 系统侵入最小的稀疏化：不改 cache 的语义，只增加一个 selector 和 sparse core；但它省掉的是“宽 attention 读全历史”，并没有消灭逐 token 历史，也没有让 indexer 的长度依赖消失。</div>
       </section>
 
       <section class="model" id="glm" style="--c:var(--violet)">
-        <div class="model-head"><div><div class="section-no">06 / GLM</div><h3>GLM：把两条路线直接焊在一起</h3><p class="sub">GLM-5 先接入 DSA，5.2 用 IndexShare 降 selector 成本，5.3-Flash 再加入 KDA。</p></div><div class="num">G</div></div>
-        <div class="model-grid"><div>
-          <p>GLM 的演进最能说明行业趋势：单纯 sparse 还不够，indexer 自己也需要降本。GLM-5.2 的 IndexShare 让每四个稀疏层复用一个 indexer；官方称在 1M context 下把每 token FLOPs 降低 2.9×。</p>
-          <div class="flow"><span class="node">3 × KDA</span><span class="arrow">→</span><span class="node">1 × DSA</span><span class="arrow">→</span><span class="node">mHC × 4 streams</span></div>
-          <p>5.3-Flash 的公开配置则是 45 层：34 KDA + 11 DSA，1M context，DSA top-k 2,048，并用 4-way mHC 重做 residual stream。它不是发明单个新算子，而是目前最激进的开源“系统配方”。</p>
-        </div><div class="spec"><div><span>Model</span><code>GLM-5.3-Flash</code></div><div><span>Layers</span><code>45</code></div><div><span>Mix</span><code>34 + 11</code></div><div><span>Context</span><code>1,048,576</code></div><div><span>Vertical path</span><code>mHC × 4</code></div></div></div>
-        <div class="verdict"><b>最适合：</b>把 1M context 当成日常 serving 目标、愿意接受多种专用 kernel 共存的前沿部署。<br><b>最难的点：</b>工程复杂度最高：KDA state、DSA cache/index、mHC、多模态与 MoE 都要在同一执行图里调度。</div>
+        <div class="model-head"><div><div class="section-no">06 / GLM-5.3-FLASH</div><h3>GLM 的机制不是简单相加：KDA + pooled DSA + NoPE MLA</h3><p class="sub">5.3-Flash 的公开配置与 Transformers 实现给出了完整 layer schedule 和 index pooling；它已经不是 GLM-5.2 的 IndexShare 配方。</p></div><div class="num">G</div></div>
+        <div class="model-grid"><div><p>45 层按 [KDA, KDA, KDA, DSA] 重复，最后以 KDA 收尾：34 个 linear-attention 层，11 个 sparse-attention 层。KDA 负责位置敏感的连续状态，DSA 负责精确内容检索。</p></div><div class="spec"><div><span>Schedule</span><code>34 KDA + 11 DSA</code></div><div><span>KDA</span><code>64 heads × 128</code></div><div><span>DSA core</span><code>64 heads, MLA rank 512</code></div><div><span>Indexer</span><code>32 heads × 128</code></div><div><span>Pool / topk</span><code>4 / 2048</code></div></div></div>
+
+        <div class="mechanism-title"><span class="badge">LINEAR</span><h4>GLM 的 KDA 几乎按 K3 的工程版实例化</h4></div>
+        <p>每层先把 q/k/v 三个 projection 拼接，过 kernel size=4 的 depthwise causal conv 和 SiLU；forget gate 是 hidden→128→64×128 的低秩 projection，产生逐 channel log-decay；β 是每 head 一个 scalar；q/k 在 KDA kernel 内 L2-normalize。</p>
+        <div class="eq">g = −5·sigmoid(exp(A<sub>h</sub>)·(W<sub>b</sub>W<sub>a</sub>x + dt_bias))<br>α = exp(g)<br>S<sub>t</sub> = (I−β<sub>t</sub>k<sub>t</sub>k<sub>t</sub><sup>⊤</sup>)Diag(α<sub>t</sub>)S<sub>t−1</sub> + β<sub>t</sub>k<sub>t</sub>v<sub>t</sub><sup>⊤</sup></div>
+        <p>同样的 −5 lower bound 意味着它继承了 K3 的数值动机：限制 cumulative reciprocal，允许 chunk KDA 的 causal tiles 使用半精度 dense matmul。Decode 调 fused recurrent KDA；prefill 调 chunk KDA；reference Transformers 把最终 recurrent state 转成 FP32 存入 cache。</p>
+        <div class="note"><b>具体 state 账</b>64×128×128=1,048,576 个数/linear layer。按参考实现 FP32 是约 4 MiB/层、34 层约 136 MiB/request，且不随 context length 增长；实际生产 kernel 可能采用不同 state dtype，但固定容量并不等于“state 很小”。</div>
+
+        <div class="mechanism-title"><span class="badge">SPARSE</span><h4>GLM 的 DSA 不是 DeepSeek 原版：先做可学习的 4-token 逐通道池化</h4></div>
+        <div class="steps">
+          <div class="step"><div><b>生成 token index key 与 compression logits</b><p>每个 token 产生 128 维 index key k<sub>j</sub>，以及另一条 128 维 gate score a<sub>j</sub>。每个 pool offset 还有一个可学习位置偏置 e<sub>r</sub>∈R<sup>128</sup>。</p></div></div>
+          <div class="step"><div><b>逐 channel 学习如何聚合 4 个 token</b><p>对 pool b 内四个 token，在 token 维做 softmax(a<sub>j</sub>+e<sub>offset(j)</sub>)；每个 key channel 都有不同权重。pool key 是四个 k<sub>j</sub> 的逐通道加权和，不是 QSA 的简单 AvgPool。</p></div></div>
+          <div class="step"><div><b>32-head index score</b><p>query 端用 MLA 的 q residual 产生 32×128 index queries。与 pooled key 点积、ReLU，再用 hidden state 产生的 32 个权重合头，延续 DSA 的 scoring 形式。</p></div></div>
+          <div class="step"><div><b>选 512 pools，展开成 2,048 token</b><p>index_topk/index_kpool=2048/4=512。被选 pools 展平回 raw indices；当前未满 4 token 的可见 tail 无条件 append，最多再加 3 个位置。</p></div></div>
+        </div>
+        <div class="eq">π<sub>b,r,c</sub> = softmax<sub>r=0..3</sub>(a<sub>4b+r,c</sub> + e<sub>r,c</sub>)<br>k̄<sub>b,c</sub> = Σ<sub>r=0..3</sub> π<sub>b,r,c</sub> k<sub>4b+r,c</sub><br>I<sub>t,b</sub> = Σ<sub>h=1..32</sub> w<sub>t,h</sub>·ReLU((q<sub>t,h</sub>)<sup>⊤</sup>k̄<sub>b</sub>)</div>
+
+        <div class="mechanism-title"><span class="badge">NOPE</span><h4>为什么 GLM 的公开配置把 qk_rope_head_dim 设成 0</h4></div>
+        <p>GLM-5.3-Flash 的 DSA core 配置是 qk_nope_head_dim=256、qk_rope_head_dim=0，且 mla_use_nope=true；indexer 同样没有 rotary 子维。换言之，global sparse layers 完全按内容匹配，位置信息由前三个 KDA 层的 decay、ShortConv 和 recurrent dynamics 注入。这个设计与 Kimi K3 的 NoPE MLA 思路一致，但与 Qwen QSA 的 64/128 partial RoPE 相反。</p>
+
+        <div class="mechanism-title"><span class="badge">5.2 → 5.3</span><h4>IndexShare 和 pooled DSA 不要混为一谈</h4></div>
+        <div class="compare"><div><h4>GLM-5.2 · INDEXSHARE</h4><p>跨相邻 sparse layers 复用同一 top-k index，减少重复 selector；官方称 1M context 每 token FLOPs 下降 2.9×。风险是不同层想看的 token 未必一致。</p></div><div><h4>GLM-5.3-FLASH · K-POOL</h4><p>当前公开 config 的 indexer_types 全为 full：每个 DSA 层自己索引，但层内先把 4 token 压成 1 pool。它用 intra-layer compression 换成本，不依赖 cross-layer similarity。</p></div></div>
+
+        <div class="mechanism-title"><span class="badge">DEPTH</span><h4>mHC 是配套 residual 机制，不是第五种 attention</h4></div>
+        <p>模型维护 4 条 residual streams。每个 sublayer 前，pre weights 把四条流 collapse 成输入；sublayer 输出由 post gate 写回各流；stream 间 mixing matrix 经多轮 Sinkhorn 归一化，约束为近似 doubly-stochastic。它改善深度方向的信息传递和训练稳定性，但不会减少 token cache 或改变 DSA/KDA 的时间复杂度。</p>
+        <div class="verdict"><b>一句话判断：</b>GLM-5.3-Flash 是当前四家里最像“最终工程配方”的实现：KDA 解决大多数层的长度增长，pooled DSA 解决少数 global 层的 indexer 成本，NoPE 把位置责任统一交给 KDA；代价是 serving 同时背负 recurrent state、latent KV、pooled index 和四路 residual。</div>
+      </section>
+
+      <section id="compare">
+        <div class="section-no">07 / EXACT PATH COMPARISON</div><h2>把同一个新 token 丢进去，四家实际走的路径</h2>
+        <div class="table-wrap"><table>
+          <thead><tr><th>STEP</th><th>KIMI K3</th><th>QWEN3.8-FLASH-NEXT</th><th>DEEPSEEK DSA</th><th>GLM-5.3-FLASH</th></tr></thead>
+          <tbody>
+            <tr><td><b>多数层</b></td><td>KDA：channel decay → delta write → state read</td><td>GDN：head decay → delta write → state read</td><td>无 linear path</td><td>KDA：与 K3 同类、−5 bounded decay</td></tr>
+            <tr><td><b>候选表示</b></td><td>无 selector</td><td>4 token AvgPool，pool 后 partial RoPE</td><td>每 token 一个 128-d FP8 index key</td><td>4 token learned per-channel weighted pool，NoPE</td></tr>
+            <tr><td><b>候选打分</b></td><td>MLA 层直接全量</td><td>4Q×1KV，ΣReLU(dot)</td><td>64 heads，Σw·ReLU(dot)</td><td>32 heads，Σw·ReLU(dot)</td></tr>
+            <tr><td><b>选择</b></td><td>全部历史</td><td>512 blocks → 2,048 tokens + tail</td><td>2,048 individual tokens</td><td>512 pools → 2,048 tokens + tail</td></tr>
+            <tr><td><b>精确计算</b></td><td>NoPE Gated MLA</td><td>partial-RoPE GQA softmax</td><td>RoPE MLA in MQA mode</td><td>NoPE MLA</td></tr>
+            <tr><td><b>长度增长缓存</b></td><td>24 MLA layers</td><td>12 QSA layers + compressed index</td><td>所有 DSA layers：latent KV + token index</td><td>11 DSA layers：latent KV + pooled index source</td></tr>
+          </tbody>
+        </table></div>
+        <div class="correction"><h4>哪个“最好”？要先指定瓶颈</h4><p><b>HBM capacity / 超长 decode：</b>KDA/GDN 的固定 state 最直接；KDA 表达力更细，GDN 更简单。<br><b>精确 needle retrieval：</b>token-level DSA 粒度最细；QSA/GLM pooling 更快但引入 block recall 风险。<br><b>已有 MLA 系统迁移：</b>DSA 改动最局部。<br><b>1M context 的整机成本：</b>3:1 linear+sparse hybrid 最有潜力，因为它同时减少“多少层存 KV”和“这些层每步读多少 KV”。</p></div>
       </section>
 
       <section id="infra">
-        <div class="section-no">07 / INFERENCE TAKEAWAYS</div><h2>站在推理 Infra 侧，真正要记的 6 件事</h2>
+        <div class="section-no">08 / INFERENCE TAKEAWAYS</div><h2>站在推理 Infra 侧，真正要记的 8 件事</h2>
         <ol class="infra">
-          <li><div><b>“KV cache 下降 75%”来自 3:1 hybrid，不是全模型零 KV。</b><span>线性层用固定 state；每第四层的 MLA / sparse attention 仍有随 L 增长的缓存。</span></div></li>
-          <li><div><b>Sparse attention 省主 attention FLOPs，不自动省 indexer 扫描。</b><span>要看 index dim、压缩比、IndexShare、TopK kernel 与 gather 是否成为新瓶颈。</span></div></li>
-          <li><div><b>Linear attention 的胜负手是 scan。</b><span>decode 很漂亮；prefill 要把递归变成 chunkwise parallel scan，并处理 state 的数值稳定性。</span></div></li>
-          <li><div><b>CP / DCP 不能原样套到 KDA / GDN。</b><span>KV 是集合，可按位置切后合并；递归 state 是链式依赖，需要 prefix-scan 或复制/按 head 切。</span></div></li>
-          <li><div><b>Hybrid model 的 scheduler 应该认识 layer type。</b><span>同一 request 在 linear 层和 sparse/full 层的 cache、kernel、并行策略不同，统一按“attention 层”处理会浪费显存和带宽。</span></div></li>
-          <li><div><b>真正的新瓶颈从 GEMM 移到数据搬运与选择。</b><span>Indexer → TopK → gather → sparse kernel 的融合度，常常比纸面复杂度更决定端到端 TPOT。</span></div></li>
+          <li><div><b>3:1 hybrid 减少的是有 per-token KV 的层数。</b><span>“KV 下降最多 75%”来自层比例；第四层依然有 cache，不能把它宣传成整模型 constant memory。</span></div></li>
+          <li><div><b>KDA/GDN state 固定，但可能很宽。</b><span>state 是每 head 的矩阵而非一个 vector；GLM reference 的 KDA state 约 4 MiB/层/request（FP32）。短上下文未必比 KV 更省。</span></div></li>
+          <li><div><b>Linear prefill 与 decode 是两套 kernel。</b><span>Prefill 需要 chunkwise UT/WY 或 parallel scan；decode 用 recurrent update。只优化其中一个，端到端仍可能输给 FlashAttention。</span></div></li>
+          <li><div><b>Sparse 的总成本是 index + TopK + gather + core。</b><span>只报 core attention 的 O(LK) 没意义；DSA 的 indexer 仍是 token dense，QSA/GLM 才进一步把候选轴压成 L/4。</span></div></li>
+          <li><div><b>Block index 用吞吐换粒度。</b><span>连续 4-token gather 对 GPU 友好，也把一次错误选择放大成整块。训练必须让 indexer 和 backbone 一起适应这个偏差。</span></div></li>
+          <li><div><b>DCP 不能原样套到 recurrent state。</b><span>Softmax KV 可按位置分片后用 log-sum-exp 合并；KDA segment 是 affine transform，必须交换 (M,S̃) 并做 prefix composition。</span></div></li>
+          <li><div><b>Prefix cache 命中条件变成双重一致。</b><span>Hybrid 模型既要 MLA/QSA/DSA 的 token cache 命中，也要命中边界处的 linear state checkpoint，否则仍要从更早位置重算。</span></div></li>
+          <li><div><b>Scheduler 必须是 layer-type aware。</b><span>KDA recurrent、chunk KDA、indexer、TopK、sparse MLA/GQA 与 dense fallback 的 batch shape 都不同；把它们统一当 FlashAttention 调度会丢掉架构收益。</span></div></li>
         </ol>
-        <h3>如果只让我押一个方向</h3>
-        <div class="bars">
-          <div class="bar"><span>超长 decode</span><div class="track"><div class="fill" style="--w:94%;--c:var(--orange)"></div></div><b>KDA</b></div>
-          <div class="bar"><span>精确 recall</span><div class="track"><div class="fill" style="--w:92%;--c:var(--teal)"></div></div><b>QSA</b></div>
-          <div class="bar"><span>现有 MLA 迁移</span><div class="track"><div class="fill" style="--w:96%;--c:var(--blue)"></div></div><b>DSA</b></div>
-          <div class="bar"><span>整机系统配方</span><div class="track"><div class="fill" style="--w:95%;--c:var(--violet)"></div></div><b>GLM</b></div>
-        </div>
-        <p class="small">这里是工程选型判断，不是统一 benchmark 排名。模型能力、训练预算与 kernel 成熟度都会改变答案。</p>
+        <div class="callout">如果只押一个总方向：不是 KDA、QSA 或 DSA 单独胜出，而是 linear state 承担 75% 层、pooled sparse attention 承担 25% 层；下一轮竞争会发生在 state 精度、index recall 和统一 cache manager，而不是再发明一个 attention 缩写。</div>
       </section>
 
       <section id="sources" class="sources">
-        <div class="section-no">08 / PRIMARY SOURCES</div><h2>一手资料</h2>
-        <a href="https://github.com/MoonshotAI/Kimi-K3"><b>KIMI</b>Kimi K3 官方仓库与技术报告</a>
-        <a href="https://github.com/MoonshotAI/Kimi-Linear"><b>KIMI</b>Kimi Linear / KDA 官方仓库</a>
+        <div class="section-no">09 / PRIMARY SOURCES</div><h2>一手资料与事实口径</h2>
+        <a href="https://github.com/MoonshotAI/Kimi-K3"><b>KIMI</b>Kimi K3 Technical Report（KDA lower bound、Gated MLA、KCP、prefix cache）</a>
+        <a href="https://github.com/MoonshotAI/Kimi-Linear"><b>KIMI</b>Kimi Linear Technical Report（delta rule、UT/WY chunkwise 算法与复杂度）</a>
         <a href="https://github.com/MoonshotAI/Attention-Residuals"><b>KIMI</b>Attention Residuals 官方实现</a>
-        <a href="https://github.com/QwenLM/Qwen3.8-Flash-Next"><b>QWEN</b>Qwen3.8-Flash-Next 官方仓库</a>
+        <a href="https://github.com/QwenLM/Qwen3.8-Flash-Next"><b>QWEN</b>Qwen3.8-Next Technical Report（GDN/QSA 公式、训练和 kernel benchmark）</a>
         <a href="https://huggingface.co/Qwen/Qwen3.8-Flash-Next/blob/main/config.json"><b>QWEN</b>公开模型配置（layer mix / QSA budget）</a>
-        <a href="https://github.com/deepseek-ai/DeepSeek-V3.2-Exp"><b>DEEPSEEK</b>DSA 官方说明与参考实现</a>
+        <a href="https://github.com/deepseek-ai/DeepSeek-V3.2-Exp"><b>DEEPSEEK</b>V3.2-Exp Technical Report 与 DSA reference implementation</a>
         <a href="https://github.com/deepseek-ai/DeepSelect"><b>DEEPSEEK</b>V3.2 / V4 / V4.1 的 TopK kernel</a>
         <a href="https://github.com/zai-org/GLM-5"><b>GLM</b>GLM-5 / 5.2 / 5.3 官方仓库</a>
         <a href="https://huggingface.co/zai-org/GLM-5.3-Flash/blob/main/config.json"><b>GLM</b>公开模型配置（KDA + DSA + mHC）</a>
+        <a href="https://github.com/huggingface/transformers/blob/main/src/transformers/models/glm5_next/modeling_glm5_next.py"><b>GLM</b>Transformers reference（KDA recurrence、k-pool compression、NoPE MLA）</a>
+        <p class="small" style="margin-top:20px">公式为便于网页阅读做了等价重排；张量维度、layer counts、pool/top-k 参数均按 2026-09-15 的官方报告、模型配置与参考实现核对。性能数字仅在其原始口径下引用，不把 attention-module speedup 写成整模型 speedup。</p>
       </section>
     </main>
   </div>
