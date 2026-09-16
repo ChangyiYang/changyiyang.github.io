@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="四家主流开源模型的新一代 Attention：Kimi KDA、Qwen QSA、DeepSeek DSA 与 GLM sparse-linear hybrid。">
+  <title>四条新 Attention 路线：Kimi · Qwen · DeepSeek · GLM</title>
+  <style>
+    :root{
+      --paper:#f4f0e7;--paper-2:#ece5d8;--ink:#171917;--muted:#66665f;--line:#cbc2b3;
+      --orange:#d96d35;--teal:#197a73;--violet:#6d59a8;--blue:#286b93;--night:#111417;
+      --serif:"Iowan Old Style","Noto Serif SC","Songti SC",Georgia,serif;
+      --sans:Inter,"Noto Sans SC","PingFang SC",system-ui,sans-serif;
+      --mono:"SFMono-Regular",Consolas,monospace;
+    }
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);line-height:1.72}
+    a{color:inherit}.topbar{height:5px;background:linear-gradient(90deg,var(--orange) 0 25%,var(--teal) 25% 50%,var(--blue) 50% 75%,var(--violet) 75%)}
+    .nav{height:58px;padding:0 clamp(18px,4vw,54px);display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);font-size:13px;letter-spacing:.08em;text-transform:uppercase}
+    .nav a{text-decoration:none}.nav .back{font-weight:750}.nav .stamp{color:var(--muted)}
+    .hero{position:relative;min-height:min(720px,80vh);display:grid;align-items:end;overflow:hidden;background:var(--night)}
+    .hero img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.74}
+    .hero:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(11,13,15,.9) 0%,rgba(11,13,15,.55) 43%,rgba(11,13,15,.05) 74%),linear-gradient(0deg,rgba(11,13,15,.78),transparent 58%)}
+    .hero-copy{position:relative;z-index:1;color:#f7f1e7;padding:clamp(34px,7vw,92px);max-width:930px}
+    .kicker{font:700 12px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:#f4a36f;margin-bottom:24px}
+    h1{font:600 clamp(42px,7.6vw,104px)/.95 var(--serif);letter-spacing:-.055em;margin:0;max-width:850px}
+    .deck{max-width:720px;font-size:clamp(17px,2vw,23px);color:#d9d3c8;margin:28px 0 0;line-height:1.5}
+    .hero-meta{display:flex;gap:18px;flex-wrap:wrap;margin-top:28px;font:600 12px/1 var(--mono);color:#bdb7ad}
+    .layout{display:grid;grid-template-columns:220px minmax(0,820px);gap:64px;max-width:1180px;margin:0 auto;padding:86px 30px 120px}
+    .toc{position:sticky;top:24px;align-self:start;border-top:2px solid var(--ink);padding-top:14px}
+    .toc b{font:750 11px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase}.toc a{display:block;text-decoration:none;color:var(--muted);font-size:13px;padding:6px 0}.toc a:hover{color:var(--orange)}
+    main{min-width:0}.lede{font:500 clamp(25px,3vw,38px)/1.42 var(--serif);letter-spacing:-.02em;margin:0 0 58px}.lede em{color:var(--orange);font-style:normal}
+    section{margin:0 0 86px;scroll-margin-top:24px}.section-no{font:700 11px/1 var(--mono);color:var(--orange);letter-spacing:.14em;margin-bottom:13px}
+    h2{font:600 clamp(31px,4.2vw,52px)/1.08 var(--serif);letter-spacing:-.035em;margin:0 0 24px}.sub{color:var(--muted);font-size:17px;max-width:720px;margin:-8px 0 30px}
+    h3{font:650 24px/1.2 var(--serif);margin:34px 0 12px}p{margin:0 0 18px}.small{font-size:13px;color:var(--muted)}
+    .callout{border-left:4px solid var(--orange);background:#ede4d6;padding:22px 24px;margin:34px 0;font:600 20px/1.5 var(--serif)}
+    .thesis{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin:32px 0}
+    .thesis article{background:#fffaf1;border:1px solid var(--line);padding:23px;border-radius:3px;position:relative;overflow:hidden}
+    .thesis article:before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--c)}
+    .thesis span{font:700 11px/1 var(--mono);letter-spacing:.11em;color:var(--c)}.thesis h3{font:650 25px/1.12 var(--serif);margin:12px 0 8px}.thesis p{font-size:14px;color:var(--muted);margin:0}
+    .table-wrap{overflow:auto;border:1px solid var(--line);background:#faf7f0;margin:28px 0}table{border-collapse:collapse;width:100%;min-width:760px;font-size:13px}th,td{text-align:left;vertical-align:top;padding:15px 14px;border-bottom:1px solid var(--line)}th{font:700 11px/1.3 var(--mono);letter-spacing:.05em;background:#eae3d7}tr:last-child td{border-bottom:0}.pill{display:inline-block;border:1px solid currentColor;border-radius:99px;padding:1px 7px;font:700 10px/1.6 var(--mono);white-space:nowrap}
+    .model{border-top:1px solid var(--line);padding-top:34px;margin-top:46px}.model-head{display:flex;justify-content:space-between;gap:24px;align-items:flex-start}.model h3{font-size:clamp(30px,4vw,44px);margin:0 0 8px}.model .num{font:700 56px/.9 var(--serif);color:var(--line)}
+    .model-grid{display:grid;grid-template-columns:1.2fr .8fr;gap:30px;margin-top:25px}.spec{background:#1a1c1e;color:#eee8df;border-radius:3px;padding:22px}.spec div{display:flex;justify-content:space-between;gap:22px;border-bottom:1px solid #3b3d3f;padding:9px 0;font-size:13px}.spec div:last-child{border:0}.spec span:first-child{color:#96989a}.spec code{font-family:var(--mono);color:#fff}
+    .flow{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:20px 0}.node{border:1px solid var(--line);background:#fffaf1;padding:8px 10px;border-radius:3px;font:700 11px/1.3 var(--mono)}.arrow{color:var(--muted)}
+    .formula{background:#fffaf1;border:1px solid var(--line);padding:18px 20px;font:600 14px/1.7 var(--mono);overflow:auto;margin:20px 0;color:#333}
+    .verdict{padding:16px 18px;background:color-mix(in srgb,var(--c) 11%,transparent);border-left:3px solid var(--c);margin-top:24px;font-size:14px}.verdict b{color:var(--c)}
+    .bars{display:grid;gap:10px;margin:24px 0}.bar{display:grid;grid-template-columns:130px 1fr 46px;align-items:center;gap:12px;font-size:12px}.track{height:9px;background:#ded6c8;border-radius:99px;overflow:hidden}.fill{height:100%;width:var(--w);background:var(--c);border-radius:99px}
+    .truth{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);margin:30px 0}.truth div{background:#f9f5ed;padding:23px}.truth b{display:block;font:650 19px/1.2 var(--serif);margin-bottom:8px}.truth span{font-size:13px;color:var(--muted)}
+    .infra{counter-reset:item;list-style:none;padding:0}.infra li{counter-increment:item;display:grid;grid-template-columns:34px 1fr;gap:12px;padding:18px 0;border-bottom:1px solid var(--line)}.infra li:before{content:counter(item,decimal-leading-zero);font:700 11px/1.8 var(--mono);color:var(--orange)}.infra b{display:block}.infra span{font-size:14px;color:var(--muted)}
+    .sources a{display:block;border-top:1px solid var(--line);padding:15px 0;text-decoration:none}.sources a:hover{color:var(--orange)}.sources b{font:700 11px/1 var(--mono);display:inline-block;width:110px;color:var(--muted)}
+    footer{background:#151719;color:#b8b5af;padding:34px clamp(22px,5vw,64px);display:flex;justify-content:space-between;gap:20px;font-size:12px}footer a{color:#fff}
+    @media(max-width:860px){.layout{grid-template-columns:1fr;padding-top:58px}.toc{display:none}.model-grid{grid-template-columns:1fr}.truth{grid-template-columns:1fr}.thesis{grid-template-columns:1fr}.hero{min-height:680px}.hero-copy{padding:34px 22px 52px}.model-head{display:block}.model .num{display:none}.bar{grid-template-columns:108px 1fr 38px}.nav .stamp{display:none}}
+  </style>
+</head>
+<body>
+  <div class="topbar"></div>
+  <nav class="nav"><a class="back" href="../">← Changyi Yang / Research</a><span class="stamp">Architecture scan · 2026.09</span></nav>
+  <header class="hero">
+    <img src="assets/attention-memory-topologies.jpg" alt="四类长上下文记忆拓扑的抽象可视化">
+    <div class="hero-copy">
+      <div class="kicker">Frontier Attention Field Guide / 01</div>
+      <h1>新 Attention<br>已经分成四条路</h1>
+      <p class="deck">Kimi、Qwen、DeepSeek、GLM 正在把“读完整个历史”改写成：压缩状态、稀疏检索、潜变量缓存，以及跨层路由。</p>
+      <div class="hero-meta"><span>KDA · GDN</span><span>QSA · DSA</span><span>MLA</span><span>AttnRes · mHC</span></div>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="toc">
+      <b>Contents</b>
+      <a href="#map">01 / 一张地图</a><a href="#mechanics">02 / 三种机制</a><a href="#kimi">03 / Kimi</a><a href="#qwen">04 / Qwen</a><a href="#deepseek">05 / DeepSeek</a><a href="#glm">06 / GLM</a><a href="#infra">07 / 推理侧结论</a><a href="#sources">08 / 一手资料</a>
+    </aside>
+
+    <main>
+      <p class="lede">结论先说：没有一个“最强 attention”。真正收敛的是一种<em>混合配方</em>——大约 3 层常数状态的线性注意力，穿插 1 层能精确回看的稀疏/潜变量 attention；再把跨层信息流一并重做。</p>
+
+      <section id="map">
+        <div class="section-no">01 / THE MAP</div><h2>四家，四个主攻方向</h2>
+        <div class="thesis">
+          <article style="--c:var(--orange)"><span>KIMI · K3</span><h3>KDA + Gated MLA</h3><p>把大部分历史压成固定状态，周期性用 MLA 做“精确回看”；再用 AttnRes 解决跨深度的信息稀释。</p></article>
+          <article style="--c:var(--teal)"><span>QWEN · 3.8 FLASH NEXT</span><h3>GDN + QSA</h3><p>线性状态负责连续记忆，QSA 的轻量 indexer 在 micro-block 粒度挑回重要上下文。</p></article>
+          <article style="--c:var(--blue)"><span>DEEPSEEK · V3.2 → V4.1</span><h3>DSA on MLA</h3><p>保留 MLA 的低秩 KV 压缩，再加 lightning indexer，只让主 attention 读取 top-k token。</p></article>
+          <article style="--c:var(--violet)"><span>GLM · 5.3 FLASH</span><h3>KDA + DSA + mHC</h3><p>最直接的“集大成”路线：3:1 的 linear/sparse hybrid，加上多分支跨层信息流。</p></article>
+        </div>
+        <div class="callout">共同答案不是“彻底杀死 softmax”，而是让昂贵的精确检索变成低频事件。</div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>MODEL</th><th>LAYER MIX</th><th>历史怎么存</th><th>每步读多少历史</th><th>最关键的代价</th></tr></thead>
+          <tbody>
+            <tr><td><b>Kimi K3</b></td><td>69 KDA + 24 Gated MLA</td><td>KDA 固定 state；MLA 压缩 KV</td><td>KDA 与 L 无关；MLA 全量</td><td>scan kernel + 两种 cache</td></tr>
+            <tr><td><b>Qwen3.8-Flash-Next</b></td><td>36 GDN + 12 QSA</td><td>GDN state；QSA 压缩索引与 KV</td><td>QSA budget 2,048</td><td>micro-block 选择 + gather</td></tr>
+            <tr><td><b>DeepSeek DSA</b></td><td>稀疏 MLA</td><td>MLA latent KV + index K</td><td>top-k 2,048</td><td>indexer 仍需扫历史</td></tr>
+            <tr><td><b>GLM-5.3-Flash</b></td><td>34 KDA + 11 DSA</td><td>固定 state + sparse MLA cache</td><td>DSA top-k 2,048</td><td>KDA / DSA 双后端</td></tr>
+          </tbody>
+        </table></div>
+        <p class="small">注：layer mix 来自公开模型配置；“每步读多少”描述主 attention 的预算，不等于 indexer 自身完全没有 O(L) 工作。</p>
+      </section>
+
+      <section id="mechanics">
+        <div class="section-no">02 / MECHANICS</div><h2>先把三个容易混的东西拆开</h2>
+        <h3>线性注意力：把历史“写进”状态</h3>
+        <div class="formula">Sₜ = update(Sₜ₋₁, kₜ, vₜ, gateₜ)　→　oₜ = read(qₜ, Sₜ)</div>
+        <p>KDA / GDN 不再保存可逐 token 随机访问的完整 KV，而是维护固定大小的递归状态。decode 的历史成本不随上下文长度增长；代价是有限状态会覆盖旧信息，且 prefill 依赖 chunkwise scan，而不是普通 FlashAttention。</p>
+        <h3>稀疏注意力：先便宜地找，再昂贵地读</h3>
+        <div class="flow"><span class="node">query</span><span class="arrow">→</span><span class="node">light indexer</span><span class="arrow">→</span><span class="node">top-k positions</span><span class="arrow">→</span><span class="node">sparse MLA / softmax</span></div>
+        <p>DSA / QSA 没有把历史消失掉：它们仍保留可回看的缓存，只是主 attention 不再扫描全部位置。收益取决于 indexer 能否又快又准，以及 top-k gather 是否能在 GPU 上保持规则访问。</p>
+        <h3>纵向 attention：在“层”之间选信息</h3>
+        <p>AttnRes、Gated Residual、mHC 解决的是另一维：当前层该从哪些早期表示读取、往哪些 residual stream 写。它们不是长上下文 attention，但与新 attention 一起出现，因为横向压缩更激进后，纵向的信息保真变得更重要。</p>
+        <div class="truth"><div><b>Linear ≠ sparse</b><span>前者压成 state；后者保留历史、只挑一部分读。</span></div><div><b>MLA ≠ linear</b><span>MLA 压低每 token KV 宽度，但 cache 仍随 L 增长。</span></div><div><b>Residual ≠ context</b><span>AttnRes / mHC 在深度轴路由，不直接替代 token attention。</span></div></div>
+      </section>
+
+      <section class="model" id="kimi" style="--c:var(--orange)">
+        <div class="model-head"><div><div class="section-no">03 / KIMI</div><h3>KDA：目前最完整的线性路线</h3><p class="sub">Kimi Linear 做机制验证，Kimi K3 把它扩到 2.8T 参数与 1M context。</p></div><div class="num">K</div></div>
+        <div class="model-grid"><div>
+          <p>KDA 是对 Gated DeltaNet 的细粒度门控改造。直觉上，它不是把新 KV 一股脑累加进 state，而是先根据 key 检查“这个槽位已经写了什么”，用 delta rule 做定向擦除/改写；更细的 gate 决定每个通道忘多少。</p>
+          <div class="flow"><span class="node">3 × KDA</span><span class="arrow">→</span><span class="node">1 × Gated MLA</span><span class="arrow">→</span><span class="node">repeat</span></div>
+          <p>这解释了 hybrid 的必要性：KDA 提供便宜的连续记忆，Gated MLA 保留精确 token 级回看。Kimi Linear 报告 KV cache 最多下降 75%、1M context 相对 MLA 的 TPOT 最多快 6.3×；K3 使用 69 KDA + 24 Gated MLA。</p>
+        </div><div class="spec"><div><span>Flagship</span><code>Kimi K3</code></div><div><span>Layers</span><code>93</code></div><div><span>Mix</span><code>69 + 24</code></div><div><span>Context</span><code>1,048,576</code></div><div><span>Vertical path</span><code>AttnRes</code></div></div></div>
+        <div class="verdict"><b>最适合：</b>超长 decode、agent trajectory、KV 容量是主瓶颈的场景。<br><b>最难的点：</b>KDA state 不可像 KV token 那样直接做 DCP；prefill 需要高质量 chunk/scan kernel。</div>
+      </section>
+
+      <section class="model" id="qwen" style="--c:var(--teal)">
+        <div class="model-head"><div><div class="section-no">04 / QWEN</div><h3>QSA：从 token top-k 走向 micro-block</h3><p class="sub">Qwen3-Next 的 GDN hybrid 已成为主干；Qwen3.8-Flash-Next 又把全局层换成 QSA。</p></div><div class="num">Q</div></div>
+        <div class="model-grid"><div>
+          <p>QSA 的关键不是“又一个 top-k”，而是让轻量 indexer 先压缩历史，并在 micro-block 粒度选候选区，再让主 attention 精读。相比逐 token 索引，这更贴近 GPU 连续访存，也更容易把 selector 的成本摊薄。</p>
+          <div class="flow"><span class="node">3 × GDN</span><span class="arrow">→</span><span class="node">1 × QSA</span><span class="arrow">→</span><span class="node">GR × 4 streams</span></div>
+          <p>公开配置是 48 层、每 4 层一个 QSA：36 个 GDN + 12 个 QSA。indexer budget 为 2,048，压缩比 4。Residual 同时升级成四分支 Gated Residual——这是 Qwen 这条路线真正“体系化”的地方。</p>
+        </div><div class="spec"><div><span>Preview</span><code>Qwen4 arch</code></div><div><span>Layers</span><code>48</code></div><div><span>Mix</span><code>36 + 12</code></div><div><span>QSA budget</span><code>2,048</code></div><div><span>Index compress</span><code>4×</code></div></div></div>
+        <div class="verdict"><b>最适合：</b>既要长上下文精确 recall，又希望访问更规整、可被硬件高效执行。<br><b>最难的点：</b>micro-block 选择会引入粒度误差；QSA kernel 和 indexer/gather 的融合决定实际收益。</div>
+      </section>
+
+      <section class="model" id="deepseek" style="--c:var(--blue)">
+        <div class="model-head"><div><div class="section-no">05 / DEEPSEEK</div><h3>DSA：给 MLA 加一层“检索门”</h3><p class="sub">从 V3.2-Exp 验证，到 V4 / V4.1 延续；它是对既有 MLA 栈改动最小的一条稀疏化路径。</p></div><div class="num">D</div></div>
+        <div class="model-grid"><div>
+          <p>DSA 保留 MLA 的 latent KV cache，在主 attention 前增加 lightning indexer。Indexer 用较小的 key 表示为每个位置打分，选 top-k 位置，再在这些位置上执行精确 MLA。V3.2-Exp 的公开配置是 64 个 index heads、128 维 index key、top-k 2,048。</p>
+          <div class="flow"><span class="node">latent KV cache</span><span class="arrow">+</span><span class="node">FP8 index K</span><span class="arrow">→</span><span class="node">top-2048 MLA</span></div>
+          <p>它的优势是路径清楚：MLA 已经压低 cache 宽度，DSA 再压低每次读取的长度。但别把 top-k 当成 O(1)：原始 indexer 仍要对历史打分，只是维度更窄、可用 FP8，并由 DeepSelect / DeepGEMM 专门优化。</p>
+        </div><div class="spec"><div><span>Debut</span><code>V3.2-Exp</code></div><div><span>Used by</span><code>V4 / V4.1</code></div><div><span>Top-k</span><code>2,048</code></div><div><span>Index dim</span><code>128</code></div><div><span>Base cache</span><code>MLA rank 512</code></div></div></div>
+        <div class="verdict"><b>最适合：</b>已经围绕 MLA / FlashMLA / DP-Attention 建好推理栈，希望以较小迁移成本获得长上下文稀疏收益。<br><b>最难的点：</b>TopK + 不规则 gather；而且 indexer RoPE 与 MLA RoPE 的布局不同，官方曾专门修过这一实现陷阱。</div>
+      </section>
+
+      <section class="model" id="glm" style="--c:var(--violet)">
+        <div class="model-head"><div><div class="section-no">06 / GLM</div><h3>GLM：把两条路线直接焊在一起</h3><p class="sub">GLM-5 先接入 DSA，5.2 用 IndexShare 降 selector 成本，5.3-Flash 再加入 KDA。</p></div><div class="num">G</div></div>
+        <div class="model-grid"><div>
+          <p>GLM 的演进最能说明行业趋势：单纯 sparse 还不够，indexer 自己也需要降本。GLM-5.2 的 IndexShare 让每四个稀疏层复用一个 indexer；官方称在 1M context 下把每 token FLOPs 降低 2.9×。</p>
+          <div class="flow"><span class="node">3 × KDA</span><span class="arrow">→</span><span class="node">1 × DSA</span><span class="arrow">→</span><span class="node">mHC × 4 streams</span></div>
+          <p>5.3-Flash 的公开配置则是 45 层：34 KDA + 11 DSA，1M context，DSA top-k 2,048，并用 4-way mHC 重做 residual stream。它不是发明单个新算子，而是目前最激进的开源“系统配方”。</p>
+        </div><div class="spec"><div><span>Model</span><code>GLM-5.3-Flash</code></div><div><span>Layers</span><code>45</code></div><div><span>Mix</span><code>34 + 11</code></div><div><span>Context</span><code>1,048,576</code></div><div><span>Vertical path</span><code>mHC × 4</code></div></div></div>
+        <div class="verdict"><b>最适合：</b>把 1M context 当成日常 serving 目标、愿意接受多种专用 kernel 共存的前沿部署。<br><b>最难的点：</b>工程复杂度最高：KDA state、DSA cache/index、mHC、多模态与 MoE 都要在同一执行图里调度。</div>
+      </section>
+
+      <section id="infra">
+        <div class="section-no">07 / INFERENCE TAKEAWAYS</div><h2>站在推理 Infra 侧，真正要记的 6 件事</h2>
+        <ol class="infra">
+          <li><div><b>“KV cache 下降 75%”来自 3:1 hybrid，不是全模型零 KV。</b><span>线性层用固定 state；每第四层的 MLA / sparse attention 仍有随 L 增长的缓存。</span></div></li>
+          <li><div><b>Sparse attention 省主 attention FLOPs，不自动省 indexer 扫描。</b><span>要看 index dim、压缩比、IndexShare、TopK kernel 与 gather 是否成为新瓶颈。</span></div></li>
+          <li><div><b>Linear attention 的胜负手是 scan。</b><span>decode 很漂亮；prefill 要把递归变成 chunkwise parallel scan，并处理 state 的数值稳定性。</span></div></li>
+          <li><div><b>CP / DCP 不能原样套到 KDA / GDN。</b><span>KV 是集合，可按位置切后合并；递归 state 是链式依赖，需要 prefix-scan 或复制/按 head 切。</span></div></li>
+          <li><div><b>Hybrid model 的 scheduler 应该认识 layer type。</b><span>同一 request 在 linear 层和 sparse/full 层的 cache、kernel、并行策略不同，统一按“attention 层”处理会浪费显存和带宽。</span></div></li>
+          <li><div><b>真正的新瓶颈从 GEMM 移到数据搬运与选择。</b><span>Indexer → TopK → gather → sparse kernel 的融合度，常常比纸面复杂度更决定端到端 TPOT。</span></div></li>
+        </ol>
+        <h3>如果只让我押一个方向</h3>
+        <div class="bars">
+          <div class="bar"><span>超长 decode</span><div class="track"><div class="fill" style="--w:94%;--c:var(--orange)"></div></div><b>KDA</b></div>
+          <div class="bar"><span>精确 recall</span><div class="track"><div class="fill" style="--w:92%;--c:var(--teal)"></div></div><b>QSA</b></div>
+          <div class="bar"><span>现有 MLA 迁移</span><div class="track"><div class="fill" style="--w:96%;--c:var(--blue)"></div></div><b>DSA</b></div>
+          <div class="bar"><span>整机系统配方</span><div class="track"><div class="fill" style="--w:95%;--c:var(--violet)"></div></div><b>GLM</b></div>
+        </div>
+        <p class="small">这里是工程选型判断，不是统一 benchmark 排名。模型能力、训练预算与 kernel 成熟度都会改变答案。</p>
+      </section>
+
+      <section id="sources" class="sources">
+        <div class="section-no">08 / PRIMARY SOURCES</div><h2>一手资料</h2>
+        <a href="https://github.com/MoonshotAI/Kimi-K3"><b>KIMI</b>Kimi K3 官方仓库与技术报告</a>
+        <a href="https://github.com/MoonshotAI/Kimi-Linear"><b>KIMI</b>Kimi Linear / KDA 官方仓库</a>
+        <a href="https://github.com/MoonshotAI/Attention-Residuals"><b>KIMI</b>Attention Residuals 官方实现</a>
+        <a href="https://github.com/QwenLM/Qwen3.8-Flash-Next"><b>QWEN</b>Qwen3.8-Flash-Next 官方仓库</a>
+        <a href="https://huggingface.co/Qwen/Qwen3.8-Flash-Next/blob/main/config.json"><b>QWEN</b>公开模型配置（layer mix / QSA budget）</a>
+        <a href="https://github.com/deepseek-ai/DeepSeek-V3.2-Exp"><b>DEEPSEEK</b>DSA 官方说明与参考实现</a>
+        <a href="https://github.com/deepseek-ai/DeepSelect"><b>DEEPSEEK</b>V3.2 / V4 / V4.1 的 TopK kernel</a>
+        <a href="https://github.com/zai-org/GLM-5"><b>GLM</b>GLM-5 / 5.2 / 5.3 官方仓库</a>
+        <a href="https://huggingface.co/zai-org/GLM-5.3-Flash/blob/main/config.json"><b>GLM</b>公开模型配置（KDA + DSA + mHC）</a>
+      </section>
+    </main>
+  </div>
+  <footer><span>Independent architecture scan · Sources checked 2026-09-15</span><span><a href="../">Back to all research</a></span></footer>
+</body>
+</html>
