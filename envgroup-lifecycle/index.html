@@ -1,0 +1,341 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>把「一次跑一台机器」改成「一组环境」：一个 agent 评测框架的生命周期重构</title><meta name="description" content="从零讲清楚：agent 评测框架为什么需要 EnvironmentGroup，状态机怎么设计，资源为什么必须在拿到的那一刻就登记回收，以及单机路径如何被消灭成「成员数为 1 的组」。"><link rel="canonical" href="https://changyiyang.github.io/envgroup-lifecycle/"><meta property="og:title" content="把「一次跑一台机器」改成「一组环境」"><meta property="og:type" content="article"><meta property="og:locale" content="zh_CN">
+<style>
+:root{--ink:#17212b;--muted:#627182;--line:#e1e7ec;--accent:#236477;--warn:#a13c35;--ok:#2f6b55}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:24px}
+body{margin:0;background:#fff;color:var(--ink);font:16px/1.85 system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+a{color:var(--accent);text-underline-offset:3px}
+a:hover{color:#0e7490}
+header,main,footer{max-width:1080px;margin:auto;padding:0 28px}
+header{padding-top:36px}
+nav{font-size:14px;color:var(--muted)}
+.eyebrow{margin-top:46px;color:var(--accent);font-size:12px;font-weight:750;letter-spacing:.14em}
+h1{font-size:clamp(30px,4.4vw,50px);line-height:1.23;letter-spacing:-.035em;margin:14px 0 24px}
+h1 small{display:block;font-size:.46em;letter-spacing:0;margin-top:16px;font-weight:600;color:#526374;line-height:1.5}
+.lead{font-size:19px;max-width:880px}
+.meta{font-size:13px;color:var(--muted);margin:22px 0 28px}
+.intro{border-left:4px solid var(--accent);background:#f5f9fa;padding:18px 24px;margin:28px 0}
+.intro p{margin:0 0 10px}.intro p:last-child{margin:0}
+.toc{display:grid;grid-template-columns:1fr 1fr;gap:5px 25px;border:1px solid var(--line);padding:22px 26px;border-radius:9px;margin:32px 0 64px;font-size:14px}
+.toc a{text-decoration:none}
+h2{font-size:28px;line-height:1.4;margin:65px 0 22px;border-top:1px solid var(--line);padding-top:35px;letter-spacing:-.02em}
+h3{font-size:20px;line-height:1.5;margin:38px 0 15px}
+p{margin:15px 0}
+strong{font-weight:700;color:#101b29}
+code{font:.87em/1.6 Consolas,"SF Mono",Menlo,monospace;background:#f4f6f8;padding:1px 5px;border-radius:4px}
+pre{background:#10212b;color:#e6edf3;padding:20px 22px;border-radius:9px;overflow-x:auto;font:13.5px/1.7 Consolas,"SF Mono",Menlo,monospace}
+pre code{background:none;padding:0;color:inherit;font-size:inherit}
+ul,ol{padding-left:24px}li{margin:7px 0}
+.box{border:1px solid var(--line);border-radius:9px;padding:20px 24px;margin:26px 0;background:#fcfdfe}
+.box.warn{border-left:4px solid var(--warn);background:#fdf7f6}
+.box.ok{border-left:4px solid var(--ok);background:#f5faf8}
+.box h4{margin:0 0 10px;font-size:15px;letter-spacing:.02em}
+table{border-collapse:collapse;width:100%;margin:24px 0;font-size:14.5px}
+th,td{border:1px solid var(--line);padding:10px 13px;text-align:left;vertical-align:top}
+th{background:#f4f7f9;font-weight:700}
+figure{margin:30px 0}
+figcaption{font-size:13.5px;color:var(--muted);margin-top:10px}
+.states{display:flex;flex-wrap:wrap;gap:8px;margin:20px 0}
+.st{border:1px solid var(--line);border-radius:999px;padding:5px 14px;font-size:13.5px;background:#f7fafb}
+.st.b{border-color:var(--accent);color:var(--accent);font-weight:650}
+.st.r{border-color:var(--warn);color:var(--warn);font-weight:650}
+footer{border-top:1px solid var(--line);margin-top:80px;padding-top:26px;padding-bottom:60px;font-size:14px;color:var(--muted)}
+@media(max-width:720px){.toc{grid-template-columns:1fr}}
+</style></head><body>
+
+<header>
+<nav><a href="../">← Changyi Yang</a></nav>
+<div class="eyebrow">AGENT 评测基础设施</div>
+<h1>把「一次跑一台机器」改成「一组环境」
+<small>一个 agent 评测框架的运行时生命周期重构：状态机、资源回收，以及怎么让单机路径彻底消失</small></h1>
+<p class="lead">这篇假设你完全不了解这个项目，从「agent 评测是干嘛的」讲起，一路讲到这次改动具体解决了什么问题、每个设计决定背后的取舍是什么。不需要任何前置知识。</p>
+<div class="meta">2026-09-21 · 约 20 分钟</div>
+</header>
+
+<main>
+
+<div class="intro">
+<p><strong>一句话</strong>：一个 agent 评测框架原本每次评测只能开一台虚拟机，这次把它改成可以开「一组」互相关联的环境（多台机器 + 共享后端），并且保证不管中途怎么崩、怎么被取消，都不会留下没回收的云资源。</p>
+<p><strong>说明</strong>：代码在私有仓库里，所以这篇只讲设计和思路，不贴源码、不放内部链接。讲的模式本身都是通用的工程手法。</p>
+</div>
+
+<div class="toc">
+<a href="#s1">1. 先搞清楚：agent 评测在测什么</a>
+<a href="#s2">2. 一次评测完整长什么样</a>
+<a href="#s3">3. 问题来了：一台机器不够用</a>
+<a href="#s4">4. 目标：从「一台沙盒」到「一组环境」</a>
+<a href="#s5">5. 改动一：一张状态机</a>
+<a href="#s6">6. 改动二：组级编排的顺序</a>
+<a href="#s7">7. 改动三：一分钱都不许漏</a>
+<a href="#s8">8. 改动四：让单机路径消失</a>
+<a href="#s9">9. 几个刻意的「不做」</a>
+<a href="#s10">10. 测试是怎么写的</a>
+<a href="#s11">11. 还没做完的部分</a>
+</div>
+
+<h2 id="s1">1. 先搞清楚：agent 评测在测什么</h2>
+
+<p>现在有一批 AI 编程/办公助手——Claude Code、Codex 这类——它们不只是聊天，而是能真的在你电脑上打开软件、敲命令、改文件、点界面，自己干完一整件事。业界管这类系统叫 <strong>agent</strong>。</p>
+
+<p>问题是：怎么知道一个 agent 到底有多能干？</p>
+
+<p>最容易想到的办法是出一堆选择题。但这测不出真本事——真实工作是「打开这个财务系统，把这三个月的报销对一遍，导出一份差异表」，它有几十步，中间会出错，要自己发现并纠正。</p>
+
+<p>所以这类评测基准的做法是：<strong>给它一台真机器，一句话任务，然后走开。</strong></p>
+
+<div class="box">
+<h4>为什么必须「走开」</h4>
+<p>如果你手把手告诉它每一步该干嘛，那么它自己的决策循环、工具选择、记忆管理全都被你绕过去了——你测的是你自己，不是它。只有让它自主跑完，Claude Code 和 Codex 这种内部结构完全不同的系统，才能在同一个维度上比较：<strong>活干成了没有。</strong></p>
+</div>
+
+<h2 id="s2">2. 一次评测完整长什么样</h2>
+
+<p>举一个真实存在的入门任务：</p>
+
+<ol>
+<li>框架开一台 Ubuntu 虚拟机</li>
+<li>把题目材料放进去：一个网页小程序、一个订单 JSON 文件</li>
+<li>给 agent 一段话：「打开这个网页，从订单文件里读出订单号，填进表单，点『生成』，把屏幕上出现的确认码写到 <code>output/result.txt</code>」</li>
+<li>agent 自己折腾——截图、点击、打字、跑命令。框架完全不干预</li>
+<li>agent 说自己干完了之后，<strong>框架这时才把标准答案放进机器</strong>，跑判分脚本比对</li>
+<li>出分（0 到 1），连同完整操作轨迹、日志、截图一起存档</li>
+<li>销毁虚拟机</li>
+</ol>
+
+<p>有两个细节值得停一下：</p>
+
+<p><strong>第 5 步的顺序不是随便排的。</strong> 标准答案必须等 agent 彻底干完才能放进机器，否则它翻一翻文件就抄到了。这类「防作弊」的时序约束，在评测框架里到处都是。</p>
+
+<p><strong>那道题的确认码是网页现算的。</strong> 它由你在界面里输入的内容算出来，任何文件里都不存在。所以 agent 必须真的会看屏幕、会点按钮——只会敲命令行的过不了这关。</p>
+
+<h2 id="s3">3. 问题来了：一台机器不够用</h2>
+
+<p>上面整套流程有一个写死的前提：<strong>一次评测 = 一台虚拟机。</strong></p>
+
+<p>代码里就是这么长的——一个「开机器」的对象，里面包着一台机器的句柄和一个控制会话。整条主流程从头到尾围着这一台机器转。</p>
+
+<p>但真实的专业工作经常不长这样：</p>
+
+<ul>
+<li>在电脑上改一张工单，然后<strong>在手机 App 上确认它同步过来了</strong></li>
+<li>一边开着管理后台，一边用另一个浏览器会话<strong>以普通用户身份验证效果</strong></li>
+<li>两台机器操作<strong>同一个业务数据库</strong>，要测并发冲突</li>
+</ul>
+
+<p>这些任务有一个共同点：<strong>多个操作界面，共享同一份业务状态。</strong> 而「一次一台机器」的模型根本没法表达它们——你连「这两台机器共用一个后端」这句话都写不下来。</p>
+
+<h2 id="s4">4. 目标：从「一台沙盒」到「一组环境」</h2>
+
+<p>解法是引入一个新的运行时单位，叫 <strong>环境组（EnvironmentGroup）</strong>。一次评测不再对应一台机器，而是对应一组东西：</p>
+
+<table>
+<tr><th>成员</th><th>是什么</th><th>agent 能碰吗</th></tr>
+<tr><td><strong>端点</strong>（Endpoint）</td><td>agent 能操作的界面：Windows / Linux / macOS / 安卓 / iOS / 独立浏览器会话</td><td>能，这就是给它操作的</td></tr>
+<tr><td><strong>App</strong></td><td>带版本号的软件，并且必须附一份「管理契约」：怎么判断它起来了、怎么灌初始数据、怎么重置、怎么读它的权威状态</td><td>能用，但不能管</td></tr>
+<tr><td><strong>共享服务</strong></td><td>业务状态住的地方。可以是某个 App 的后端，也可以是通用的数据库/缓存/对象存储</td><td>能访问，不能管</td></tr>
+<tr><td><strong>账号与凭据</strong></td><td>任务声明「我要一个普通用户角色的账号」，框架运行时分配真实账号；凭据只存引用不存明文</td><td>只能拿到明确发给它的那份</td></tr>
+</table>
+
+<div class="box">
+<h4>一个关键的边界</h4>
+<p><strong>端点是 agent 的，其余基本都是框架的。</strong> agent 拿到的只有端点的操作接口和明确发给它的凭据。它不能自己开机器、不能重置环境、读不到管理密钥，也够不着判分用的通道。</p>
+<p>判分这条线<strong>故意</strong>放在 agent 摸不到的地方：干完活之后先切断它的访问，再从它改不了的通道去读最终状态，然后才判分。否则理论上 agent 可以伪造「我干完了」的证据。</p>
+</div>
+
+<p>这次的改动，就是<strong>实现这一组东西的生老病死</strong>：谁先起来、谁后起来、中途怎么重置、结束时按什么顺序拆、以及——最重要的——<strong>崩了怎么办</strong>。</p>
+
+<h2 id="s5">5. 改动一：一张状态机</h2>
+
+<p>组里每个成员都有状态。八个：</p>
+
+<div class="states">
+<span class="st">pending 待处理</span>
+<span class="st">provisioning 申请中</span>
+<span class="st b">ready 就绪</span>
+<span class="st b">active 使用中</span>
+<span class="st">resetting 重置中</span>
+<span class="st">finalizing 收尾中</span>
+<span class="st">released 已释放</span>
+<span class="st r">failed 失败</span>
+</div>
+
+<p>光列出状态没用，关键是<strong>规定清楚哪些跳转是合法的</strong>，以及<strong>谁有权改</strong>。</p>
+
+<p>这次改动里，我认为最有价值的一条规则是：</p>
+
+<div class="box ok">
+<h4>状态只允许在两个地方被修改</h4>
+<p>一处是<strong>控制网关</strong>——当它确认 agent 的操作已经彻底断干净时，把「就绪/使用中」收回。另一处是<strong>组管理器</strong>，负责其余所有跳转。除此之外，代码里任何地方都不许直接给状态赋值。</p>
+</div>
+
+<p>为什么这条值得单独拎出来说？因为改之前，状态是<strong>散着改的</strong>——某个适配器在自己的启动流程里顺手写了两次。这种代码一开始没问题，但只要参与的人多起来，就会变成：出了 bug 没人知道状态是被谁改坏的，因为哪儿都能改。</p>
+
+<p>把写入口收拢到两处之后，「这个端点为什么会是这个状态」永远只有两个可能的答案。这是那种<strong>写的时候不觉得，出事的时候救命</strong>的约束。</p>
+
+<h3>顺带发现的一个洞</h3>
+
+<p>在整理状态机的时候，我把整个代码库搜了一遍，发现 <code>active</code>（使用中）这个状态<strong>从来没有任何代码写入过</strong>——网关有两处会读它，但没有一处产生它。也就是说这个状态在当时是<strong>不可达</strong>的。</p>
+
+<p>这种东西不能默默绕过去，得让定义它的人来拍：是该由管理器在把控制权交给 agent 时置上，还是这个状态本来就多余、该删掉。我把证据整理成两个选项发在了对应的 issue 上，同时按其中一个方案先实现（另一个方案改起来是一行）。</p>
+
+<h2 id="s6">6. 改动二：组级编排的顺序</h2>
+
+<p>一组东西起来的顺序不能乱。这次定的是：</p>
+
+<pre><code>申请   →  共享服务先全部起来并确认健康
+          然后才去申请各个端点的资源
+连接   →  给每个端点打开控制会话
+基线   →  按 App 实例做一次协调的初始化和重置
+交付   →  把操作权交给 agent
+收尾   →  切断 agent 访问，等待状态收敛
+清理   →  按获取的逆序释放：先拆客户端，再拆它连的后端</code></pre>
+
+<h3>为什么服务一定在端点前面</h3>
+
+<p>因为端点可能需要服务的地址才能工作——比如一个独立浏览器会话，它被创建出来之后要导航到某个地址，那个地址得由后端先启动才能确定。</p>
+
+<p>这里我做了一个判断：<strong>不做通用的依赖图。</strong> 一开始我以为需要拓扑排序，但读完 schema 之后发现，共享服务只能由 App 或通用类型（数据库/缓存/对象存储等）提供，并列出哪些端点能访问它——<strong>schema 里根本没有「把服务挂在某个端点上」这种写法</strong>。所以依赖永远是单向的「服务 → 端点」，两层就够，而且这是正确答案，不是偷懒。</p>
+
+<p>这个判断的价值在于：少写一个拓扑排序不算什么，但少一个<strong>没人用得上、却要一直维护并且可能出环</strong>的抽象，是实打实的。</p>
+
+<h3>重置为什么按 App 实例聚合</h3>
+
+<p>假设两个端点访问的是同一个后端实例。如果按端点各重置一次，第二次重置会把第一个端点刚初始化好的数据冲掉。</p>
+
+<p>所以重置的单位不是端点，而是<strong>真正共用的那个 App 实例</strong>：访问同一个共享服务的所有客户端算一组，一起初始化一次；装在各自机器上的本地客户端各算一组。</p>
+
+<div class="box warn">
+<h4>顺手挖出的一个真空洞</h4>
+<p>沿着这条思路我发现：校验逻辑会检查每个客户端请求的初始状态在 App 清单里存在，<strong>但不检查两个共用同一个后端的客户端是不是请求了同一个初始状态</strong>。</p>
+<p>如果它们不一致，程序会闷声按其中一个执行下去——而且是不确定的那一个。这种 bug 很难查，因为它不报错，只是结果偶尔不对。我在实现里直接把这种情况拒掉了。</p>
+</div>
+
+<h2 id="s7">7. 改动三：一分钱都不许漏</h2>
+
+<p>这是整个改动里我认为最重要的一部分，也是最容易被写错的一部分。</p>
+
+<p>先说清楚为什么重要：这些「资源」是<strong>真的云虚拟机</strong>。一台跑着的机器每小时都在烧钱。如果一次评测崩了却没把机器删掉，它会一直开着，直到有人发现。批量跑几千次评测的时候，漏掉百分之一就是几十台僵尸机器。</p>
+
+<h3>错误的写法</h3>
+
+<pre><code># 看起来很自然，但是错的
+async def provision(members):
+    acquired = []
+    for m in members:
+        await m.provision()      # ← 假设这里炸了
+        acquired.append(m)       # ← 这行就不会执行
+    return acquired              # 前面成功的那些，也丢了引用</code></pre>
+
+<p>问题出在<strong>「先成功，再登记」</strong>。如果第三个成员申请到一半失败了：</p>
+<ul>
+<li>前两个已经成功的，因为异常直接抛出去了，<code>acquired</code> 这个列表没人拿得到——<strong>两台机器泄漏</strong></li>
+<li>第三个更糟：它可能<strong>已经在云上创建出来了</strong>，只是返回之前出的错。它从来没进过任何列表，谁都不知道它存在</li>
+</ul>
+
+<h3>正确的写法</h3>
+
+<pre><code># 拿到之前就登记
+async def provision(self):
+    for m in self.members:
+        self.acquired.append(m)   # ← 先登记
+        await m.provision()       # ← 再申请</code></pre>
+
+<p>就是把两行换个顺序。但语义完全变了：<strong>登记的不是「我成功拿到了什么」，而是「我可能已经动过什么」。</strong></p>
+
+<p>清理的时候遍历这个列表，即使某个成员其实什么都没申请成功，对它调一次释放也是无害的（释放操作本身要设计成幂等的）。这比漏掉一台真机器划算太多。</p>
+
+<h3>清理还要满足三条</h3>
+
+<ul>
+<li><strong>逐个都试，不许中断。</strong> 一个成员释放失败，后面的必须照常释放——不能让一台卡住的机器拖着其他三台一起泄漏。所有错误收集起来一起返回。</li>
+<li><strong>自己绝不抛异常。</strong> 清理跑在 <code>finally</code> 里，如果它自己抛了，会盖掉原本真正的失败原因，排查时就看不到病根了。</li>
+<li><strong>释放失败的留在「失败」，不要标成「已释放」。</strong> 这条有点反直觉：既然都试过释放了，标成已释放不是更整齐吗？不行——<strong>释放失败意味着那台机器可能还活着</strong>。标成「已释放」等于在运行记录里撒谎，而这条记录正是运维排查僵尸机器的依据。</li>
+</ul>
+
+<h3>还有一种更隐蔽的泄漏</h3>
+
+<p>控制网关在收回 agent 权限时，可能返回「<strong>结果不确定</strong>」——比如某个操作发出去了，但没等到确认就超时了。这时候不能当成成功，也不能简单当成失败。</p>
+
+<p>这种端点会被<strong>隔离</strong>：标记为失败，照常尝试释放，但<strong>永远不允许被回收复用</strong>。因为你不知道上一个 agent 在它上面留下了什么——复用它意味着把上一次评测的污染带进下一次，而这种污染造成的错误结果，几乎不可能事后查出来。</p>
+
+<h2 id="s8">8. 改动四：让单机路径消失</h2>
+
+<p>做这种改造有个常见的诱惑：<strong>保留老路径</strong>。「单机还是走原来那套，多机走新的」——听起来很稳妥，实际上是慢性毒药。两条路径会各自演化，修 bug 要修两遍，而且总有一条会被遗忘，直到某天它在生产环境上炸掉。</p>
+
+<p>所以这次的做法是：<strong>单机运行 = 成员数为 1 的组。</strong></p>
+
+<p>具体手段是写一层很薄的适配器，把原有的「开机器」那套包装成标准的端点接口。于是主流程永远只有一条路：组 → 成员。而已有的一百多个存量任务，通过一个自动转换，都被表达成「只有一个端点的组」，行为完全不变。</p>
+
+<div class="box ok">
+<h4>一个降低风险的小技巧</h4>
+<p>那层适配器<strong>照常对外暴露原来的机器句柄和会话对象</strong>。所以主流程里剩下的四百多行代码——staging、跑 agent、拉日志、判分——<strong>一个字都不用改</strong>。</p>
+<p>整个改动最后只动了主流程文件净增四十多行。改得越少，回归风险越小，review 的人也越容易看明白。这比「顺手重构一下」重要得多。</p>
+</div>
+
+<h2 id="s9">9. 几个刻意的「不做」</h2>
+
+<h3>不接多端点到主流程</h3>
+
+<p>管理器已经能处理任意多个端点了，但主流程<strong>目前仍然拒绝多端点任务</strong>。这不是漏了。</p>
+
+<p>因为真正的各平台适配器（浏览器、安卓、Windows）是别人正在做的工作。我现在硬造一个适配器注册表，等于<strong>替他们做了设计决定</strong>——而他们比我更清楚自己那个平台需要什么参数、什么生命周期。管理器这边已经完全准备好，他们的东西一落地就能接上。</p>
+
+<p>这是那种「多做一步显得更完整，但实际上是给别人添麻烦」的典型场景。</p>
+
+<h3>不删看起来没用的旧代码</h3>
+
+<p>改完之后，原来那个「开机器」的类在主流程里已经没人引用了。但它还在，因为它是对外暴露的标准接口的一部分，可能有我不知道的使用者。<strong>删掉别人可能在用的东西之前先问一句</strong>，成本几乎为零，代价却可能很大。</p>
+
+<h2 id="s10">10. 测试是怎么写的</h2>
+
+<p>一共 43 个测试。除了常规的正常流程，重点覆盖的是<strong>坏掉的情况</strong>——因为这次改动的价值恰恰在于坏掉的时候表现如何：</p>
+
+<ul>
+<li>状态跳转表<strong>穷举</strong>：所有状态两两组合，合法的必须成功，非法的必须报错<strong>且不改变原状态</strong></li>
+<li>第 k 个成员申请失败时，前 k-1 个<strong>恰好</strong>被释放，不多不少</li>
+<li>申请中途被取消（模拟收到终止信号），不留任何资源</li>
+<li>清理调用两次是无害的</li>
+<li>一个成员释放失败时，其余成员照常释放，并且它自己留在「失败」状态</li>
+<li>共享服务健康检查不通过时，<strong>一个端点资源都不申请</strong>就停下</li>
+<li>端点申请失败时，先起来的共享服务照样被回收</li>
+<li>同一个环境声明<strong>连跑三遍</strong>都干净——可重复性本身就是验收标准之一</li>
+<li>单端点组和双端点组走<strong>完全相同</strong>的调用序列</li>
+</ul>
+
+<p>最后这条是对「让单机路径消失」这个设计的直接验证：如果哪天有人偷偷加回一条单机特殊分支，这个测试会立刻失败。</p>
+
+<h3>关于「已有的失败」</h3>
+
+<p>跑全量测试时有 4 个用例是红的。我没有直接汇报「4 个失败」，而是<strong>另外拉了一份完全未改动的代码，逐个比对</strong>，确认这 4 个在改动之前就以完全相同的方式失败（3 个是环境缺一个可选依赖，1 个是本地连接问题）。</p>
+
+<p>这一步花了几分钟，但它的意义是：<strong>「这 4 个不是我搞的」这句话，从猜测变成了结论。</strong></p>
+
+<h2 id="s11">11. 还没做完的部分</h2>
+
+<ul>
+<li><strong>取消与隔离的进一步加固</strong>：目前覆盖了常规取消路径，极端情况还要再打磨</li>
+<li><strong>端点标识灌进操作轨迹</strong>：让事后回放能按端点过滤「这一步是在哪台设备上做的」。事件那一半已经完成，轨迹记录那一半还没</li>
+<li><strong>兜底的容器清理</strong>：判分环节会起容器，如果判分进程自己先死了，它没机会清理。这个兜底应该由组的清理来做。我倾向于做成「可注册的清理钩子」——让判分那边自己注册规则，而不是把容器相关的知识塞进生命周期核心。这样后续其他组件（App 进程、浏览器 worker）能复用同一个机制。
+<br><br>同时要说清楚边界：<strong>进程内的兜底只能覆盖「某个子系统死了但主框架还活着」</strong>。如果整个框架被强杀，进程内什么都救不了，那需要一个独立的外部回收进程——那是另一个人的范围，不能让别人误以为这里兜住了。</li>
+</ul>
+
+<h2 id="s12">写在最后</h2>
+
+<p>如果要从这次改动里挑三条能带走的经验：</p>
+
+<ol>
+<li><strong>状态的写入口越少越好。</strong> 收拢到两处之后，「它为什么是这个状态」永远只有两个答案。</li>
+<li><strong>登记的是「我可能动过什么」，不是「我成功拿到了什么」。</strong> 顺序换一下，泄漏就没了。</li>
+<li><strong>别保留老路径。</strong> 把特殊情况表达成一般情况的退化形式（单机 = 成员数为 1 的组），比维护两条路径便宜得多。</li>
+</ol>
+
+<p>还有一条不算技术的：<strong>发现别人代码里的洞时，把证据整理清楚交给定义它的人拍板，比自己默默绕过去或者直接改掉要好。</strong> 那个不可达的状态、那个校验漏掉的冲突检查，都是这么处理的。</p>
+
+</main>
+
+<footer>
+本文描述的工作位于私有仓库，因此只讲设计与思路，不含源码与内部链接。<br>
+源码：<a href="https://github.com/ChangyiYang/changyiyang.github.io">github.com/ChangyiYang/changyiyang.github.io</a>
+</footer>
+
+</body></html>
