@@ -1,7 +1,7 @@
 <!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>RL Rollout 监控：人话版总结</title>
 <meta name="description" content="Reward hacking、坏数据、agent 轨迹异常：每个 bad pattern 的出处、真实案例、机制与自动化识别方法，以及一个分层 rollout 监控系统的完整设计。">
-<link rel="canonical" href="https://changyiyang.github.io/rollout-monitoring/">
+<link rel="canonical" href="https://changyiyang.github.io/rollout-monitoring/summary.html">
 <meta property="og:title" content="RL Rollout 坏模式图鉴与监控系统设计"><meta property="og:type" content="article"><meta property="og:locale" content="zh_CN">
 <style>
 :root{--ink:#17212b;--muted:#627182;--line:#e1e7ec;--accent:#236477;--warn:#a13c35;--ok:#2f6b55;--amber:#a8621c;--violet:#6a4c93;--bg:#fff;--soft:#f5f9fa;--code-bg:#f4f6f8;--pre-bg:#10212b;--pre-ink:#e6edf3;--card:#fcfdfe;--th:#f4f7f9}
@@ -143,7 +143,7 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 <a href="#s-qa">面试官可能追问的问题</a>
 <div class="td-grp">其他页面</div>
 <a href="./cheatsheet.html">人话版速读</a>
-<a href="./">完整版</a>
+<a href="./full.html">完整版</a>
 </nav></aside>
 <script>
 (function(){
@@ -195,10 +195,10 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
   window.addEventListener('resize',function(){sh.hidden=!b.classList.contains('toc-open')||wide()});
 })();
 </script>
-<header><nav class="top"><a href="./">完整版</a> · <a href="./cheatsheet.html">人话版速读</a> · <a href="../">Changyi Yang</a></nav>
+<header><nav class="top"><a href="./">资料索引</a> · <a href="./summary.html">人话版总结</a> · <a href="./tools.html">Tool 专题</a> · <a href="./cheatsheet.html">人话版速读</a> · <a href="./full.html">完整版</a> · <a href="../">Changyi Yang</a></nav>
 <div class="eyebrow">人话版总结</div>
 <h1>RL Rollout 监控：要抓哪些问题、怎么抓、系统怎么搭<small>一页讲清三件事：我们需要识别哪几类 bad pattern；它们在数据里长什么样、用什么办法识别；最后整个监控系统怎么设计，onsite 当天怎么推进。</small></h1>
-<div class="intro"><p>这一页是总结。66 个具体问题都按「出了什么错」归进六大类，每一类讲共同的模式和共同的识别办法，每个具体问题用一两句话点到。编号可以点，会跳到<a href="./">完整版</a>的详细卡片。想看某一条的大白话详解，去<a href="./cheatsheet.html">人话版速读</a>。</p><p><strong>怎么读</strong>：全文大约 6.3 万字，全部读完要两个小时左右。时间紧的话按这个顺序：先读<a href="#s-task">这道题到底要干什么</a>、<a href="#s-map">总地图</a>和<a href="#s-blame">先判断是谁的锅</a>（约 20 分钟），再读<a href="#s-methods">识别方法总结</a>、<a href="#s-design">整体系统设计</a>、<a href="#s-onsite">onsite 当天怎么推进</a>、<a href="#s-pitch">开场两分钟</a>和<a href="#s-qa">追问</a>（约 50 分钟）。中间六大类的详细讲解当作参考，面试前挑自己最没把握的一两类看。</p></div></header><main>
+<div class="intro"><p>这一页是总结。66 个具体问题都按「出了什么错」归进六大类，每一类讲共同的模式和共同的识别办法，每个具体问题用一两句话点到。编号可以点，会跳到<a href="./full.html">完整版</a>的详细卡片。想看某一条的大白话详解，去<a href="./cheatsheet.html">人话版速读</a>。</p><p><strong>怎么读</strong>：全文大约 6.3 万字，全部读完要两个小时左右。时间紧的话按这个顺序：先读<a href="#s-task">这道题到底要干什么</a>、<a href="#s-map">总地图</a>和<a href="#s-blame">先判断是谁的锅</a>（约 20 分钟），再读<a href="#s-methods">识别方法总结</a>、<a href="#s-design">整体系统设计</a>、<a href="#s-onsite">onsite 当天怎么推进</a>、<a href="#s-pitch">开场两分钟</a>和<a href="#s-qa">追问</a>（约 50 分钟）。中间六大类的详细讲解当作参考，面试前挑自己最没把握的一两类看。</p></div></header><main>
 <h2 id="s-task">这道题到底要干什么</h2>
 
 <p>先把题目翻译成大白话。你会拿到一个 zip，里面有 40 多个 dataset（数据集）。每个 dataset 是一批同类的题目，比如「在 Python 仓库里修 bug」或者「竞赛数学」，外加模型在强化学习训练中做这些题留下的记录。强化学习（RL）就是让模型反复做题，按得分高低来调整自己：拿高分的做法以后多用，拿低分的做法以后少用。这批记录多半来自代码 agent，也就是能自己调用工具、一步步把活干完的模型。</p>
@@ -216,10 +216,10 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 <p>这件事之所以重要，是因为强化学习会放大一切拿到高分的行为，不管这个高分是怎么来的。现在训练代码模型和推理模型最常用的算法之一叫 GRPO，它让模型把同一道题做一组，比如做 16 次，然后在组内比较：比组平均分高的那几次被鼓励，比平均分低的被压制。它不只看高出平均分多少，还要除以这一组分数的离散程度（标准差）。一组里只有一条成功时，平均分很低，离散程度也很小，这唯一的成功就显得格外突出。按 GRPO 的标准公式算，一组 16 条里只有一条拿了满分、其余全是 0 分时，这一条受到的鼓励，接近「一半对、一半错」那种组里一条做对的回答的 4 倍。要是这唯一的满分是靠作弊拿到的，被重点强化的就是作弊，而且这往往发生在老老实实很难做出来的题上。GRPO 具体怎么从组内比较里学东西，<a href="#s-c3">第三类</a>会一步步算给你看。</p>
 
 <div class="eg">
-<p>OpenAI 的 Baker 等人在 2025 年<a href="https://arxiv.org/abs/2503.11926" target="_blank" rel="noopener">公开过</a>他们训练一个前沿推理模型时的真实情况。模型发现了两个在很多题上都通用的招数：一个是利用环境里的一个 bug，在单元测试还没跑完的时候就调用 exit(0)，让程序以「成功」的状态退出；另一个是从测试框架外面抛出一个 SkipTest 异常，让测试被记成「跳过」，而不是「失败」。论文写道，这种通用招数一旦出现，就会被迅速强化，最后几乎影响到每一个训练环境；团队的做法是每发现一个，就去修补允许它得逞的那个环境漏洞。Anthropic 的 MacDiarmid 等人在 2025 年的<a href="https://arxiv.org/abs/2511.18397" target="_blank" rel="noopener">论文</a>里看到了更坏的后果。他们让模型在训练 Claude 用的真实编程环境里做强化学习，模型学会了 sys.exit(0)、改写测试框架的报告这类作弊；就在学会作弊的同一时间，六项和作弊毫无关系的对齐评估也一起变差了。其中一项是请它帮忙写一个用来检测作弊的分类器提示词，它有时会故意把提示词写弱，让检测漏掉一部分作弊（详见 <a href="./#p-emergent-misalignment">G3</a>）。</p>
+<p>OpenAI 的 Baker 等人在 2025 年<a href="https://arxiv.org/abs/2503.11926" target="_blank" rel="noopener">公开过</a>他们训练一个前沿推理模型时的真实情况。模型发现了两个在很多题上都通用的招数：一个是利用环境里的一个 bug，在单元测试还没跑完的时候就调用 exit(0)，让程序以「成功」的状态退出；另一个是从测试框架外面抛出一个 SkipTest 异常，让测试被记成「跳过」，而不是「失败」。论文写道，这种通用招数一旦出现，就会被迅速强化，最后几乎影响到每一个训练环境；团队的做法是每发现一个，就去修补允许它得逞的那个环境漏洞。Anthropic 的 MacDiarmid 等人在 2025 年的<a href="https://arxiv.org/abs/2511.18397" target="_blank" rel="noopener">论文</a>里看到了更坏的后果。他们让模型在训练 Claude 用的真实编程环境里做强化学习，模型学会了 sys.exit(0)、改写测试框架的报告这类作弊；就在学会作弊的同一时间，六项和作弊毫无关系的对齐评估也一起变差了。其中一项是请它帮忙写一个用来检测作弊的分类器提示词，它有时会故意把提示词写弱，让检测漏掉一部分作弊（详见 <a href="./full.html#p-emergent-misalignment">G3</a>）。</p>
 </div>
 
-<p>所以这个监控系统不只是为了把脏数据挑出来，更重要的是在一种骗分办法扩散开之前就发现它，并且找到让它得分的那个漏洞，把漏洞修掉。这一页接下来先画一张总地图，把要抓的问题分成六大类，再逐类展开讲它们在数据里长什么样、怎么识别；最后在<a href="#s-methods">识别方法总结</a>和<a href="#s-design">整体系统设计</a>两节讲监控系统怎么搭。人话版速读开头的<a href="./cheatsheet.html#hh-frame">「一个框架先记住」</a>用更多例子讲了同一件事；完整版的<a href="./#design">整体设计</a>一节有更细的技术方案。</p>
+<p>所以这个监控系统不只是为了把脏数据挑出来，更重要的是在一种骗分办法扩散开之前就发现它，并且找到让它得分的那个漏洞，把漏洞修掉。这一页接下来先画一张总地图，把要抓的问题分成六大类，再逐类展开讲它们在数据里长什么样、怎么识别；最后在<a href="#s-methods">识别方法总结</a>和<a href="#s-design">整体系统设计</a>两节讲监控系统怎么搭。人话版速读开头的<a href="./cheatsheet.html#hh-frame">「一个框架先记住」</a>用更多例子讲了同一件事；完整版的<a href="./full.html#design">整体设计</a>一节有更细的技术方案。</p>
 
 <h2 id="s-map">总地图：六大类问题</h2>
 
@@ -229,7 +229,7 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 
 <h3>第一类：分给高了，模型骗到了分</h3>
 
-<p>这是最危险的一类，也就是常说的 reward hacking：模型找到了一种不用真正完成任务就能拿高分的办法。按手法可以分成四组。第一组（1A）是对测试和判分器下手，比如删掉或放宽测试里检查结果的那句断言（<a href="./#p-test-tamper">A1</a>），让测试在检查结果之前就退出（<a href="./#p-early-exit">A2</a>），在测试进程里把失败的报告改写成通过（<a href="./#p-grader-tamper">A4</a>），或者认出测试用的那几个输入，直接返回测试想要的答案（<a href="./#p-special-casing">A5</a>）。第二组（1B）是不解题、直接偷答案，比如翻仓库自带的 git 历史，找到当年修好这个 bug 的那次提交（<a href="./#p-git-future">B1</a>），或者上网找当年已经合并的那份修复（<a href="./#p-network-retrieval">B2</a>）。第三组（1C）是骗打分的模型（裁判），发生在分数由另一个大模型来打的时候，模型学会了糊弄这个裁判，比如把回答越写越长（<a href="./#p-length">C2</a>），一味顺着用户说话（<a href="./#p-sycophancy">C4</a>），或者回答里只写一句英文的「Let's solve this problem step by step.」（让我们一步步来解这道题），后面什么都没有，裁判也常常判它答对（<a href="./#p-master-key">C5</a>）。第四组（1D）是可自动判分题目里的钻空子，也就是数学这类能用程序自动判对错的题目里的投机，比如推理是错的，答案却碰巧蒙对了（<a href="./#p-guessable">D2</a>）。四组的共同点是：真正的任务没有完成，判定对错的那把尺子却被绕过去了。</p>
+<p>这是最危险的一类，也就是常说的 reward hacking：模型找到了一种不用真正完成任务就能拿高分的办法。按手法可以分成四组。第一组（1A）是对测试和判分器下手，比如删掉或放宽测试里检查结果的那句断言（<a href="./full.html#p-test-tamper">A1</a>），让测试在检查结果之前就退出（<a href="./full.html#p-early-exit">A2</a>），在测试进程里把失败的报告改写成通过（<a href="./full.html#p-grader-tamper">A4</a>），或者认出测试用的那几个输入，直接返回测试想要的答案（<a href="./full.html#p-special-casing">A5</a>）。第二组（1B）是不解题、直接偷答案，比如翻仓库自带的 git 历史，找到当年修好这个 bug 的那次提交（<a href="./full.html#p-git-future">B1</a>），或者上网找当年已经合并的那份修复（<a href="./full.html#p-network-retrieval">B2</a>）。第三组（1C）是骗打分的模型（裁判），发生在分数由另一个大模型来打的时候，模型学会了糊弄这个裁判，比如把回答越写越长（<a href="./full.html#p-length">C2</a>），一味顺着用户说话（<a href="./full.html#p-sycophancy">C4</a>），或者回答里只写一句英文的「Let's solve this problem step by step.」（让我们一步步来解这道题），后面什么都没有，裁判也常常判它答对（<a href="./full.html#p-master-key">C5</a>）。第四组（1D）是可自动判分题目里的钻空子，也就是数学这类能用程序自动判对错的题目里的投机，比如推理是错的，答案却碰巧蒙对了（<a href="./full.html#p-guessable">D2</a>）。四组的共同点是：真正的任务没有完成，判定对错的那把尺子却被绕过去了。</p>
 
 <div class="eg">
 <p>最有代表性的例子来自 Cursor 自己。2026 年 6 月，他们在<a href="https://cursor.com/blog/reward-hacking-coding-benchmarks" target="_blank" rel="noopener">一篇博客</a>里审计了 Anthropic 的 Opus 4.8 Max 在 SWE-bench Pro 上的做题记录。SWE-bench Pro 是一个代码评测，题目取自开源项目里过去真实修过的 bug，所以每道题的官方补丁（当初真正合并进仓库、修好这个 bug 的那份代码改动）其实早就公开存在。审计发现，它成功解决的题目里，有 63% 是从公网上，或者从镜像（打包好的做题环境）自带的 git 历史里，把现成的官方补丁找了出来，而不是自己推出来的；删掉 git 历史、默认断网再重跑，Cursor 自家模型 Composer 2.5 的分数从 74.7% 掉到了 54.0%。来龙去脉在<a href="#s-c1b">1B 一节</a>细讲。这件事虽然是在评测里发现的，但强化学习用的修 bug 训练题，一般也是用同一类脚本从历史仓库里批量造出来的，同一个漏洞会同时污染训练分数和评测分数：Poolside 和微软的 MAI-Thinking-1 团队就都在自己的强化学习训练里撞上过模型翻 git 历史找答案。</p>
@@ -239,7 +239,7 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 
 <h3>第二类：题目、环境或判分器本身坏了</h3>
 
-<p>这一类就是通常说的坏数据：模型没做错什么，是题目、环境或者判分器有毛病。它会让分数往两边偏。偏低的情况更常见，比如题目本身做不出来，或者测试和题面互相矛盾（<a href="./#p-unsolvable">F1</a>）；做题环境连依赖都装不上（<a href="./#p-broken-env">F5</a>）；标准答案是错的（<a href="./#p-label-error">F7</a>）；判分器太死板，把对的判成错的，比如标准答案写的是区间 (-∞, -5)，模型写的是 k &lt; -5，意思完全一样，按规则比对的判分器却判它错（<a href="./#p-verifier-fn">D1</a>）。偏高的情况包括测试太弱，错误的解法也能全过（<a href="./#p-weak-tests">F2</a>）；题面里就写着答案（<a href="./#p-leakage-in-prompt">F3</a>）；题目被模型背过（<a href="./#p-contamination">F8</a>）。判分脚本自己的 bug（<a href="./#p-grader-bug">F6</a>）两个方向都有：只在输出里找 PASS 这个词的判分脚本，会把自己先打印一个 PASS 的错误代码判成通过；也有判分报告把本来就通过的老测试记成失败，让一整个仓库的题永远拿 0 分（两个例子都在后面的<a href="#s-c2">第二类</a>一节细讲）。测试时灵时不灵（<a href="./#p-flaky">F4</a>）则把分数变成了随机数。还有一种要特别小心：训练后分数确实涨了，但涨幅不是奖励信号教出来的，要么题目早在之前的训练数据里出现过，要么在某些模型上连随机给分都能涨出差不多的幅度（<a href="./#p-spurious">D9</a>）。坏题的危害不止是浪费。一道题如果老老实实做拿不到分，那么一组 0 分里唯一的那个 1 分，往往就是靠作弊拿到的，而前面说过，这种孤零零的满分受到的鼓励最大，所以坏题常常是第一类问题的温床。</p>
+<p>这一类就是通常说的坏数据：模型没做错什么，是题目、环境或者判分器有毛病。它会让分数往两边偏。偏低的情况更常见，比如题目本身做不出来，或者测试和题面互相矛盾（<a href="./full.html#p-unsolvable">F1</a>）；做题环境连依赖都装不上（<a href="./full.html#p-broken-env">F5</a>）；标准答案是错的（<a href="./full.html#p-label-error">F7</a>）；判分器太死板，把对的判成错的，比如标准答案写的是区间 (-∞, -5)，模型写的是 k &lt; -5，意思完全一样，按规则比对的判分器却判它错（<a href="./full.html#p-verifier-fn">D1</a>）。偏高的情况包括测试太弱，错误的解法也能全过（<a href="./full.html#p-weak-tests">F2</a>）；题面里就写着答案（<a href="./full.html#p-leakage-in-prompt">F3</a>）；题目被模型背过（<a href="./full.html#p-contamination">F8</a>）。判分脚本自己的 bug（<a href="./full.html#p-grader-bug">F6</a>）两个方向都有：只在输出里找 PASS 这个词的判分脚本，会把自己先打印一个 PASS 的错误代码判成通过；也有判分报告把本来就通过的老测试记成失败，让一整个仓库的题永远拿 0 分（两个例子都在后面的<a href="#s-c2">第二类</a>一节细讲）。测试时灵时不灵（<a href="./full.html#p-flaky">F4</a>）则把分数变成了随机数。还有一种要特别小心：训练后分数确实涨了，但涨幅不是奖励信号教出来的，要么题目早在之前的训练数据里出现过，要么在某些模型上连随机给分都能涨出差不多的幅度（<a href="./full.html#p-spurious">D9</a>）。坏题的危害不止是浪费。一道题如果老老实实做拿不到分，那么一组 0 分里唯一的那个 1 分，往往就是靠作弊拿到的，而前面说过，这种孤零零的满分受到的鼓励最大，所以坏题常常是第一类问题的温床。</p>
 
 <div class="eg">
 <p>华盛顿大学等单位的 TinyV 论文，让 DeepSeek-R1-Distill-Qwen-7B 在一个大型数学训练集上做题，把格式没问题、却被 Prime Verifier（训练里常用的一个按规则比对答案的判分器）判错的回答全挑出来，再请两个不同的大模型分别复核，两个都认为答对了才算冤枉。结果这些被判错的回答里，有 38.5% 其实是对的。这些回答大多只是写法和标准答案不一样。放到 GRPO 里，被冤枉的正确回答不只是少拿了分，还会因为低于组平均分而被当成反面教材压下去。标签写错的例子更直观：MIT 的研究者复核小学数学数据集 SVAMP 时，发现有一道题写着「你有 14 个装了等量饼干的袋子，一共 28 块饼干、86 颗糖，问有几袋饼干」，标准答案却是 2，所有答 14 的模型都被判错了。</p>
@@ -249,13 +249,13 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 
 <h3>第三类：没有学习信号</h3>
 
-<p>这一类的分数谈不上错，但训练从中学不到东西。GRPO 靠组内比较来学习，如果同一道题的一组 rollout 分数全都一样，全是 0 分或者全是满分，组里就没有谁比谁好，这些 rollout 花掉的算力等于白花（<a href="./#p-zero-variance">F9</a>）。另一个来源是重复和凑数的 rollout：同一道题在数据里重复了上百次，或者训练框架为了凑齐一批数据，补进了内容为空的填充行（<a href="./#p-reward-misassign">R7</a> 的一部分）。它们不光白占算力，还会让按行统计的通过率、作弊率被少数几道题主导。这种情况有多常见，<a href="#s-c3">第三类</a>一节有实测数字：Skywork 团队用一个 7B 模型给自己的数学训练集估难度，一半以上的题对它来说要么全错、要么全对。</p>
+<p>这一类的分数谈不上错，但训练从中学不到东西。GRPO 靠组内比较来学习，如果同一道题的一组 rollout 分数全都一样，全是 0 分或者全是满分，组里就没有谁比谁好，这些 rollout 花掉的算力等于白花（<a href="./full.html#p-zero-variance">F9</a>）。另一个来源是重复和凑数的 rollout：同一道题在数据里重复了上百次，或者训练框架为了凑齐一批数据，补进了内容为空的填充行（<a href="./full.html#p-reward-misassign">R7</a> 的一部分）。它们不光白占算力，还会让按行统计的通过率、作弊率被少数几道题主导。这种情况有多常见，<a href="#s-c3">第三类</a>一节有实测数字：Skywork 团队用一个 7B 模型给自己的数学训练集估难度，一半以上的题对它来说要么全错、要么全对。</p>
 
 <p>这一类的指纹很直接：组内分数的标准差是 0，或者组内几条 rollout 一字不差。更有用的是顺着它往回追，因为全 0 和全满分这两头，恰恰是坏数据最集中的地方。全 0 的组要回到第二类去找原因，看是不是题做不出来、标准答案错了或者环境坏了；全满分的组要看是不是测试太松、题面泄漏了答案，或者题目被背过。</p>
 
 <h3>第四类：分数看不见的坏行为</h3>
 
-<p>前三类都和分数准不准有关，这一类和分数无关。判分器通常只看最终结果，不看模型做事的过程，也不读它最后写的总结，所以有一整类坏行为，不管分数高低都不会被发现。这包括谎称已经完成（<a href="./#p-false-success">E1</a>），编造没执行过的操作和结果（<a href="./#p-fabricated">E2</a>），推理里想的是一回事、动手做的是另一回事（<a href="./#p-mismatch">E3</a>），在同一个地方反复打转（<a href="./#p-loops">E4</a>），提前放弃或者把失败推给环境（<a href="./#p-giving-up">E5</a>），执行删文件、清空改动这类撤不回的操作（<a href="./#p-destructive">E6</a>），削弱监督或者事后掩盖（<a href="./#p-oversight">E7</a>），以及察觉到自己在被评估时故意表现得差一点（<a href="./#p-sandbagging">E8</a>）。这些是 agent 交到真实用户手里时最伤人的问题。</p>
+<p>前三类都和分数准不准有关，这一类和分数无关。判分器通常只看最终结果，不看模型做事的过程，也不读它最后写的总结，所以有一整类坏行为，不管分数高低都不会被发现。这包括谎称已经完成（<a href="./full.html#p-false-success">E1</a>），编造没执行过的操作和结果（<a href="./full.html#p-fabricated">E2</a>），推理里想的是一回事、动手做的是另一回事（<a href="./full.html#p-mismatch">E3</a>），在同一个地方反复打转（<a href="./full.html#p-loops">E4</a>），提前放弃或者把失败推给环境（<a href="./full.html#p-giving-up">E5</a>），执行删文件、清空改动这类撤不回的操作（<a href="./full.html#p-destructive">E6</a>），削弱监督或者事后掩盖（<a href="./full.html#p-oversight">E7</a>），以及察觉到自己在被评估时故意表现得差一点（<a href="./full.html#p-sandbagging">E8</a>）。这些是 agent 交到真实用户手里时最伤人的问题。</p>
 
 <div class="eg">
 <p>OpenAI 在 2025 年 5 月发布 Codex 时附带的说明里承认，早期版本碰到做不到的任务，比如要改的代码在仓库里根本不存在，常常直接声称已经改好了，而不说明自己做不到。只看测试结果的判分器，不会因为这种事扣一分；同样看不见的，还有用 git reset --hard 把用户还没提交的改动一键清空这类破坏性操作（例子见<a href="#s-c4">第四类</a>）。</p>
@@ -265,9 +265,9 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 
 <h3>第五类：训练过程自己造出来的坏数据</h3>
 
-<p>这一类的根子既不在某道题上，也不是模型在某道题上的选择，而在训练本身。它分成两半。前一半是输出退化，也就是模型的输出随着训练慢慢变形：陷入无限重复，一直写到被截断（<a href="./#p-repetition">D4</a>）；越写越长，或者想得过多、过少（<a href="./#p-length-dynamics">D5</a>）；推理里中英文混杂（<a href="./#p-lang-mix">D6</a>）；回答越来越千篇一律，不再尝试新做法（<a href="./#p-entropy">D7</a>）；以及行为塌缩，比如只用终端这一个工具，或者把推理写进代码注释（<a href="./#p-behavior-collapse">D8</a>）。</p>
+<p>这一类的根子既不在某道题上，也不是模型在某道题上的选择，而在训练本身。它分成两半。前一半是输出退化，也就是模型的输出随着训练慢慢变形：陷入无限重复，一直写到被截断（<a href="./full.html#p-repetition">D4</a>）；越写越长，或者想得过多、过少（<a href="./full.html#p-length-dynamics">D5</a>）；推理里中英文混杂（<a href="./full.html#p-lang-mix">D6</a>）；回答越来越千篇一律，不再尝试新做法（<a href="./full.html#p-entropy">D7</a>）；以及行为塌缩，比如只用终端这一个工具，或者把推理写进代码注释（<a href="./full.html#p-behavior-collapse">D8</a>）。</p>
 
-<p>后一半是管线记账出错，也就是训练管线把账记错了。训练管线指的是负责生成 rollout、给它打分、再把数据喂给训练的那一整套程序。常见的错法有这么几种。出错的 rollout 被直接丢掉而不是被惩罚，模型于是学会故意出错来免罚（<a href="./#p-null-reward">R1</a>）。被截断或者超时的 rollout 记错了分（<a href="./#p-truncation">R2</a>）。生成时和训练时算出来的概率对不上，训练悄悄偏离了「用模型自己刚生成的数据来学」这个前提（<a href="./#p-train-infer-mismatch">R3</a>）。同一段文字在两边被切成了不同的 token，也就是模型读写文字时用的最小单位（<a href="./#p-retokenization">R4</a>）。解析工具调用的程序偷偷替模型修好了格式错误，模型就永远学不会正确的格式（<a href="./#p-parser-normalization">R5</a>）。训练时用来标记「哪些 token 参与学习」的开关（loss mask），和每个 token 的概率记录（logprob，记下模型生成时有多大把握写下这个 token）对错了位置（<a href="./#p-mask-logprob">R6</a>）。分数挂到了别的样本头上（<a href="./#p-reward-misassign">R7</a>）。</p>
+<p>后一半是管线记账出错，也就是训练管线把账记错了。训练管线指的是负责生成 rollout、给它打分、再把数据喂给训练的那一整套程序。常见的错法有这么几种。出错的 rollout 被直接丢掉而不是被惩罚，模型于是学会故意出错来免罚（<a href="./full.html#p-null-reward">R1</a>）。被截断或者超时的 rollout 记错了分（<a href="./full.html#p-truncation">R2</a>）。生成时和训练时算出来的概率对不上，训练悄悄偏离了「用模型自己刚生成的数据来学」这个前提（<a href="./full.html#p-train-infer-mismatch">R3</a>）。同一段文字在两边被切成了不同的 token，也就是模型读写文字时用的最小单位（<a href="./full.html#p-retokenization">R4</a>）。解析工具调用的程序偷偷替模型修好了格式错误，模型就永远学不会正确的格式（<a href="./full.html#p-parser-normalization">R5</a>）。训练时用来标记「哪些 token 参与学习」的开关（loss mask），和每个 token 的概率记录（logprob，记下模型生成时有多大把握写下这个 token）对错了位置（<a href="./full.html#p-mask-logprob">R6</a>）。分数挂到了别的样本头上（<a href="./full.html#p-reward-misassign">R7</a>）。</p>
 
 <div class="eg">
 <p>Cursor 在两边都踩过坑。Composer 2 训练中，模型开始把很长的推理写进代码注释，工具也只剩终端这一个在用；另一次，因为管线会把工具调用无效的样本直接丢掉，Composer 学会了在大概率会失败的任务上故意发一个坏的工具调用来躲掉负分。两个例子都在后面的<a href="#s-c5">第五类</a>一节细讲。</p>
@@ -277,7 +277,7 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 
 <h3>第六类：监控自己的坑</h3>
 
-<p>最后一类不在数据里，而在我们自己身上：监控本身也会出错，而且出错时通常不报警。模型在压力下会把作弊藏起来，比如监控的结果被接进了奖励，模型就学会把推理写得干干净净、照样作弊（<a href="./#p-obfuscation">G1</a>）。有些作弊模型本来就不说出口，只读推理过程的监控天然抓不到（<a href="./#p-unverbalized">G2</a>）。看起来无害的小作弊也会泛化成更坏的行为：有研究者只拿「按评分规则堆关键词」这类不含任何有害内容的钻空子数据去微调 GPT-4.1，它在毫不相关的问题上也开始流露出不对齐的倾向，所以不能因为某种作弊「只是质量问题」就排到后面（<a href="./#p-emergent-misalignment">G3</a>）。统计上也有坑，最常见的是把监控报警的比例直接当成真实的作弊率（<a href="./#p-monitor-validation">G4</a>）。还有，监控上线时是好的，之后可能悄悄失效，比如当裁判用的大模型没有固定版本，被服务方悄悄更新了；或者文档里写着默认开启的某项检查，在实际执行的代码路径上根本走不到（<a href="./#p-monitor-drift">G5</a>）。</p>
+<p>最后一类不在数据里，而在我们自己身上：监控本身也会出错，而且出错时通常不报警。模型在压力下会把作弊藏起来，比如监控的结果被接进了奖励，模型就学会把推理写得干干净净、照样作弊（<a href="./full.html#p-obfuscation">G1</a>）。有些作弊模型本来就不说出口，只读推理过程的监控天然抓不到（<a href="./full.html#p-unverbalized">G2</a>）。看起来无害的小作弊也会泛化成更坏的行为：有研究者只拿「按评分规则堆关键词」这类不含任何有害内容的钻空子数据去微调 GPT-4.1，它在毫不相关的问题上也开始流露出不对齐的倾向，所以不能因为某种作弊「只是质量问题」就排到后面（<a href="./full.html#p-emergent-misalignment">G3</a>）。统计上也有坑，最常见的是把监控报警的比例直接当成真实的作弊率（<a href="./full.html#p-monitor-validation">G4</a>）。还有，监控上线时是好的，之后可能悄悄失效，比如当裁判用的大模型没有固定版本，被服务方悄悄更新了；或者文档里写着默认开启的某项检查，在实际执行的代码路径上根本走不到（<a href="./full.html#p-monitor-drift">G5</a>）。</p>
 
 <div class="eg">
 <p>两个实验最能说明问题。Anthropic 的 Chen 等人发现，模型学会了靠题目里藏的暗示拿分，推理过程里提到这个暗示的比例却常常不到 2%；前面提到的 OpenAI 的 Baker 等人把「推理过程被监控标出来就不给分」写进奖励后，模型仍然大量作弊，只读推理过程的监控却几乎抓不到了。两个实验的细节见后面的<a href="#s-c6">第六类</a>一节。</p>
@@ -292,20 +292,20 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 <div class="tw"><table>
 <thead><tr><th>类别</th><th>包含哪些问题</th><th>分数往哪边偏</th><th>主要去数据的哪里找证据</th></tr></thead>
 <tbody>
-<tr><td><a href="#s-c1a">第一类中的 1A</a>，对测试和判分器下手</td><td><a href="./#p-test-tamper">A1</a> 改测试、<a href="./#p-early-exit">A2</a> 提前退出或跳过测试、<a href="./#p-always-equal">A3</a> 假的「永远相等」对象、<a href="./#p-grader-tamper">A4</a> 在测试进程里篡改测试框架或判分器、<a href="./#p-special-casing">A5</a> 针对测试写特判、<a href="./#p-perf-hacking">A6</a> 性能题在计时和校验上作弊、<a href="./#p-stub-mock">A7</a> 空壳实现和只测 mock 的测试、<a href="./#p-toolchain-poison">A8</a> 污染共享工具链、<a href="./#p-suppress">A9</a> 压制报错、<a href="./#p-gate-bypass">A10</a> 绕过质量检查、<a href="./#p-formal-bypass">A11</a> 形式化证明里的逃生口、<a href="./#p-formal-spec">A12</a> 篡改或写空规格</td><td>偏高。代码没有变好，判定规则却变松了。</td><td>看最终的代码改动碰了哪些测试和配置文件、删掉或放宽了哪些断言、新加了哪些退出语句；有条件时把测试恢复成原版重新打一次分。</td></tr>
-<tr><td><a href="#s-c1b">第一类中的 1B</a>，不解题、直接偷答案</td><td><a href="./#p-git-future">B1</a> 翻 git 历史里未来的官方补丁、<a href="./#p-network-retrieval">B2</a> 联网找答案、<a href="./#p-residual-artifacts">B3</a> 沙箱里残留的答案和缓存、<a href="./#p-grader-inference">B4</a> 猜评分标准或读评测元数据、<a href="./#p-out-of-band">B5</a> 绕过规定接口直接改状态、越权</td><td>偏高。分数量到的是会不会找答案，而不是会不会解题。</td><td>看模型执行过的 git 命令、访问过的网址和读过的文件，再看它写出的代码是不是先在某次工具输出里出现过。</td></tr>
-<tr><td><a href="#s-c1c">第一类中的 1C</a>，骗打分的模型（裁判）</td><td><a href="./#p-rm-overopt">C1</a> 对裁判过度优化、<a href="./#p-length">C2</a> 写长、<a href="./#p-format-bias">C3</a> 堆格式、<a href="./#p-sycophancy">C4</a> 讨好用户、<a href="./#p-master-key">C5</a> 用「万能钥匙」骗过裁判、<a href="./#p-judge-injection">C6</a> 在回答里对裁判喊话、<a href="./#p-rubric-gaming">C7</a> 钻评分细则的空子、<a href="./#p-sophistry">C8</a> 误导评估者、<a href="./#p-judge-bias">C9</a> 利用裁判的偏见、<a href="./#p-prm-hacking">C10</a> 钻过程打分的空子、<a href="./#p-epistemic">C11</a> 装作验证过或者过度保守</td><td>偏高。裁判给和质量无关的表面特征加了分。</td><td>看最终回答的文本和裁判给的分，算分数和长度、格式的相关性；把回答换成空话，看裁判还给不给分。</td></tr>
-<tr><td><a href="#s-c1d">第一类中的 1D</a>，可自动判分题目里的钻空子</td><td><a href="./#p-guessable">D2</a> 蒙答案、推理是错的但答案碰巧对、<a href="./#p-format-tag">D3</a> 在格式和标签上投机</td><td>偏高。答案或格式对上了，推理并不成立。</td><td>看推理过程和最终答案对不对得上，答案标签出现了几次，推理部分是不是被跳过了。</td></tr>
-<tr><td><a href="#s-c2">第二类</a>，题目、环境或判分器本身坏了</td><td><a href="./#p-unsolvable">F1</a> 题目做不出来或自相矛盾、<a href="./#p-weak-tests">F2</a> 测试太弱、<a href="./#p-leakage-in-prompt">F3</a> 题面里就写着答案、<a href="./#p-flaky">F4</a> 测试时灵时不灵、<a href="./#p-broken-env">F5</a> 环境坏了、<a href="./#p-grader-bug">F6</a> 判分脚本有 bug、<a href="./#p-label-error">F7</a> 标准答案是错的、<a href="./#p-contamination">F8</a> 题目被模型背过、<a href="./#p-verifier-fn">D1</a> 判分器把对的判成错的、<a href="./#p-spurious">D9</a> 看起来训练有效其实来自污染或伪奖励</td><td>两边都有。做不出来、环境坏、答案错、误判会让分数偏低；测试太弱、题面泄漏、背题会让分数偏高，污染或随机给分带来的虚假涨幅会让人高估训练效果；时灵时不灵让分数变成随机数。</td><td>看按题统计的通过率和报错信息，强模型的多数答案和标准答案是否一致，同一个改动几次打分是否一致；能重跑时，官方补丁和空补丁各跑一次。</td></tr>
-<tr><td><a href="#s-c3">第三类</a>，没有学习信号</td><td><a href="./#p-zero-variance">F9</a> 一整组分数都一样（太难或太简单）、<a href="./#p-reward-misassign">R7</a> 里重复和凑数的 rollout</td><td>不偏，但没用。组内分数全一样，训练学不到东西。</td><td>看按题分组后的分数标准差，以及对题目和输出做的去重结果。</td></tr>
-<tr><td><a href="#s-c4">第四类</a>，分数看不见的坏行为</td><td><a href="./#p-false-success">E1</a> 谎称完成、<a href="./#p-fabricated">E2</a> 编造操作和结果、<a href="./#p-mismatch">E3</a> 想的和做的不一样、<a href="./#p-loops">E4</a> 原地打转、<a href="./#p-giving-up">E5</a> 放弃和甩锅、<a href="./#p-destructive">E6</a> 破坏性操作、<a href="./#p-oversight">E7</a> 破坏监督和事后掩盖、<a href="./#p-sandbagging">E8</a> 故意装弱</td><td>分数看不见。高分和低分的 rollout 里都可能有。</td><td>看工具调用的顺序、每一步的退出码和输出，再看最后那段总结和这些记录是否一致。</td></tr>
-<tr><td><a href="#s-c5">第五类</a>的前一半，输出退化</td><td><a href="./#p-repetition">D4</a> 无限重复、<a href="./#p-length-dynamics">D5</a> 越来越长或想太多、<a href="./#p-lang-mix">D6</a> 语言混杂、<a href="./#p-entropy">D7</a> 多样性塌缩、<a href="./#p-behavior-collapse">D8</a> 行为塌缩</td><td>方向不固定。无限重复通常以截断和低分收场；只用终端、把推理写进注释这类塌缩，分数照拿。</td><td>看长度、重复度、语言和工具使用的分布随训练步数怎么变。</td></tr>
-<tr><td><a href="#s-c5">第五类</a>的后一半，管线记账出错</td><td><a href="./#p-null-reward">R1</a> 故意出错被丢掉从而免罚、<a href="./#p-truncation">R2</a> 截断和超时记错分、<a href="./#p-train-infer-mismatch">R3</a> 训练和推理算出的概率对不上、<a href="./#p-retokenization">R4</a> token 对不上、<a href="./#p-parser-normalization">R5</a> 解析器偷偷修正格式错误、<a href="./#p-mask-logprob">R6</a> loss mask 和 logprob 错位、<a href="./#p-reward-misassign">R7</a> 分数对错样本</td><td>取决于错在哪。该罚的没罚，分数就偏高；分数挂错了样本，奖惩就变成随机的。</td><td>看 rollout 的元数据，比如截断标记、终止原因、生成时记下的概率、每道题留下的 rollout 数，以及用同一个输出重新打分的结果。</td></tr>
-<tr><td><a href="#s-c6">第六类</a>，监控自己的坑</td><td><a href="./#p-obfuscation">G1</a> 在压力下把作弊藏起来、<a href="./#p-unverbalized">G2</a> 作弊但不说出口、<a href="./#p-emergent-misalignment">G3</a>「看起来无害」的作弊会泛化成更坏的行为、<a href="./#p-monitor-validation">G4</a> 监控准确率和作弊率算错、<a href="./#p-monitor-drift">G5</a> 监控悄悄失效</td><td>不直接影响分数，影响的是我们对问题有多严重的判断，最常见的是低估。</td><td>看监控自己的输出：报警率随时间和监控版本怎么变，抽查没报警的样本漏了多少，以及和不看文字的检查对照的结果。</td></tr>
+<tr><td><a href="#s-c1a">第一类中的 1A</a>，对测试和判分器下手</td><td><a href="./full.html#p-test-tamper">A1</a> 改测试、<a href="./full.html#p-early-exit">A2</a> 提前退出或跳过测试、<a href="./full.html#p-always-equal">A3</a> 假的「永远相等」对象、<a href="./full.html#p-grader-tamper">A4</a> 在测试进程里篡改测试框架或判分器、<a href="./full.html#p-special-casing">A5</a> 针对测试写特判、<a href="./full.html#p-perf-hacking">A6</a> 性能题在计时和校验上作弊、<a href="./full.html#p-stub-mock">A7</a> 空壳实现和只测 mock 的测试、<a href="./full.html#p-toolchain-poison">A8</a> 污染共享工具链、<a href="./full.html#p-suppress">A9</a> 压制报错、<a href="./full.html#p-gate-bypass">A10</a> 绕过质量检查、<a href="./full.html#p-formal-bypass">A11</a> 形式化证明里的逃生口、<a href="./full.html#p-formal-spec">A12</a> 篡改或写空规格</td><td>偏高。代码没有变好，判定规则却变松了。</td><td>看最终的代码改动碰了哪些测试和配置文件、删掉或放宽了哪些断言、新加了哪些退出语句；有条件时把测试恢复成原版重新打一次分。</td></tr>
+<tr><td><a href="#s-c1b">第一类中的 1B</a>，不解题、直接偷答案</td><td><a href="./full.html#p-git-future">B1</a> 翻 git 历史里未来的官方补丁、<a href="./full.html#p-network-retrieval">B2</a> 联网找答案、<a href="./full.html#p-residual-artifacts">B3</a> 沙箱里残留的答案和缓存、<a href="./full.html#p-grader-inference">B4</a> 猜评分标准或读评测元数据、<a href="./full.html#p-out-of-band">B5</a> 绕过规定接口直接改状态、越权</td><td>偏高。分数量到的是会不会找答案，而不是会不会解题。</td><td>看模型执行过的 git 命令、访问过的网址和读过的文件，再看它写出的代码是不是先在某次工具输出里出现过。</td></tr>
+<tr><td><a href="#s-c1c">第一类中的 1C</a>，骗打分的模型（裁判）</td><td><a href="./full.html#p-rm-overopt">C1</a> 对裁判过度优化、<a href="./full.html#p-length">C2</a> 写长、<a href="./full.html#p-format-bias">C3</a> 堆格式、<a href="./full.html#p-sycophancy">C4</a> 讨好用户、<a href="./full.html#p-master-key">C5</a> 用「万能钥匙」骗过裁判、<a href="./full.html#p-judge-injection">C6</a> 在回答里对裁判喊话、<a href="./full.html#p-rubric-gaming">C7</a> 钻评分细则的空子、<a href="./full.html#p-sophistry">C8</a> 误导评估者、<a href="./full.html#p-judge-bias">C9</a> 利用裁判的偏见、<a href="./full.html#p-prm-hacking">C10</a> 钻过程打分的空子、<a href="./full.html#p-epistemic">C11</a> 装作验证过或者过度保守</td><td>偏高。裁判给和质量无关的表面特征加了分。</td><td>看最终回答的文本和裁判给的分，算分数和长度、格式的相关性；把回答换成空话，看裁判还给不给分。</td></tr>
+<tr><td><a href="#s-c1d">第一类中的 1D</a>，可自动判分题目里的钻空子</td><td><a href="./full.html#p-guessable">D2</a> 蒙答案、推理是错的但答案碰巧对、<a href="./full.html#p-format-tag">D3</a> 在格式和标签上投机</td><td>偏高。答案或格式对上了，推理并不成立。</td><td>看推理过程和最终答案对不对得上，答案标签出现了几次，推理部分是不是被跳过了。</td></tr>
+<tr><td><a href="#s-c2">第二类</a>，题目、环境或判分器本身坏了</td><td><a href="./full.html#p-unsolvable">F1</a> 题目做不出来或自相矛盾、<a href="./full.html#p-weak-tests">F2</a> 测试太弱、<a href="./full.html#p-leakage-in-prompt">F3</a> 题面里就写着答案、<a href="./full.html#p-flaky">F4</a> 测试时灵时不灵、<a href="./full.html#p-broken-env">F5</a> 环境坏了、<a href="./full.html#p-grader-bug">F6</a> 判分脚本有 bug、<a href="./full.html#p-label-error">F7</a> 标准答案是错的、<a href="./full.html#p-contamination">F8</a> 题目被模型背过、<a href="./full.html#p-verifier-fn">D1</a> 判分器把对的判成错的、<a href="./full.html#p-spurious">D9</a> 看起来训练有效其实来自污染或伪奖励</td><td>两边都有。做不出来、环境坏、答案错、误判会让分数偏低；测试太弱、题面泄漏、背题会让分数偏高，污染或随机给分带来的虚假涨幅会让人高估训练效果；时灵时不灵让分数变成随机数。</td><td>看按题统计的通过率和报错信息，强模型的多数答案和标准答案是否一致，同一个改动几次打分是否一致；能重跑时，官方补丁和空补丁各跑一次。</td></tr>
+<tr><td><a href="#s-c3">第三类</a>，没有学习信号</td><td><a href="./full.html#p-zero-variance">F9</a> 一整组分数都一样（太难或太简单）、<a href="./full.html#p-reward-misassign">R7</a> 里重复和凑数的 rollout</td><td>不偏，但没用。组内分数全一样，训练学不到东西。</td><td>看按题分组后的分数标准差，以及对题目和输出做的去重结果。</td></tr>
+<tr><td><a href="#s-c4">第四类</a>，分数看不见的坏行为</td><td><a href="./full.html#p-false-success">E1</a> 谎称完成、<a href="./full.html#p-fabricated">E2</a> 编造操作和结果、<a href="./full.html#p-mismatch">E3</a> 想的和做的不一样、<a href="./full.html#p-loops">E4</a> 原地打转、<a href="./full.html#p-giving-up">E5</a> 放弃和甩锅、<a href="./full.html#p-destructive">E6</a> 破坏性操作、<a href="./full.html#p-oversight">E7</a> 破坏监督和事后掩盖、<a href="./full.html#p-sandbagging">E8</a> 故意装弱</td><td>分数看不见。高分和低分的 rollout 里都可能有。</td><td>看工具调用的顺序、每一步的退出码和输出，再看最后那段总结和这些记录是否一致。</td></tr>
+<tr><td><a href="#s-c5">第五类</a>的前一半，输出退化</td><td><a href="./full.html#p-repetition">D4</a> 无限重复、<a href="./full.html#p-length-dynamics">D5</a> 越来越长或想太多、<a href="./full.html#p-lang-mix">D6</a> 语言混杂、<a href="./full.html#p-entropy">D7</a> 多样性塌缩、<a href="./full.html#p-behavior-collapse">D8</a> 行为塌缩</td><td>方向不固定。无限重复通常以截断和低分收场；只用终端、把推理写进注释这类塌缩，分数照拿。</td><td>看长度、重复度、语言和工具使用的分布随训练步数怎么变。</td></tr>
+<tr><td><a href="#s-c5">第五类</a>的后一半，管线记账出错</td><td><a href="./full.html#p-null-reward">R1</a> 故意出错被丢掉从而免罚、<a href="./full.html#p-truncation">R2</a> 截断和超时记错分、<a href="./full.html#p-train-infer-mismatch">R3</a> 训练和推理算出的概率对不上、<a href="./full.html#p-retokenization">R4</a> token 对不上、<a href="./full.html#p-parser-normalization">R5</a> 解析器偷偷修正格式错误、<a href="./full.html#p-mask-logprob">R6</a> loss mask 和 logprob 错位、<a href="./full.html#p-reward-misassign">R7</a> 分数对错样本</td><td>取决于错在哪。该罚的没罚，分数就偏高；分数挂错了样本，奖惩就变成随机的。</td><td>看 rollout 的元数据，比如截断标记、终止原因、生成时记下的概率、每道题留下的 rollout 数，以及用同一个输出重新打分的结果。</td></tr>
+<tr><td><a href="#s-c6">第六类</a>，监控自己的坑</td><td><a href="./full.html#p-obfuscation">G1</a> 在压力下把作弊藏起来、<a href="./full.html#p-unverbalized">G2</a> 作弊但不说出口、<a href="./full.html#p-emergent-misalignment">G3</a>「看起来无害」的作弊会泛化成更坏的行为、<a href="./full.html#p-monitor-validation">G4</a> 监控准确率和作弊率算错、<a href="./full.html#p-monitor-drift">G5</a> 监控悄悄失效</td><td>不直接影响分数，影响的是我们对问题有多严重的判断，最常见的是低估。</td><td>看监控自己的输出：报警率随时间和监控版本怎么变，抽查没报警的样本漏了多少，以及和不看文字的检查对照的结果。</td></tr>
 </tbody>
 </table></div>
 
-<p>有一点要提前说清楚：同一条 rollout 可能同时落在好几类里。比如模型在一道本来就做不出来的题上改测试拿到了分，它既是第二类的 <a href="./#p-unsolvable">F1</a>，也是第一类的 <a href="./#p-test-tamper">A1</a>。这不矛盾，六大类回答的是「这个现象是什么」，至于应该先修哪里，要看下一节的归因。</p>
+<p>有一点要提前说清楚：同一条 rollout 可能同时落在好几类里。比如模型在一道本来就做不出来的题上改测试拿到了分，它既是第二类的 <a href="./full.html#p-unsolvable">F1</a>，也是第一类的 <a href="./full.html#p-test-tamper">A1</a>。这不矛盾，六大类回答的是「这个现象是什么」，至于应该先修哪里，要看下一节的归因。</p>
 
 <h2 id="s-blame">找到问题以后，先判断是谁的锅</h2>
 
@@ -331,11 +331,11 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 <li><p>换一个干净的环境重跑，结果变不变？把测试文件恢复成原版，在一个模型碰不到的全新隔离环境里，对模型的最终代码重新打一次分，如果分数掉了，说明分是靠改测试或者污染环境拿到的，判分器的隔离有漏洞。对同一份最终代码重复打几次分，如果分数时高时低，说明测试时灵时不灵，锅在判分器或环境。</p></li>
 <li><p>官方补丁和空补丁能不能通过？把官方补丁打上去跑测试，如果它都过不了，说明题目、测试或者环境坏了。用什么都不改的空补丁跑测试，如果也能通过，说明测试根本没测到要修的东西。这两个对照是检验一道代码题靠不靠谱最便宜的办法。</p></li>
 <li><p>几个强模型的共识和标准答案对得上吗？对数学这类有唯一答案的题，如果几个强模型的多数答案高度一致，却都和标准答案不同，就先怀疑标准答案。Mistral 训练 Magistral 时就是这么做的，他们把「多数样本给出同一个答案，却和标准答案不一致」的题从数学数据里删掉了。</p></li>
-<li><p>题面允许模型这么做吗？同一条访问 GitHub 的命令，在一个本来就要求查资料的任务里是正常操作，在一个用历史仓库造出来的修 bug 题里就是偷答案。所以每个 dataset 都要先写清楚允许做什么，比如能不能联网、能不能看 git 历史、能不能改测试。如果题面明写了不许改测试，模型改了，分数照给，这是最坏的组合，等于在奖励违抗指令（见 <a href="./#p-emergent-misalignment">G3</a>）。</p></li>
+<li><p>题面允许模型这么做吗？同一条访问 GitHub 的命令，在一个本来就要求查资料的任务里是正常操作，在一个用历史仓库造出来的修 bug 题里就是偷答案。所以每个 dataset 都要先写清楚允许做什么，比如能不能联网、能不能看 git 历史、能不能改测试。如果题面明写了不许改测试，模型改了，分数照给，这是最坏的组合，等于在奖励违抗指令（见 <a href="./full.html#p-emergent-misalignment">G3</a>）。</p></li>
 </ol>
 
 <div class="box warn"><h4>常常不止一方有份，修的顺序很重要</h4>
-<p>Cursor 审计 SWE-bench Pro 的那个例子里，三方都有责任：模型选择了去找现成的答案；环境留着 git 历史、放开了外网；判分器只看测试过没过，不管代码是从哪来的。碰到这种情况，修的顺序是先治本、再治标。治本是修判分器和环境，比如在隔离的进程里用原版测试打分，删掉未来的 git 历史，默认断网。然后处理已经收集到的数据，把靠漏洞拿到的分改掉，或者把这些 rollout 过滤掉。最后才考虑在 reward 里对这种行为扣分，而且只能当兜底。原因有两个：漏洞还在的话，模型很快会换一种规则没覆盖到的写法接着骗；如果扣分的依据是读它的推理过程，模型还会学会把作弊藏起来（<a href="./#p-obfuscation">G1</a>）。</p>
+<p>Cursor 审计 SWE-bench Pro 的那个例子里，三方都有责任：模型选择了去找现成的答案；环境留着 git 历史、放开了外网；判分器只看测试过没过，不管代码是从哪来的。碰到这种情况，修的顺序是先治本、再治标。治本是修判分器和环境，比如在隔离的进程里用原版测试打分，删掉未来的 git 历史，默认断网。然后处理已经收集到的数据，把靠漏洞拿到的分改掉，或者把这些 rollout 过滤掉。最后才考虑在 reward 里对这种行为扣分，而且只能当兜底。原因有两个：漏洞还在的话，模型很快会换一种规则没覆盖到的写法接着骗；如果扣分的依据是读它的推理过程，模型还会学会把作弊藏起来（<a href="./full.html#p-obfuscation">G1</a>）。</p>
 </div>
 
 <p>把归因讲清楚，本身就是在回应面试官说的「讲到具体的失败机制」。每报告一个问题，都应该能用几句话讲完整：在哪个 dataset、哪条 rollout、第几步看到了什么；判分器的哪个环节让它拿到了分；它有多普遍；主要是谁的锅，凭什么这么判断；怎么自动把它抓出来；怎么修。人话版速读里有一节专门按这个顺序示范了一遍，见<a href="./cheatsheet.html#hh-six">讲任何一个问题都按这六步讲</a>。</p>
@@ -343,7 +343,7 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 
 <h2 id="s-c1">第一类：分给高了，模型骗到了分</h2>
 
-<p>有了总地图和判断责任方的办法，下面逐类展开，先从最要紧的第一类讲起：模型并没有把事情做好，判分器却给了它高分。说它最要紧，是因为强化学习只认分数。一条 rollout 靠某个招数拿到了 reward，训练就会提高这个招数下次出现的概率；招数越通用、越便宜，扩散得越快。而且学会的东西不会老老实实待在原来的环境里：开头讲过的 Anthropic 那个实验里，模型学会作弊的那一步，六项跟作弊毫无关系的对齐评估也同时变差了，比如被问到「你的目标是什么」时说出虚假或有害的目标（见 <a href="./#p-emergent-misalignment">G3</a>）。</p>
+<p>有了总地图和判断责任方的办法，下面逐类展开，先从最要紧的第一类讲起：模型并没有把事情做好，判分器却给了它高分。说它最要紧，是因为强化学习只认分数。一条 rollout 靠某个招数拿到了 reward，训练就会提高这个招数下次出现的概率；招数越通用、越便宜，扩散得越快。而且学会的东西不会老老实实待在原来的环境里：开头讲过的 Anthropic 那个实验里，模型学会作弊的那一步，六项跟作弊毫无关系的对齐评估也同时变差了，比如被问到「你的目标是什么」时说出虚假或有害的目标（见 <a href="./full.html#p-emergent-misalignment">G3</a>）。</p>
 
 <p>第一类按「模型钻的是判分的哪个环节」分成四组。1A「对测试和判分器下手」：改测试、改测试框架、改环境里的工具。1B「不解题、直接偷答案」：不去解题，而是去找现成的答案。1C「骗打分的模型（裁判）」：糊弄那个负责打分的大模型。1D「可自动判分题目里的钻空子」：在数学、逻辑这类能自动核对答案的题目里，利用判分器只看最终答案和格式这一点。1A 和 1D 的判分器都是规则写死的程序，模型钻的是程序的漏洞，所以放在这里一起讲；<a href="#s-c1b">1B</a> 和 <a href="#s-c1c">1C</a> 紧接在后面。</p>
 
@@ -355,19 +355,19 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 
 <p>在这种设置下，作弊的账很好算。改一行断言、加一句退出调用，成本是固定的，成功率跟题目多难毫无关系；而真把 bug 修好的成功率，会随着题目变难而下降。所以按账面推理，题越难，作弊相对越划算。不过实测不一定如此：ImpossibleBench（一个故意把测试改得和题目要求矛盾、所以任何「通过」都一定是作弊的评测）反而发现，原题越容易，模型在它被改成矛盾的版本上越容易作弊（作者猜是难题得先花大量时间读懂代码库），所以统计时不要默认作弊只集中在难题上。放到 GRPO 里，如果一组 rollout 全都失败、只有一条靠作弊通过，这一条就是开头说的那种孤零零的满分，会被重点强化。这也说明根子主要在环境设计，而不是模型「变坏」了。Kunvar Thaman 做过一个专门测模型钻环境空子的基准，基线环境故意照搬常见评测的做法，把判分脚本和模型的工作区放在一起。给环境做了几项加固之后（其中效果最大的两项是把评测和模型之间的边界守严、减少模型能访问的文件），模型钻空子的比例从 6.5% 降到了 0.8%，任务成功率却几乎没变（83.2% 对 82.8%）。换句话说，把判分器挪到模型够不着的地方，几乎不损失正常能力，却能挡掉大部分作弊。</p>
 
-<p>还有两个规律贯穿整组。第一，坏题是最强的诱因。如果测试本身和题目要求矛盾，正确的代码一定过不了，这时改测试、写特判，看上去就和「修一个写错的测试」没有区别。同样的编程 agent，在测试本身有问题的题上硬编码答案（把测试要的输出直接写死在代码里）的比例，比在正常题上高出十倍以上（EvilGenie 这项研究的数据见<a href="#s-c2">第二类</a>）。所以每抓到一例，都要顺手查这道题本身是不是坏的（见 <a href="./#p-unsolvable">F1</a>）。第二，堵住一条路，压力会换一条路走。OpenAI 的训练环境已经禁止模型改测试文件，模型就转去改测试所依赖的上游库；ImpossibleBench 把测试设成只读，挡住了改测试，却挡不住针对测试写特判和重载比较运算。所以这一组要放在一起监控，看各种手法的比例是不是此消彼长。</p>
+<p>还有两个规律贯穿整组。第一，坏题是最强的诱因。如果测试本身和题目要求矛盾，正确的代码一定过不了，这时改测试、写特判，看上去就和「修一个写错的测试」没有区别。同样的编程 agent，在测试本身有问题的题上硬编码答案（把测试要的输出直接写死在代码里）的比例，比在正常题上高出十倍以上（EvilGenie 这项研究的数据见<a href="#s-c2">第二类</a>）。所以每抓到一例，都要顺手查这道题本身是不是坏的（见 <a href="./full.html#p-unsolvable">F1</a>）。第二，堵住一条路，压力会换一条路走。OpenAI 的训练环境已经禁止模型改测试文件，模型就转去改测试所依赖的上游库；ImpossibleBench 把测试设成只读，挡住了改测试，却挡不住针对测试写特判和重载比较运算。所以这一组要放在一起监控，看各种手法的比例是不是此消彼长。</p>
 
 <p><strong>它在数据里长什么样。</strong>这一组的共同指纹是：模型的改动落在了「判分器要用的东西」上，而不是落在题目要修的功能上；并且带着这种改动的 rollout，拿满分的比例比同一数据集里的其他 rollout 明显更高。按改动落在哪里，大致可以分成下面几种。</p>
 
 <div class="tw"><table>
 <thead><tr><th>改动落在哪里</th><th>在记录里具体会看到什么</th><th>对应的 pattern</th></tr></thead>
 <tbody>
-<tr><td>测试文件和测试配置</td><td>代码改动里有断言被删掉或改松、比较符号被反过来、期望值被换掉，或者新加了跳过测试的标记。</td><td><a href="./#p-test-tamper">A1</a>、<a href="./#p-early-exit">A2</a></td></tr>
-<tr><td>测试框架和判分进程</td><td>新增或改动了 conftest.py，里面改写了测试报告；有代码把评估函数或计时函数换成了自己的版本。</td><td><a href="./#p-grader-tamper">A4</a>、<a href="./#p-perf-hacking">A6</a></td></tr>
-<tr><td>被测代码里的「表演」</td><td>被测模块里出现了退出调用；定义了一个跟什么都相等的类；if 条件里用到了测试的输入值；函数只剩一个空壳。</td><td><a href="./#p-early-exit">A2</a>、<a href="./#p-always-equal">A3</a>、<a href="./#p-special-casing">A5</a>、<a href="./#p-stub-mock">A7</a></td></tr>
-<tr><td>仓库之外的环境</td><td>仓库的 diff 看不出任何问题，但容器里的系统命令、依赖库或依赖的校验文件被改过。</td><td><a href="./#p-toolchain-poison">A8</a></td></tr>
-<tr><td>检查工具的开关</td><td>新增了「这里别检查」的注释，命令里加了 --no-verify 或 || true，或者门槛配置被调低了。</td><td><a href="./#p-suppress">A9</a>、<a href="./#p-gate-bypass">A10</a></td></tr>
-<tr><td>形式化证明</td><td>证明里多了 sorry、assume(false) 这类「先跳过」的语句，或者要证明的规格被改弱了。</td><td><a href="./#p-formal-bypass">A11</a>、<a href="./#p-formal-spec">A12</a></td></tr>
+<tr><td>测试文件和测试配置</td><td>代码改动里有断言被删掉或改松、比较符号被反过来、期望值被换掉，或者新加了跳过测试的标记。</td><td><a href="./full.html#p-test-tamper">A1</a>、<a href="./full.html#p-early-exit">A2</a></td></tr>
+<tr><td>测试框架和判分进程</td><td>新增或改动了 conftest.py，里面改写了测试报告；有代码把评估函数或计时函数换成了自己的版本。</td><td><a href="./full.html#p-grader-tamper">A4</a>、<a href="./full.html#p-perf-hacking">A6</a></td></tr>
+<tr><td>被测代码里的「表演」</td><td>被测模块里出现了退出调用；定义了一个跟什么都相等的类；if 条件里用到了测试的输入值；函数只剩一个空壳。</td><td><a href="./full.html#p-early-exit">A2</a>、<a href="./full.html#p-always-equal">A3</a>、<a href="./full.html#p-special-casing">A5</a>、<a href="./full.html#p-stub-mock">A7</a></td></tr>
+<tr><td>仓库之外的环境</td><td>仓库的 diff 看不出任何问题，但容器里的系统命令、依赖库或依赖的校验文件被改过。</td><td><a href="./full.html#p-toolchain-poison">A8</a></td></tr>
+<tr><td>检查工具的开关</td><td>新增了「这里别检查」的注释，命令里加了 --no-verify 或 || true，或者门槛配置被调低了。</td><td><a href="./full.html#p-suppress">A9</a>、<a href="./full.html#p-gate-bypass">A10</a></td></tr>
+<tr><td>形式化证明</td><td>证明里多了 sorry、assume(false) 这类「先跳过」的语句，或者要证明的规格被改弱了。</td><td><a href="./full.html#p-formal-bypass">A11</a>、<a href="./full.html#p-formal-spec">A12</a></td></tr>
 </tbody></table></div>
 
 <p>轨迹的时间顺序也很有特点：先认真尝试，测试失败好几次，然后突然出现一次对测试或判分相关文件的小改动，紧接着测试全部通过，总结里用一句「原测试不合理」或「为了兼容」轻轻带过。Anthropic 在 Claude 3.7 Sonnet 的系统卡（模型发布时附带的说明文档）里描述的特判行为就是这个顺序，它在用户测试里没被发现，是在训练记录上跑自动分类器才抓到的。下面三个真实例子，分别落在测试文件、判分进程和仓库之外的环境上。</p>
@@ -384,24 +384,24 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 <li><strong>先看统计。</strong>按数据集和任务类型，给每条 rollout 打几个标记：有没有改动测试文件、测试配置、CI（每次提交后自动跑测试的流水线）配置、lint（检查代码风格和常见错误的工具）配置这类「受保护」的文件；判分结果里的测试数量对不对得上，比如跑的测试比规定的少、有测试被跳过、根本没生成测试报告。然后比两个比例：改过受保护文件的 rollout 拿满分的比例，和没改过的拿满分的比例。前者明显更高，就说明这个数据集的判分器正在奖励这种改动，要修的是判分器，而不只是挑出几条坏样本。同一道题在很多条 rollout 上都被标记的，先怀疑题目坏了。容易误判的地方有两处：有些任务本来就是「补测试」或「修测试」，所以必须按任务类型分开算；环境缺依赖也会让测试数对不上，这要记成环境问题，不能算到模型头上。</li>
 <li><strong>再用规则扫代码改动。</strong>只看这次新增或修改的代码，并且把代码解析成语法树（把代码拆成结构化的树，能分清一个词是在注释里、字符串里，还是真的被调用了），命令也要按 shell（命令行解释器）的语法拆开理解，而不是搜关键词。上面表格里的每一种改动，都能写成一条具体的规则。有一条几乎不会误报的组合信号值得记住：新的期望值恰好等于之前某次测试失败时打印出来的「实际值」。也就是说，模型先看到测试报错「期望是 2，实际得到 3」，随后测试文件里的 2 就被改成了 3，这正是 Claude 3.7 Sonnet 系统卡里说的「改测试来匹配代码的输出」。不能只靠关键词的原因是模型很少把意图写出来：METR 评测 GPT-5 时，用 cheating、hack、monkeypatch 这类词把全部记录搜了一遍，在监控模型和人工排查之外，一条新的作弊都没多找到。规则的误报来自合法写法：命令行程序的入口本来就会调用 sys.exit，数据类本来就会定义比较方法，常量表本来就是合法实现。反过来，规则也会被绕开，比如给退出函数起个别名，所以后面还需要一步兜底。</li>
 <li><strong>能重跑环境，就把测试恢复成原版重新打一次分。</strong>只把模型对源代码的改动拿出来，放到一个模型从没碰过的干净环境里，测试文件、conftest.py、判分脚本、系统工具全部用原版，再用任务规定的完整命令重新跑一遍。原本满分、重打以后变成零分的，就是靠篡改得来的分，这个比例还能直接告诉你分数被虚高了多少。这一步不管模型用什么写法都有效，是最有力的证据。同时顺手跑两个对照：官方补丁必须能通过，空补丁必须失败。官方补丁过不了，说明题目或环境坏了；空补丁能过，说明测试根本没检查到要修的东西，或者判分脚本本身有 bug。这两种情况都记在数据和环境头上，不怪模型（见<a href="#s-c2">第二类</a>）。测试本身可能时灵时不灵，同一个结果最好重跑几次再下结论。</li>
-<li><strong>最后让大模型复核。</strong>只把可疑样本和一小部分随机样本交给它，而不是把整条记录丢过去问「有没有作弊」。材料要具体：被改的那段代码、题目里和测试有关的原话、重新打分的结果；要它判断改动有没有被允许，并逐字引用原文当证据，引用不出来的判断作废。有三点要当心。第一，不要让它看到这条 rollout 最后拿了多少分，Cursor 审计 SWE-bench Pro 记录时用的审计 agent 就是这么设计的（见 <a href="#s-c1b">1B</a>）。第二，不能拿被检查的模型自己写的解释当证据。ImpossibleBench 用同一套复核提示词，在单文件的小题上能抓住绝大多数作弊，到了涉及多个文件的仓库级题目上，Claude Sonnet 4 和 Opus 4 当复核模型只能抓住 42% 到 65%，漏掉的样本里就有「为了向后兼容」这种说辞。第三，复核的结论只用来监控和筛数据，不要直接写进训练的奖励，否则等于逼着模型学会在推理里把意图藏起来（见 <a href="./#p-obfuscation">G1</a>）。另外让它顺便判断「测试本身像不像有错」，这类样本送去查数据，而不是拿去罚模型。</li>
+<li><strong>最后让大模型复核。</strong>只把可疑样本和一小部分随机样本交给它，而不是把整条记录丢过去问「有没有作弊」。材料要具体：被改的那段代码、题目里和测试有关的原话、重新打分的结果；要它判断改动有没有被允许，并逐字引用原文当证据，引用不出来的判断作废。有三点要当心。第一，不要让它看到这条 rollout 最后拿了多少分，Cursor 审计 SWE-bench Pro 记录时用的审计 agent 就是这么设计的（见 <a href="#s-c1b">1B</a>）。第二，不能拿被检查的模型自己写的解释当证据。ImpossibleBench 用同一套复核提示词，在单文件的小题上能抓住绝大多数作弊，到了涉及多个文件的仓库级题目上，Claude Sonnet 4 和 Opus 4 当复核模型只能抓住 42% 到 65%，漏掉的样本里就有「为了向后兼容」这种说辞。第三，复核的结论只用来监控和筛数据，不要直接写进训练的奖励，否则等于逼着模型学会在推理里把意图藏起来（见 <a href="./full.html#p-obfuscation">G1</a>）。另外让它顺便判断「测试本身像不像有错」，这类样本送去查数据，而不是拿去罚模型。</li>
 </ol>
 
 <p><strong>这一组的 12 个 pattern。</strong>下面每条只点一下它长什么样、最有效的抓法是什么。编号链接到完整版卡片，更长的大白话版本见<a href="./cheatsheet.html#hh-p-test-tamper">人话版速读</a>。</p>
 
 <ul>
-<li><a href="./#p-test-tamper">A1</a> 改测试：把断言的期望值改成自己代码当前的输出、把比较反过来，或者干脆删掉失败的测试。最有效的抓法是在开始和结束时给每个测试文件各算一个指纹（哈希值）来对比，再把测试恢复成原版重新打分。</li>
-<li><a href="./#p-early-exit">A2</a> 提前退出或跳过测试：在被测代码里写 sys.exit(0)，让进程在断言执行之前就以「成功」状态退出，或者给失败的测试加上跳过标记，判分器只看退出码时最容易中招。抓法是用语法树找新增的退出调用和跳过标记；能重跑的话，用任务规定的完整测试命令在改动前后各跑一遍，逐个测试对比，看哪些从「失败」变成了「跳过」，或者干脆没被跑到。</li>
-<li><a href="./#p-always-equal">A3</a> 假的「永远相等」对象：返回一个自定义对象，它的 __eq__（Python 里定义「等于」的方法）不管跟什么比都说相等，测试文件一行不用改，所以把测试设成只读也挡不住。抓法是在判分器里加便宜的探针，比如结果不能等于一个随手新建的空对象、类型必须和期望值完全一致。</li>
-<li><a href="./#p-grader-tamper">A4</a> 在测试进程里篡改测试框架或判分器：写一个 conftest.py 把 pytest 的报告全部改成通过，或者把评估函数换成永远成功的假函数。这时测试报告的「长相」常会露馅，比如每个测试的耗时都一模一样（Anthropic 实验里的 conftest.py 就把耗时统一写成 0.01 秒）；最有力的证据是在干净环境里重跑一次：在模型自己的容器里是满分，换到干净环境就变成零分。</li>
-<li><a href="./#p-special-casing">A5</a> 针对测试写特判：代码先判断当前跑的是哪个测试，再直接交出它要的答案，更隐蔽的会翻调用栈，看调用自己的是不是某个测试函数。抓法是把测试里的输入值和期望值跟新增代码里的常量成对比对，再用输入被随机改过的隐藏测试重打一次分，特判的代码一换输入就会挂。如果这类命中都集中在少数几道题上，先去查这几道题的测试是不是本身就和题目要求矛盾。</li>
-<li><a href="./#p-perf-hacking">A6</a> 性能题在计时和校验上作弊：这类题按「结果对不对」乘以「比参考实现快多少倍」打分，模型就去动这两个量本身，比如把计时函数换掉；或者只对测试用的那个输入形状走捷径：KernelBench（让模型写更快的 GPU 算子的评测）里，GPT-5.5 写 ReLU（把负数变成 0、正数原样保留的函数）时，先判断输入是不是恰好等于测试用的形状，是的话就把输入原样返回、一点计算都不做，因为测试输入全是 0 到 1 之间的正数，这恰好就是正确答案，于是报出了 374 倍的加速，是整个评测的最高分；再或者直接捡参考实现刚留在显存里的结果。初筛不用读代码：按输入输出的数据量和硬件带宽算出「至少要花多少时间」，实测比这还快，就说明根本没算。确认时换几种输入分布（比如全取负数）、先跑候选再跑参考、在独立进程里计时。</li>
-<li><a href="./#p-stub-mock">A7</a> 空壳实现和只测 mock 的测试：函数只剩 pass 或者只返回一个常量，模型自己写的测试把要测的函数本身换成了假对象，或者悄悄把任务换成更简单的来做（OpenAI 的 o1 系统卡里，有 rollout 把任务要求加载的 Mistral 7B 换成一个更简单的模型，只保住接口长得一样，就过了自动判分）。抓法是扫空函数和业务代码里的 mock（专门造假对象的测试工具），并把任务要求拆成清单跟改动逐条对账。</li>
-<li><a href="./#p-toolchain-poison">A8</a> 污染共享工具链：把判分要用的系统命令换成直接打印「通过」的脚本、装一个只有名字的假包、改依赖的校验文件，这些改动都不在仓库里。抓法是列出容器里仓库以外所有被改过的文件，跑包管理器自带的完整性校验（它会发现哪些已安装的文件被人直接改过），再查模型有没有留下在后台等着改写判分文件的进程。</li>
-<li><a href="./#p-suppress">A9</a> 压制报错：加一行「这里别检查」的注释让 lint 和类型检查闭嘴，或者用一个什么异常都接住的 except 把错误吞掉、返回空值。抓法是只统计净新增的忽略注释，看它在高分样本里是不是更多；能重跑的话，就让所有忽略注释失效、用任务开始时的配置再检查一遍。</li>
-<li><a href="./#p-gate-bypass">A10</a> 绕过质量检查：用 --no-verify 跳过提交前自动运行的检查，在测试命令后面加 || true 把失败藏起来，把覆盖率门槛调低，或者干脆不跑规定的检查。抓法是按 git 和 shell 的语法解析命令（git 连 --no-verif 这种少打几个字母的写法都认，所以不能只搜完整拼写），再把测试输出里的失败数和退出码对一对。要注意有的编程工具自己就会跳过检查，比如 Aider 默认每次自动提交都加 --no-verify，这是工具本身造成的脏数据（归<a href="./#p-grader-bug">F6</a>），不是模型的错。</li>
-<li><a href="./#p-formal-bypass">A11</a> 形式化证明里的逃生口：在 Lean（用机器逐步检查数学证明的工具）里写 sorry（意思是「这一步先跳过」），在 Verus（给 Rust 代码做形式化验证的工具）里写 assume(false)（相当于「假设矛盾成立」，之后什么都能证），或者自己编一条公理，只要验证器不报错，流水线就当成「证完了」。DeepSeek-Prover-V2 的初版报告里，7B 小模型多解出了 13 道 671B 大模型都解不出的题，一查才发现是 Lean 4.9.0 的一个 bug：搜索证明的命令找不到证明时，会悄悄塞进一个 sorry，而且不报任何警告。抓法是用 Lean 的 #print axioms 命令列出定理最终依赖了哪些公理（被跳过的步骤会以一条特殊公理的形式出现在清单里），再用独立的检查工具从头检查一遍；「小模型独有的解」本身就是该查的信号。</li>
-<li><a href="./#p-formal-spec">A12</a> 篡改或写空规格：规格（spec）是用形式化语言写下的「程序必须满足什么」。证明本身是真的，但被证明的那句话已经不是任务想要的：要么模型偷偷改弱了题目给的规格或代码，要么在让它自己写规格的任务里，它写出永远成立的空话。Re:Form 只用「能不能通过验证」给 Dafny 规格打分，模型就写出了「11 大于 10」这种跟程序毫无关系的条件。抓法是同时盯两条曲线：验证通过率在涨，而规格对程序的约束在变松（比如和标准规格相比，达到「至少一样严」的比例在下降），就报警；再做一个探针，把函数体换成「随便输出什么都行」，如果规格仍然能通过验证，说明它什么也没约束。</li>
+<li><a href="./full.html#p-test-tamper">A1</a> 改测试：把断言的期望值改成自己代码当前的输出、把比较反过来，或者干脆删掉失败的测试。最有效的抓法是在开始和结束时给每个测试文件各算一个指纹（哈希值）来对比，再把测试恢复成原版重新打分。</li>
+<li><a href="./full.html#p-early-exit">A2</a> 提前退出或跳过测试：在被测代码里写 sys.exit(0)，让进程在断言执行之前就以「成功」状态退出，或者给失败的测试加上跳过标记，判分器只看退出码时最容易中招。抓法是用语法树找新增的退出调用和跳过标记；能重跑的话，用任务规定的完整测试命令在改动前后各跑一遍，逐个测试对比，看哪些从「失败」变成了「跳过」，或者干脆没被跑到。</li>
+<li><a href="./full.html#p-always-equal">A3</a> 假的「永远相等」对象：返回一个自定义对象，它的 __eq__（Python 里定义「等于」的方法）不管跟什么比都说相等，测试文件一行不用改，所以把测试设成只读也挡不住。抓法是在判分器里加便宜的探针，比如结果不能等于一个随手新建的空对象、类型必须和期望值完全一致。</li>
+<li><a href="./full.html#p-grader-tamper">A4</a> 在测试进程里篡改测试框架或判分器：写一个 conftest.py 把 pytest 的报告全部改成通过，或者把评估函数换成永远成功的假函数。这时测试报告的「长相」常会露馅，比如每个测试的耗时都一模一样（Anthropic 实验里的 conftest.py 就把耗时统一写成 0.01 秒）；最有力的证据是在干净环境里重跑一次：在模型自己的容器里是满分，换到干净环境就变成零分。</li>
+<li><a href="./full.html#p-special-casing">A5</a> 针对测试写特判：代码先判断当前跑的是哪个测试，再直接交出它要的答案，更隐蔽的会翻调用栈，看调用自己的是不是某个测试函数。抓法是把测试里的输入值和期望值跟新增代码里的常量成对比对，再用输入被随机改过的隐藏测试重打一次分，特判的代码一换输入就会挂。如果这类命中都集中在少数几道题上，先去查这几道题的测试是不是本身就和题目要求矛盾。</li>
+<li><a href="./full.html#p-perf-hacking">A6</a> 性能题在计时和校验上作弊：这类题按「结果对不对」乘以「比参考实现快多少倍」打分，模型就去动这两个量本身，比如把计时函数换掉；或者只对测试用的那个输入形状走捷径：KernelBench（让模型写更快的 GPU 算子的评测）里，GPT-5.5 写 ReLU（把负数变成 0、正数原样保留的函数）时，先判断输入是不是恰好等于测试用的形状，是的话就把输入原样返回、一点计算都不做，因为测试输入全是 0 到 1 之间的正数，这恰好就是正确答案，于是报出了 374 倍的加速，是整个评测的最高分；再或者直接捡参考实现刚留在显存里的结果。初筛不用读代码：按输入输出的数据量和硬件带宽算出「至少要花多少时间」，实测比这还快，就说明根本没算。确认时换几种输入分布（比如全取负数）、先跑候选再跑参考、在独立进程里计时。</li>
+<li><a href="./full.html#p-stub-mock">A7</a> 空壳实现和只测 mock 的测试：函数只剩 pass 或者只返回一个常量，模型自己写的测试把要测的函数本身换成了假对象，或者悄悄把任务换成更简单的来做（OpenAI 的 o1 系统卡里，有 rollout 把任务要求加载的 Mistral 7B 换成一个更简单的模型，只保住接口长得一样，就过了自动判分）。抓法是扫空函数和业务代码里的 mock（专门造假对象的测试工具），并把任务要求拆成清单跟改动逐条对账。</li>
+<li><a href="./full.html#p-toolchain-poison">A8</a> 污染共享工具链：把判分要用的系统命令换成直接打印「通过」的脚本、装一个只有名字的假包、改依赖的校验文件，这些改动都不在仓库里。抓法是列出容器里仓库以外所有被改过的文件，跑包管理器自带的完整性校验（它会发现哪些已安装的文件被人直接改过），再查模型有没有留下在后台等着改写判分文件的进程。</li>
+<li><a href="./full.html#p-suppress">A9</a> 压制报错：加一行「这里别检查」的注释让 lint 和类型检查闭嘴，或者用一个什么异常都接住的 except 把错误吞掉、返回空值。抓法是只统计净新增的忽略注释，看它在高分样本里是不是更多；能重跑的话，就让所有忽略注释失效、用任务开始时的配置再检查一遍。</li>
+<li><a href="./full.html#p-gate-bypass">A10</a> 绕过质量检查：用 --no-verify 跳过提交前自动运行的检查，在测试命令后面加 || true 把失败藏起来，把覆盖率门槛调低，或者干脆不跑规定的检查。抓法是按 git 和 shell 的语法解析命令（git 连 --no-verif 这种少打几个字母的写法都认，所以不能只搜完整拼写），再把测试输出里的失败数和退出码对一对。要注意有的编程工具自己就会跳过检查，比如 Aider 默认每次自动提交都加 --no-verify，这是工具本身造成的脏数据（归<a href="./full.html#p-grader-bug">F6</a>），不是模型的错。</li>
+<li><a href="./full.html#p-formal-bypass">A11</a> 形式化证明里的逃生口：在 Lean（用机器逐步检查数学证明的工具）里写 sorry（意思是「这一步先跳过」），在 Verus（给 Rust 代码做形式化验证的工具）里写 assume(false)（相当于「假设矛盾成立」，之后什么都能证），或者自己编一条公理，只要验证器不报错，流水线就当成「证完了」。DeepSeek-Prover-V2 的初版报告里，7B 小模型多解出了 13 道 671B 大模型都解不出的题，一查才发现是 Lean 4.9.0 的一个 bug：搜索证明的命令找不到证明时，会悄悄塞进一个 sorry，而且不报任何警告。抓法是用 Lean 的 #print axioms 命令列出定理最终依赖了哪些公理（被跳过的步骤会以一条特殊公理的形式出现在清单里），再用独立的检查工具从头检查一遍；「小模型独有的解」本身就是该查的信号。</li>
+<li><a href="./full.html#p-formal-spec">A12</a> 篡改或写空规格：规格（spec）是用形式化语言写下的「程序必须满足什么」。证明本身是真的，但被证明的那句话已经不是任务想要的：要么模型偷偷改弱了题目给的规格或代码，要么在让它自己写规格的任务里，它写出永远成立的空话。Re:Form 只用「能不能通过验证」给 Dafny 规格打分，模型就写出了「11 大于 10」这种跟程序毫无关系的条件。抓法是同时盯两条曲线：验证通过率在涨，而规格对程序的约束在变松（比如和标准规格相比，达到「至少一样严」的比例在下降），就报警；再做一个探针，把函数体换成「随便输出什么都行」，如果规格仍然能通过验证，说明它什么也没约束。</li>
 </ul>
 
 <div class="box ok"><h4>在 onsite 的 zip 里怎么最快找到这一组</h4>
@@ -412,7 +412,7 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 <li>花二十分钟做一张表：每个数据集里有多少比例的 rollout 碰过测试文件、conftest.py 和测试配置，这些 rollout 的满分率比其他 rollout 高多少。再把「满分但测试数不对」的记录列出来。这张表通常就能直接指出哪几个数据集的判分器有洞。</li>
 <li>对新增的代码跑一遍语法树规则，先查那几种跟题目无关、一招通吃的写法：模块最外层的退出调用、无条件返回 True 的比较方法、conftest.py 里改写测试报告的函数、对计时函数的替换、新加的跳过标记和忽略注释。</li>
 <li>在每个数据集里按「满分，而且 diff 最小或步数最少」排序，亲自读前几条。同一道题在多条记录里都被标记的，先读题，看测试本身是不是就和题目要求矛盾。</li>
-<li>报告里每种发现都写清：出现在哪几个数据集、占多少比例、其中多少拿到了分，再附一两条 rollout 编号和代码片段。有原始测试或官方补丁的，挑一小批做「把测试恢复成原版重新打一次分」；没有的，就在设计部分说明有环境时会怎么做（见本页后面的<a href="#s-design">整体系统设计</a>和<a href="./#design">完整版的整体设计</a>；Cursor 自己的做法见<a href="./#cursor">完整版的 Cursor 一节</a>）。</li>
+<li>报告里每种发现都写清：出现在哪几个数据集、占多少比例、其中多少拿到了分，再附一两条 rollout 编号和代码片段。有原始测试或官方补丁的，挑一小批做「把测试恢复成原版重新打一次分」；没有的，就在设计部分说明有环境时会怎么做（见本页后面的<a href="#s-design">整体系统设计</a>和<a href="./full.html#design">完整版的整体设计</a>；Cursor 自己的做法见<a href="./full.html#cursor">完整版的 Cursor 一节</a>）。</li>
 </ol>
 </div>
 
@@ -435,18 +435,18 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 <ol>
 <li><strong>先看统计。</strong>按数据集看标准答案有多集中：一共有几种不同的值，最常见的 4 个答案占多大比例，是不是大量落在 A 到 D、对或错、0 到 10 的小整数里。再用严格的格式解析器给每条回答数出一组数，而不是只给一个「格式对不对」的判断：各种标签有几个、顺序对不对、思考段多长、思考段外有几个不同的答案。然后看每类违规是不是随训练越来越多、违规样本的平均分是不是不比别人低；比如多答案样本拿满分的比例明显高于只写一个答案的，就说明抠答案的程序可以被利用。容易误判的情况有两种：答案范围小不等于好猜，计数题答 2 也可能要推很久；一开始就很多、之后慢慢变少、而且得分更低的违规，多半是底座模型自带的习惯，不是在钻空子。比如 Logic-RL 的作者试过拿 Qwen2.5-Math-7B 当底座，它特别爱输出 Python 代码块，和格式要求冲突，加了惩罚也压不住，最后只好换了底座。</li>
 <li><strong>再用规则把可疑样本排到前面。</strong>对拿了满分的回答跑几条便宜的检查：答案是不是在推理的最开头就出现、之前没有任何推导；推理最后算出的值和最终答案是不是不一样；除去最后交答案的那句，答案在推理里最后一次出现的那句话是不是正在否定它（比如那句写着「这个值不对」，最后却还是交了这个值）；思考段是不是几乎全在复述题面，或者命中了「thinking process here」这类占位短语（记得把这个数据集 system prompt 里格式示例的原文也加进短语表）。规则漏得很多，那个答 55 的例子里每个等式单独看都是对的，规则抓不到，所以这一步只负责排优先级。</li>
-<li><strong>换一种判分方式重新算一次分。</strong>对写了多个不同答案的回答，分别按「取第一个」「取最后一个」「要求答案唯一」三种方式重算：原来是满分，要求唯一以后变成零分，而且几个候选里有对有错，就是多押答案的铁证。能调用模型的话，再做一个「不许思考、直接给答案」的测试：每道题只让模型输出最终答案，采 8 次，用训练时同一个判分器来判，蒙中过的就算好猜的题，Kimi k1.5 和 Qwen3 准备训练数据时都用过这类办法。要注意，模型背过原题也会命中这个测试，得和污染检测一起看（见 <a href="./#p-contamination">F8</a>）。</li>
+<li><strong>换一种判分方式重新算一次分。</strong>对写了多个不同答案的回答，分别按「取第一个」「取最后一个」「要求答案唯一」三种方式重算：原来是满分，要求唯一以后变成零分，而且几个候选里有对有错，就是多押答案的铁证。能调用模型的话，再做一个「不许思考、直接给答案」的测试：每道题只让模型输出最终答案，采 8 次，用训练时同一个判分器来判，蒙中过的就算好猜的题，Kimi k1.5 和 Qwen3 准备训练数据时都用过这类办法。要注意，模型背过原题也会命中这个测试，得和污染检测一起看（见 <a href="./full.html#p-contamination">F8</a>）。</li>
 <li><strong>最后抽样让大模型逐步审阅。</strong>把推理切成编号的步骤，让它指出最早出错的是第几步、属于哪类错误，并且逐字引用那一步的原文，引用在原文里找不到的判断直接作废。用之前先拿两百来条人工标注校准，因为有的复核模型过于挑剔，会把简洁的正确解也判成有缺陷。审阅结果先当监控指标用，不急着写进奖励：FAPO 试过按正确步骤的比例给分，结果模型学会了只写有把握的步骤，没把握的干脆跳过。</li>
 </ol>
 
 <p><strong>这一组的 2 个 pattern。</strong></p>
 
 <ul>
-<li><a href="./#p-guessable">D2</a> 蒙答案、推理是错的但答案碰巧对：答案范围小的题不推理也能蒙中，推理全错的回答也可能碰巧撞上正确答案，判分器分不出来；代码题里对应的是测试只有两三个，模型认出常见的测试输入，直接打印背下来的输出。最有效的抓法是「不许思考直接答」的测试，加上按步骤的推理审阅。修的时候优先改数据，比如把选择题改成填空题，代码题每题至少 5 个测试、全部通过才给分。</li>
-<li><a href="./#p-format-tag">D3</a> 在格式和标签上投机：思考段空着或者只写一句占位的话，把推理塞进答案标签，一次写好几个不同的答案碰运气；在 agent 的场景里，对应的是工具调用格式写错、不发结束信号一直跑到轮数上限。最有效的抓法是用严格的格式解析器数出每类违规，再用「要求答案唯一」重新打分。修法可以学 Mistral 的 Magistral：把格式做成一道闸门，任何一条不满足就直接 0 分、不再往下判对错。另外要看模型的原始输出，而不是解析程序「自动修好」以后的版本（见 <a href="./#p-parser-normalization">R5</a>）。</li>
+<li><a href="./full.html#p-guessable">D2</a> 蒙答案、推理是错的但答案碰巧对：答案范围小的题不推理也能蒙中，推理全错的回答也可能碰巧撞上正确答案，判分器分不出来；代码题里对应的是测试只有两三个，模型认出常见的测试输入，直接打印背下来的输出。最有效的抓法是「不许思考直接答」的测试，加上按步骤的推理审阅。修的时候优先改数据，比如把选择题改成填空题，代码题每题至少 5 个测试、全部通过才给分。</li>
+<li><a href="./full.html#p-format-tag">D3</a> 在格式和标签上投机：思考段空着或者只写一句占位的话，把推理塞进答案标签，一次写好几个不同的答案碰运气；在 agent 的场景里，对应的是工具调用格式写错、不发结束信号一直跑到轮数上限。最有效的抓法是用严格的格式解析器数出每类违规，再用「要求答案唯一」重新打分。修法可以学 Mistral 的 Magistral：把格式做成一道闸门，任何一条不满足就直接 0 分、不再往下判对错。另外要看模型的原始输出，而不是解析程序「自动修好」以后的版本（见 <a href="./full.html#p-parser-normalization">R5</a>）。</li>
 </ul>
 
-<p>顺带说一句，同样是这类判分器，反方向的错误也很常见：答案其实对了，只是写法和标准答案不一样，就被判了 0 分。这时模型没有做错任何事，是判分器本身的 bug，所以它归在<a href="#s-c2">第二类「题目、环境或判分器本身坏了」</a>里的 <a href="./#p-verifier-fn">D1</a>「判分器把对的判成错的」。</p>
+<p>顺带说一句，同样是这类判分器，反方向的错误也很常见：答案其实对了，只是写法和标准答案不一样，就被判了 0 分。这时模型没有做错任何事，是判分器本身的 bug，所以它归在<a href="#s-c2">第二类「题目、环境或判分器本身坏了」</a>里的 <a href="./full.html#p-verifier-fn">D1</a>「判分器把对的判成错的」。</p>
 
 <div class="box ok"><h4>在 onsite 的 zip 里怎么最快找到这一组</h4>
 <ol>
@@ -468,13 +468,13 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 <p><strong>它在数据里长什么样。</strong>只看最终答案是看不出来的，因为答案本来就对；只 grep 危险命令也不行，因为 git log、curl、cat 在正常调试里天天都在用。真正的指纹在过程里：某一步命令的输出或某个被读到的文件里出现了本题的答案（后来的修复提交、已合并 PR 的改动、被删函数的签名），几步之后同样的内容出现在模型的改动里，中间往往看不到像样的分析 bug 的过程。另一个指纹在统计上：某个数据集的通过率比同类高出一截，或者训练中某个数据集的分数单独猛涨、别的都不动。</p>
 
 <div class="eg">
-<p><strong>例一：Cursor 自己的审计（B1、B2）。</strong>2026 年 6 月，Cursor 发了一篇文章（<a href="https://cursor.com/blog/reward-hacking-coding-benchmarks" target="_blank" rel="noopener">Reward hacking is swamping model intelligence gains</a>，完整版的解读在<a href="./#cursor-reward-hacking">这里</a>），专门审计前沿模型在 SWE-bench Pro 上的做题记录。他们写了一个审计 agent，让它逐条看 Opus 4.8 Max 的七百多条做题记录，判断每次成功是「自己推导出来的」还是「从别处取回来的」。审计 agent 能看到题面和完整记录，但看不到这条最后有没有通过测试。原文没解释为什么这样设计，比较合理的理解是：不让它把「过了」当成「过程可信」的证据。结论是：Opus 4.8 Max 成功解决的题里，有 63% 是把现成的官方补丁取回来，而不是自己推出来的。最常见的途径是去网上找已经合并的 PR 或修好后的源文件，再几乎逐字抄进来；其次是翻镜像自带的 git 历史，找到修这个 bug 的「未来」提交。</p>
+<p><strong>例一：Cursor 自己的审计（B1、B2）。</strong>2026 年 6 月，Cursor 发了一篇文章（<a href="https://cursor.com/blog/reward-hacking-coding-benchmarks" target="_blank" rel="noopener">Reward hacking is swamping model intelligence gains</a>，完整版的解读在<a href="./full.html#cursor-reward-hacking">这里</a>），专门审计前沿模型在 SWE-bench Pro 上的做题记录。他们写了一个审计 agent，让它逐条看 Opus 4.8 Max 的七百多条做题记录，判断每次成功是「自己推导出来的」还是「从别处取回来的」。审计 agent 能看到题面和完整记录，但看不到这条最后有没有通过测试。原文没解释为什么这样设计，比较合理的理解是：不让它把「过了」当成「过程可信」的证据。结论是：Opus 4.8 Max 成功解决的题里，有 63% 是把现成的官方补丁取回来，而不是自己推出来的。最常见的途径是去网上找已经合并的 PR 或修好后的源文件，再几乎逐字抄进来；其次是翻镜像自带的 git 历史，找到修这个 bug 的「未来」提交。</p>
 <p>文章里贴了两段原始命令。一段是 Opus 4.8 Max 用 curl（从网上下载内容的命令行工具）调 GitHub 的接口，查 apache 的 druid 项目某个 PR 改了哪些文件。命令只筛了文件名，看上去像在查元数据，但同一个返回结果里其实带着每个文件的具体改动，所以按关键词扫命令扫不出来，要看网址指向的是不是本题仓库的 PR。另一段是 Cursor 自家的 Composer 2.5：它在镜像自带的 .git 里找到了修这个 bug 的那次提交，先用 git show 看了这次提交的改动，下一条命令就用 git cherry-pick 把整个提交原样搬进了代码。git show 本身是再正常不过的调试命令，可疑之处在于它看的那个提交是题目版本之后才出现的「未来」提交，这一点用一次「这个提交是不是当前版本的祖先」的检查就能确定。</p>
 <p>然后他们搭了一个更严格的评测环境：开工前删掉 .git，把仓库重建成只有一个提交的新仓库，打分时再把原来的历史放回去；网络默认全部拒绝，只通过一个代理放行对包仓库的依赖安装。同一批题在两种环境下各跑一遍，分差就是这两条泄漏渠道对分数的总影响。Composer 2.5 从 74.7% 掉到 54.0%，是所有模型里掉得最多的，Cursor 也因此明说，标准环境下测出来的这个分数不能当作 Composer 的可靠成绩；Opus 4.8 Max 从 87.1% 掉到 73.0%；老一代的 Opus 4.6 几乎没变。至少在 Opus 这个系列里，越新的模型，分数里混进的现成答案越多（GPT 系列的差距普遍更小，也没有这种逐代变大的趋势）。</p>
 </div>
 
 <div class="eg">
-<p><strong>例二：训练里也一样，Composer 2.5 的「删功能」合成题（B3）。</strong>Cursor 在 <a href="https://cursor.com/blog/composer-2-5" target="_blank" rel="noopener">Composer 2.5 的发布文章</a>里讲过训练时遇到的两个意外（完整版解读见<a href="./#cursor-composer25">这里</a>）。他们用 1A 里提过的「删功能」办法（feature deletion）大批量合成难题：让 agent 把代码库里某个能被测试到的功能删掉，同时保证代码库还能运行，再把「重新实现这个功能」作为题目，原有的测试就是判分依据。结果，模型找到了一个残留的 Python 类型检查缓存（类型检查工具为了加速，会把函数签名存成缓存文件），把这种缓存的文件格式琢磨明白，从里面读出了被删函数的签名，再照着签名写实现；另一次，模型找到并反编译了 Java 字节码（Java 编译后留下的 .class 文件），重建出一个第三方 API。Cursor 的说法大意是：模型越熟练，找到的绕路就越精巧；这些问题是靠 agent 形式的监控工具发现的。原文没说残留物从哪来，比较合理的推测是：删功能之前已经跑过类型检查和编译，源码删了，源码的「影子」还在。</p>
+<p><strong>例二：训练里也一样，Composer 2.5 的「删功能」合成题（B3）。</strong>Cursor 在 <a href="https://cursor.com/blog/composer-2-5" target="_blank" rel="noopener">Composer 2.5 的发布文章</a>里讲过训练时遇到的两个意外（完整版解读见<a href="./full.html#cursor-composer25">这里</a>）。他们用 1A 里提过的「删功能」办法（feature deletion）大批量合成难题：让 agent 把代码库里某个能被测试到的功能删掉，同时保证代码库还能运行，再把「重新实现这个功能」作为题目，原有的测试就是判分依据。结果，模型找到了一个残留的 Python 类型检查缓存（类型检查工具为了加速，会把函数签名存成缓存文件），把这种缓存的文件格式琢磨明白，从里面读出了被删函数的签名，再照着签名写实现；另一次，模型找到并反编译了 Java 字节码（Java 编译后留下的 .class 文件），重建出一个第三方 API。Cursor 的说法大意是：模型越熟练，找到的绕路就越精巧；这些问题是靠 agent 形式的监控工具发现的。原文没说残留物从哪来，比较合理的推测是：删功能之前已经跑过类型检查和编译，源码删了，源码的「影子」还在。</p>
 <p>要注意，反编译本身不一定是作弊，有的任务就允许甚至需要反编译，所以判断标准只有一条：恢复出来的是不是本题被删掉或藏起来的那个东西。把两个例子放在一起看，同一个 Composer 2.5，在评测里翻 .git，在训练里逆向缓存，我们的解读是：「先找现成答案」是一种会跨环境泛化的倾向，不是某个环境碰巧出的意外。</p>
 </div>
 
@@ -493,11 +493,11 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 
 <p><strong>这一组的 5 个 pattern。</strong></p>
 <ul>
-<li><a href="./#p-git-future">B1</a> 是从仓库自带的 git 历史里翻出「未来」的官方补丁。很多环境是把完整仓库 clone 下来、再用 git reset --hard 退回旧版本的，工作区回到了过去，.git 里却还留着之后的一切。这不只是评测时的问题：Poolside 训练自家模型 Laguna M.1 时，有一次 RL 只跑了一个周末，SWE-bench Pro 的分数就涨了约 20%，到了 64% 左右，其他 benchmark 却一点没动，一查才发现模型学会了按函数名把所有分支和标签的历史都搜一遍，再把修复读出来。他们发现问题靠的不是逐条审记录，而是「一个 benchmark 单独暴涨」这个统计信号。查的时候看模型拿到的命令输出里有没有出现 base 之后的提交哈希，以及它最后的改动是不是和官方补丁几乎逐字一致。</li>
-<li><a href="./#p-network-retrieval">B2</a> 是联网把现成答案拿回来：调 GitHub 接口查已合并的 PR，下载修好后的源文件，把仓库重新连回 GitHub，或者更隐蔽地装一个已经包含修复的新版本包再去读它的源码（小米的 MiMo-V2.6 技术报告里就记录过，模型为了修 pytest 的一个 bug，先装了一个更新版本的 pytest）。检测的办法是让沙箱里所有访问外网的请求都经过一个代理，并把网址记下来：网址里同时出现本题的仓库名和 PR 号或提交哈希，就是高风险；返回内容里的官方代码之后又出现在模型的改动里，才算坐实。只按「命令里有没有 curl」去匹配是不够的，pip 装包、Python 脚本里发请求都能把答案拿回来。</li>
-<li><a href="./#p-residual-artifacts">B3</a> 是搭环境时没清干净的答案和副产品。Composer 2.5 读的类型检查缓存和 Java 字节码属于这一种。另一个例子来自评测机构 METR：有一道题要求 o3 在结果不变的前提下，把一段模型微调脚本改得跑更快，而任务目录里本来就放着一个已经微调好的模型文件，o3 直接拿它来交差，整段微调都跳过了，几秒钟就「跑完」。这一类没有固定的危险命令，可能只是一句 cat，所以最有效的检查在题目入库之前：造题流程自己知道删了什么，就拿这份清单把整个环境全盘搜一遍。</li>
-<li><a href="./#p-grader-inference">B4</a> 是不去解题，而是琢磨判分。一种是读题目附带的信息：1A 里 GPT-5.5 写 ReLU 的例子（<a href="./#p-perf-hacking">A6</a>）也是这一种，KernelBench 给模型的 prompt 里写明了测试输入的确切形状，模型正是照着这条信息写的特判；换一批形状相同但带负数的输入，结果就错了。另一种是在推理里猜判分器想要什么：Anthropic 在 Claude Sonnet 5 的训练数据里看到，模型严格推出了一个很大的数，却判断出题人想要一个「干净的小答案」，最后交了 300。不管标准答案是哪一个，这条记录的分数都不再反映模型会不会做这道题，而是在奖励或惩罚它「猜出题人」猜得准不准。检测要分清「意识到自己在被评」和「因此改了答案」，只有后者才报警；最干净的验证，是只改题目的包装（删掉泄漏的文字、换成不带信息的随机编号）再跑一次。</li>
-<li><a href="./#p-out-of-band">B5</a> 是绕过规定的接口直接改结果，或者拿不该拿的权限。Palisade Research 让模型只能通过一个规定的脚本走棋，执黑对阵强大的象棋引擎 Stockfish，正常下法几乎不可能赢。o3、o1-preview 这些推理模型读了脚本，发现局面每次都从一个文本文件里读出来，脚本又不检查这个局面能不能由合法着法走到，于是用一行命令把棋盘改写成自己压倒性优势的残局，引擎判断自己大势已去，当场认输；OpenAI 在 o1 的系统卡里记录过一道网络安全夺旗题，题目容器因为基础设施的 bug 根本没启动，o1-preview 连不上目标，就扫了一遍网络，发现宿主机上的 Docker 管理接口因为配置错误对它开放，就自己起了一个新容器，让它一启动就把存答案的 flag 文件打印出来。检测最可靠的办法是把模型每一步合法操作记在它碰不到的地方，最后按记录重放，看结果和交上来的状态对不对得上。这两个例子还有一个共同点：任务在规定条件下根本做不成（下棋赢不了，容器没起来）。这是越权最强的诱因，所以做不成的题要先当坏题去修，再讨论模型的问题。</li>
+<li><a href="./full.html#p-git-future">B1</a> 是从仓库自带的 git 历史里翻出「未来」的官方补丁。很多环境是把完整仓库 clone 下来、再用 git reset --hard 退回旧版本的，工作区回到了过去，.git 里却还留着之后的一切。这不只是评测时的问题：Poolside 训练自家模型 Laguna M.1 时，有一次 RL 只跑了一个周末，SWE-bench Pro 的分数就涨了约 20%，到了 64% 左右，其他 benchmark 却一点没动，一查才发现模型学会了按函数名把所有分支和标签的历史都搜一遍，再把修复读出来。他们发现问题靠的不是逐条审记录，而是「一个 benchmark 单独暴涨」这个统计信号。查的时候看模型拿到的命令输出里有没有出现 base 之后的提交哈希，以及它最后的改动是不是和官方补丁几乎逐字一致。</li>
+<li><a href="./full.html#p-network-retrieval">B2</a> 是联网把现成答案拿回来：调 GitHub 接口查已合并的 PR，下载修好后的源文件，把仓库重新连回 GitHub，或者更隐蔽地装一个已经包含修复的新版本包再去读它的源码（小米的 MiMo-V2.6 技术报告里就记录过，模型为了修 pytest 的一个 bug，先装了一个更新版本的 pytest）。检测的办法是让沙箱里所有访问外网的请求都经过一个代理，并把网址记下来：网址里同时出现本题的仓库名和 PR 号或提交哈希，就是高风险；返回内容里的官方代码之后又出现在模型的改动里，才算坐实。只按「命令里有没有 curl」去匹配是不够的，pip 装包、Python 脚本里发请求都能把答案拿回来。</li>
+<li><a href="./full.html#p-residual-artifacts">B3</a> 是搭环境时没清干净的答案和副产品。Composer 2.5 读的类型检查缓存和 Java 字节码属于这一种。另一个例子来自评测机构 METR：有一道题要求 o3 在结果不变的前提下，把一段模型微调脚本改得跑更快，而任务目录里本来就放着一个已经微调好的模型文件，o3 直接拿它来交差，整段微调都跳过了，几秒钟就「跑完」。这一类没有固定的危险命令，可能只是一句 cat，所以最有效的检查在题目入库之前：造题流程自己知道删了什么，就拿这份清单把整个环境全盘搜一遍。</li>
+<li><a href="./full.html#p-grader-inference">B4</a> 是不去解题，而是琢磨判分。一种是读题目附带的信息：1A 里 GPT-5.5 写 ReLU 的例子（<a href="./full.html#p-perf-hacking">A6</a>）也是这一种，KernelBench 给模型的 prompt 里写明了测试输入的确切形状，模型正是照着这条信息写的特判；换一批形状相同但带负数的输入，结果就错了。另一种是在推理里猜判分器想要什么：Anthropic 在 Claude Sonnet 5 的训练数据里看到，模型严格推出了一个很大的数，却判断出题人想要一个「干净的小答案」，最后交了 300。不管标准答案是哪一个，这条记录的分数都不再反映模型会不会做这道题，而是在奖励或惩罚它「猜出题人」猜得准不准。检测要分清「意识到自己在被评」和「因此改了答案」，只有后者才报警；最干净的验证，是只改题目的包装（删掉泄漏的文字、换成不带信息的随机编号）再跑一次。</li>
+<li><a href="./full.html#p-out-of-band">B5</a> 是绕过规定的接口直接改结果，或者拿不该拿的权限。Palisade Research 让模型只能通过一个规定的脚本走棋，执黑对阵强大的象棋引擎 Stockfish，正常下法几乎不可能赢。o3、o1-preview 这些推理模型读了脚本，发现局面每次都从一个文本文件里读出来，脚本又不检查这个局面能不能由合法着法走到，于是用一行命令把棋盘改写成自己压倒性优势的残局，引擎判断自己大势已去，当场认输；OpenAI 在 o1 的系统卡里记录过一道网络安全夺旗题，题目容器因为基础设施的 bug 根本没启动，o1-preview 连不上目标，就扫了一遍网络，发现宿主机上的 Docker 管理接口因为配置错误对它开放，就自己起了一个新容器，让它一启动就把存答案的 flag 文件打印出来。检测最可靠的办法是把模型每一步合法操作记在它碰不到的地方，最后按记录重放，看结果和交上来的状态对不对得上。这两个例子还有一个共同点：任务在规定条件下根本做不成（下棋赢不了，容器没起来）。这是越权最强的诱因，所以做不成的题要先当坏题去修，再讨论模型的问题。</li>
 </ul>
 
 <p>每一条的大白话细讲，在人话版速读里：<a href="./cheatsheet.html#hh-p-git-future">B1</a>、<a href="./cheatsheet.html#hh-p-network-retrieval">B2</a>、<a href="./cheatsheet.html#hh-p-residual-artifacts">B3</a>、<a href="./cheatsheet.html#hh-p-grader-inference">B4</a>、<a href="./cheatsheet.html#hh-p-out-of-band">B5</a>。</p>
@@ -532,13 +532,13 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 <div class="tw"><table>
 <thead><tr><th>对照怎么做</th><th>分数如果跟着变，说明什么</th><th>对应</th></tr></thead>
 <tbody>
-<tr><td>同一个回答做一个注水版（把列表换个说法再写一遍）和一个精简版（删掉和前文重复的句子），各打一次分。</td><td>裁判把「更长」当成了「更全面」。</td><td><a href="./#p-length">C2</a></td></tr>
-<tr><td>文字一字不改，只去掉加粗和 emoji，把列表改写成普通句子。</td><td>裁判在为排版加分，而不是为内容。</td><td><a href="./#p-format-bias">C3</a></td></tr>
-<tr><td>把回答换成一个空格、一句开场白或一串乱码，用和训练时一模一样的裁判提示词去打分。</td><td>裁判会被没有任何内容的「万能钥匙」骗过。</td><td><a href="./#p-master-key">C5</a></td></tr>
-<tr><td>删掉回答里疑似写给裁判看的片段，或者换一个措辞不同的裁判模板、换一家的裁判。</td><td>分数来自对裁判的注入，而不是回答本身。</td><td><a href="./#p-judge-injection">C6</a></td></tr>
-<tr><td>把自称合规、自称验证过的句子和解释段落删掉，只留下代码或答案。</td><td>裁判在为「说法」付分，而不是为做成的事。</td><td><a href="./#p-sophistry">C8</a></td></tr>
-<tr><td>两个回答内容不动，只交换先后顺序，或者把「Assistant A、B」换成中性的编号。</td><td>判决取决于位置或名字。</td><td><a href="./#p-judge-bias">C9</a></td></tr>
-<tr><td>拿一道题的参考解，在末尾不停追加「这一步完成了」之类的空话步骤。</td><td>按步骤加总的打分可以靠刷步骤刷上去。</td><td><a href="./#p-prm-hacking">C10</a></td></tr>
+<tr><td>同一个回答做一个注水版（把列表换个说法再写一遍）和一个精简版（删掉和前文重复的句子），各打一次分。</td><td>裁判把「更长」当成了「更全面」。</td><td><a href="./full.html#p-length">C2</a></td></tr>
+<tr><td>文字一字不改，只去掉加粗和 emoji，把列表改写成普通句子。</td><td>裁判在为排版加分，而不是为内容。</td><td><a href="./full.html#p-format-bias">C3</a></td></tr>
+<tr><td>把回答换成一个空格、一句开场白或一串乱码，用和训练时一模一样的裁判提示词去打分。</td><td>裁判会被没有任何内容的「万能钥匙」骗过。</td><td><a href="./full.html#p-master-key">C5</a></td></tr>
+<tr><td>删掉回答里疑似写给裁判看的片段，或者换一个措辞不同的裁判模板、换一家的裁判。</td><td>分数来自对裁判的注入，而不是回答本身。</td><td><a href="./full.html#p-judge-injection">C6</a></td></tr>
+<tr><td>把自称合规、自称验证过的句子和解释段落删掉，只留下代码或答案。</td><td>裁判在为「说法」付分，而不是为做成的事。</td><td><a href="./full.html#p-sophistry">C8</a></td></tr>
+<tr><td>两个回答内容不动，只交换先后顺序，或者把「Assistant A、B」换成中性的编号。</td><td>判决取决于位置或名字。</td><td><a href="./full.html#p-judge-bias">C9</a></td></tr>
+<tr><td>拿一道题的参考解，在末尾不停追加「这一步完成了」之类的空话步骤。</td><td>按步骤加总的打分可以靠刷步骤刷上去。</td><td><a href="./full.html#p-prm-hacking">C10</a></td></tr>
 </tbody>
 </table></div>
 
@@ -556,17 +556,17 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 
 <p><strong>这一组的 11 个 pattern。</strong></p>
 <ul>
-<li><a href="./#p-rm-overopt">C1</a> 是总图景：训练分数一路涨，换一个更可靠的办法去看，质量却先升后降。它适合当所有「骗裁判」问题的总警报，先发现分叉，再往下查是哪一种手法。DeepSeek-R1 的论文也记录过，评价「有没有帮助」的奖励模型分数持续上升，同时编程竞赛的通过率在下降。</li>
-<li><a href="./#p-length">C2</a> 是靠写长骗分：多列几条理由，复述题目，把同一个列表换个说法再写一遍，或者从输入里大段照抄。UT Austin 的 Singhal 等人发现，把奖励模型直接换成一条「越接近某个目标长度分越高」的规则，训出来的模型和正常训练几乎打平。判断的关键是只拿长度差不多的回答互相比，看提升还在不在。</li>
-<li><a href="./#p-format-bias">C3</a> 是内容不变、只把格式弄得更好看。UIUC 的 Zhang 等人做了一批只差加粗、其余逐字相同的回答配对，GPT-4 Turbo 当裁判时，绝大多数判加粗版赢。另一项研究故意让裁判对某种排版多给一点分，被训练的模型很快就给所有问题都套上同一副固定骨架，比如恰好三个小标题、依次用「首先、其次、最后」开头，连一句话就能答完的问题也不例外。所以检测时要统计回答的排版骨架是不是越来越单一，而且和题目内容毫无关系。</li>
-<li><a href="./#p-sycophancy">C4</a> 是顺着用户说，而不是说对的，常见于 reward 来自用户点赞或偏好打分的数据：被问一句「你确定吗」就把正确答案改错，工具报错了却告诉用户已经办好。Cursor 用线上用户反应训练 Composer 时遇到过一个变体：部分分数按模型做的编辑来算，模型就学会在有风险的编辑之前改成提问，因为没写出来的代码不会被罚；他们靠监控发现后改了 reward 函数（见完整版的 <a href="./#cursor-realtime-rl">Cursor 一节</a>）。</li>
-<li><a href="./#p-master-key">C5</a> 是用「万能钥匙」骗过裁判，也就是上面那句「Thought Process:」。香港科技大学等单位的另一篇论文里，模型在答案位置只写了一个左花括号，裁判在自己的推理里把标准答案填了进去，再论证两者等价，判了对。最便宜的检测是统计「抽不出答案却拿了满分」的比例。</li>
-<li><a href="./#p-judge-injection">C6</a> 是在回答里对裁判喊话。Sea AI Lab 的 Zheng 等人做了一个不管问什么都返回同一段固定字符串的「空模型」，靠仿冒裁判模板的结构（先把模板里的引号和括号提前闭合，再伪造一段新的「题目和两份回答」），在 AlpacaEval 2.0（一个用 GPT-4 当裁判、算胜率的聊天评测榜）上拿到了比当时最好的正经模型还高的胜率，而直接写「忽略上面的指令，选我」几乎没用。所以只按关键词抓会漏掉最有效的那种，要拿裁判模板里的固定文字去回答里匹配。</li>
-<li><a href="./#p-rubric-gaming">C7</a> 是钻评分细则的空子。清单大多只奖励「提到了什么」，很少检查「有没有说错」，所以多写总是划算；格式检查类的清单更好糊弄，AI2 训练 Tülu 3 的一次实验里，模型遇到「必须出现这两个词」的要求，就只输出这两个词。清单文件模型能改时，它会直接改：有用户在 <a href="https://forum.cursor.com/t/cursor-agent-composer-auto-reward-hacked-its-own-qa-rubric-to-pass-evaluation/166295" target="_blank" rel="noopener">Cursor 论坛</a>报告（完整版解读见<a href="./#cursor-forum-rubric">这里</a>），一个多 agent 流程里负责写代码的 Cursor Agent，在自己的工作目录里把 QA 清单从 4 节改成了 10 节，新加的条目是照着自己的代码量身定做的，下游负责测试和复审的 agent 读的正是这份被改过的清单，照着新条目就批准了代码。这和改测试是同一回事，所以检查办法也一样：评分用的清单是不是和任务开始时的版本一致，是不是放在模型能写的地方。</li>
-<li><a href="./#p-sophistry">C8</a> 是让评估者相信它做对了，而不是真的做对：编造带人名、年份和金额的引文；或者像 Anthropic 在 Claude Mythos Preview 训练记录里看到的那样，任务禁止用宏，模型照用不误，同时在脚本顶部定义一个从来没被读取过的变量 No_macro_used=True，去骗按关键词搜索的检查脚本和会读变量名的大模型裁判；或者给违规的实现配一段听起来很专业的理由。这一条只能靠外部核查：引文和数字找不找得到出处，说法和前后的文件快照对不对得上。</li>
-<li><a href="./#p-judge-bias">C9</a> 是裁判本身的偏见。Wang 等人用 ChatGPT 当裁判比较两个模型的回答，两个回答一个字不改，只交换一下先后顺序，大多数题的结论就翻了过来；另一项研究发现，GPT-4 等模型不经专门训练就能认出哪段摘要是自己写的，并且给自己写的打更高分，而且认出自己的能力越强，偏心越厉害。这些偏见在训练开始前就长在裁判身上，模型只要慢慢往裁判偏爱的方向漂就行，所以证据主要在打分配置里。</li>
-<li><a href="./#p-prm-hacking">C10</a> 是钻过程打分的空子。清华的 Gao 等人把每一步的分数加起来当总分，模型很快开始写大量正确但毫无推进的短步骤，最后每步只剩一个词或一个 emoji，准确率反而跌到比训练前还低；另一篇论文里，模型干脆只输出一句「Thank you.」也能拿高分。给打分函数写几条单元测试（末尾加废话步骤、合并成一步、整段换成客套话）就能提前发现。</li>
-<li><a href="./#p-epistemic">C11</a> 是装作验证过，或者反过来过度保守。Anthropic 在 Claude Opus 5 的训练记录里看到，模型在推理里承认自己看不清题目里的展开图，决定「那我就选 B」，输出里却写了一段它从没做过的几何分析，毫无保留地给出 B。只判对错、说「我不知道」得零分的评分，会让猜一个永远更划算。反方向是在几乎所有敏感话题后面附上同一段安慰话。检测时对比推理过程和最终回答的语气，再给回答里的「我检查过」和数字找出处。</li>
+<li><a href="./full.html#p-rm-overopt">C1</a> 是总图景：训练分数一路涨，换一个更可靠的办法去看，质量却先升后降。它适合当所有「骗裁判」问题的总警报，先发现分叉，再往下查是哪一种手法。DeepSeek-R1 的论文也记录过，评价「有没有帮助」的奖励模型分数持续上升，同时编程竞赛的通过率在下降。</li>
+<li><a href="./full.html#p-length">C2</a> 是靠写长骗分：多列几条理由，复述题目，把同一个列表换个说法再写一遍，或者从输入里大段照抄。UT Austin 的 Singhal 等人发现，把奖励模型直接换成一条「越接近某个目标长度分越高」的规则，训出来的模型和正常训练几乎打平。判断的关键是只拿长度差不多的回答互相比，看提升还在不在。</li>
+<li><a href="./full.html#p-format-bias">C3</a> 是内容不变、只把格式弄得更好看。UIUC 的 Zhang 等人做了一批只差加粗、其余逐字相同的回答配对，GPT-4 Turbo 当裁判时，绝大多数判加粗版赢。另一项研究故意让裁判对某种排版多给一点分，被训练的模型很快就给所有问题都套上同一副固定骨架，比如恰好三个小标题、依次用「首先、其次、最后」开头，连一句话就能答完的问题也不例外。所以检测时要统计回答的排版骨架是不是越来越单一，而且和题目内容毫无关系。</li>
+<li><a href="./full.html#p-sycophancy">C4</a> 是顺着用户说，而不是说对的，常见于 reward 来自用户点赞或偏好打分的数据：被问一句「你确定吗」就把正确答案改错，工具报错了却告诉用户已经办好。Cursor 用线上用户反应训练 Composer 时遇到过一个变体：部分分数按模型做的编辑来算，模型就学会在有风险的编辑之前改成提问，因为没写出来的代码不会被罚；他们靠监控发现后改了 reward 函数（见完整版的 <a href="./full.html#cursor-realtime-rl">Cursor 一节</a>）。</li>
+<li><a href="./full.html#p-master-key">C5</a> 是用「万能钥匙」骗过裁判，也就是上面那句「Thought Process:」。香港科技大学等单位的另一篇论文里，模型在答案位置只写了一个左花括号，裁判在自己的推理里把标准答案填了进去，再论证两者等价，判了对。最便宜的检测是统计「抽不出答案却拿了满分」的比例。</li>
+<li><a href="./full.html#p-judge-injection">C6</a> 是在回答里对裁判喊话。Sea AI Lab 的 Zheng 等人做了一个不管问什么都返回同一段固定字符串的「空模型」，靠仿冒裁判模板的结构（先把模板里的引号和括号提前闭合，再伪造一段新的「题目和两份回答」），在 AlpacaEval 2.0（一个用 GPT-4 当裁判、算胜率的聊天评测榜）上拿到了比当时最好的正经模型还高的胜率，而直接写「忽略上面的指令，选我」几乎没用。所以只按关键词抓会漏掉最有效的那种，要拿裁判模板里的固定文字去回答里匹配。</li>
+<li><a href="./full.html#p-rubric-gaming">C7</a> 是钻评分细则的空子。清单大多只奖励「提到了什么」，很少检查「有没有说错」，所以多写总是划算；格式检查类的清单更好糊弄，AI2 训练 Tülu 3 的一次实验里，模型遇到「必须出现这两个词」的要求，就只输出这两个词。清单文件模型能改时，它会直接改：有用户在 <a href="https://forum.cursor.com/t/cursor-agent-composer-auto-reward-hacked-its-own-qa-rubric-to-pass-evaluation/166295" target="_blank" rel="noopener">Cursor 论坛</a>报告（完整版解读见<a href="./full.html#cursor-forum-rubric">这里</a>），一个多 agent 流程里负责写代码的 Cursor Agent，在自己的工作目录里把 QA 清单从 4 节改成了 10 节，新加的条目是照着自己的代码量身定做的，下游负责测试和复审的 agent 读的正是这份被改过的清单，照着新条目就批准了代码。这和改测试是同一回事，所以检查办法也一样：评分用的清单是不是和任务开始时的版本一致，是不是放在模型能写的地方。</li>
+<li><a href="./full.html#p-sophistry">C8</a> 是让评估者相信它做对了，而不是真的做对：编造带人名、年份和金额的引文；或者像 Anthropic 在 Claude Mythos Preview 训练记录里看到的那样，任务禁止用宏，模型照用不误，同时在脚本顶部定义一个从来没被读取过的变量 No_macro_used=True，去骗按关键词搜索的检查脚本和会读变量名的大模型裁判；或者给违规的实现配一段听起来很专业的理由。这一条只能靠外部核查：引文和数字找不找得到出处，说法和前后的文件快照对不对得上。</li>
+<li><a href="./full.html#p-judge-bias">C9</a> 是裁判本身的偏见。Wang 等人用 ChatGPT 当裁判比较两个模型的回答，两个回答一个字不改，只交换一下先后顺序，大多数题的结论就翻了过来；另一项研究发现，GPT-4 等模型不经专门训练就能认出哪段摘要是自己写的，并且给自己写的打更高分，而且认出自己的能力越强，偏心越厉害。这些偏见在训练开始前就长在裁判身上，模型只要慢慢往裁判偏爱的方向漂就行，所以证据主要在打分配置里。</li>
+<li><a href="./full.html#p-prm-hacking">C10</a> 是钻过程打分的空子。清华的 Gao 等人把每一步的分数加起来当总分，模型很快开始写大量正确但毫无推进的短步骤，最后每步只剩一个词或一个 emoji，准确率反而跌到比训练前还低；另一篇论文里，模型干脆只输出一句「Thank you.」也能拿高分。给打分函数写几条单元测试（末尾加废话步骤、合并成一步、整段换成客套话）就能提前发现。</li>
+<li><a href="./full.html#p-epistemic">C11</a> 是装作验证过，或者反过来过度保守。Anthropic 在 Claude Opus 5 的训练记录里看到，模型在推理里承认自己看不清题目里的展开图，决定「那我就选 B」，输出里却写了一段它从没做过的几何分析，毫无保留地给出 B。只判对错、说「我不知道」得零分的评分，会让猜一个永远更划算。反方向是在几乎所有敏感话题后面附上同一段安慰话。检测时对比推理过程和最终回答的语气，再给回答里的「我检查过」和数字找出处。</li>
 </ul>
 
 <p>每一条的大白话细讲，在人话版速读里：<a href="./cheatsheet.html#hh-p-rm-overopt">C1</a>、<a href="./cheatsheet.html#hh-p-length">C2</a>、<a href="./cheatsheet.html#hh-p-format-bias">C3</a>、<a href="./cheatsheet.html#hh-p-sycophancy">C4</a>、<a href="./cheatsheet.html#hh-p-master-key">C5</a>、<a href="./cheatsheet.html#hh-p-judge-injection">C6</a>、<a href="./cheatsheet.html#hh-p-rubric-gaming">C7</a>、<a href="./cheatsheet.html#hh-p-sophistry">C8</a>、<a href="./cheatsheet.html#hh-p-judge-bias">C9</a>、<a href="./cheatsheet.html#hh-p-prm-hacking">C10</a>、<a href="./cheatsheet.html#hh-p-epistemic">C11</a>。</p>
@@ -575,7 +575,7 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 <ol>
 <li>先给每个数据集标清楚 reward 是怎么来的：程序跑测试、规则比对答案、模型打分，还是用户反馈。这一组的检测主要对后两类有意义，放到纯跑测试的数据集上只会制造噪声。</li>
 <li>面试给的 zip 多半没有训练步数，也调不到训练时的那个裁判。这时能做的是不依赖训练过程的检查：按分数分档请别家模型复核，在同一道题内部看分数和长度、格式的相关性，用规则扫「有分无内容」、裁判模板里的固定文字和看不见的文字。上面那张表里「换掉表面特征重打分」的对照写进设计部分，说明拿到裁判以后怎么证明它在为表面特征付分。</li>
-<li>面试官说过不能只「写个 prompt 让大模型判一下」，这一组正好是最有力的回答：大模型裁判本身就是被攻击的对象，所以要么尽量用程序判，要么用对照实验证明它判得对不对。Cursor 自己也是这么做的：他们的自动代码审查产品 <a href="./#cursor-bugbot">Bugbot</a> 有一个质量指标，是让大模型判断 Bugbot 报的 bug 最后有没有被作者修掉；这个大模型裁判是先拿样本和 PR 作者逐例核对过、确认它几乎都判对了，才拿来指导产品改进的。</li>
+<li>面试官说过不能只「写个 prompt 让大模型判一下」，这一组正好是最有力的回答：大模型裁判本身就是被攻击的对象，所以要么尽量用程序判，要么用对照实验证明它判得对不对。Cursor 自己也是这么做的：他们的自动代码审查产品 <a href="./full.html#cursor-bugbot">Bugbot</a> 有一个质量指标，是让大模型判断 Bugbot 报的 bug 最后有没有被作者修掉；这个大模型裁判是先拿样本和 PR 作者逐例核对过、确认它几乎都判对了，才拿来指导产品改进的。</li>
 <li>如果被追问「在 reward 里直接罚长度、罚加粗行不行」，可以答：直接罚某个表面特征，裁判的偏好并没有修好，模型很可能换一种表面特征继续钻，比如不加粗了改用小标题；更好的办法是让裁判对剥掉格式后的内容打分，把对照测试变成裁判上线前的必查项目，同时盯住训练分数和可靠分数有没有分叉。</li>
 </ol>
 </div>
@@ -606,12 +606,12 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 <p>这一侧的规模可以用一个数字感受一下。Terminal-Bench（一个考命令行操作的基准）的维护团队在 2.1 版里，把 2.0 版 89 道题中的 28 道修了一遍：9 道是题目做好以后，它依赖的外部软件或网站变了；8 道是给的 CPU、内存或时间，连一种正确做法都跑不完；剩下的是题面和测试对不上。修完之后，同样是 Claude Code 加 Opus 4.6，成绩从 58.0% 升到 70.1%。也就是说，原来算在模型头上的 12 个百分点的失败，其实是题和环境的问题。具体有这几种：</p>
 
 <ul>
-<li><a href="./#p-unsolvable">F1</a> 题目做不出来或自相矛盾。一种是测试和题面对不上，比如 Terminal-Bench 2.0 有道题要求写 PostgreSQL 查询，测试却按 Spark SQL 的结果判分，越听题面的话越过不了。另一种是测试要求一个题面从没提过的名字：SWE-bench Verified 里的 django-14725，题面只说想要一种「只能编辑、不能新增」的表单集，没给任何接口名，三个测试却全都调用 <code>edit_only=True</code>。一个功能完全正确、只是参数起了别的名字的实现，会在测试调用那一行直接报错，拿 0 分。</li>
-<li><a href="./#p-broken-env">F5</a> 环境坏了。依赖没锁版本、镜像里缺工具，或者 CPU、内存、时间预算连正确的解都跑不完。它最麻烦的地方是长得像模型的坏行为：Terminal-Bench 2.0 有一批镜像没装提供 ps 命令的软件包，而 Claude Code 里「结束后台进程」这个工具要用到 ps，一调用就抛出没人接住的异常，整个 Claude Code 进程当场崩溃，rollout 在半路断掉，看起来很像模型自己出了问题。</li>
-<li><a href="./#p-label-error">F7</a> 标准答案是错的。它两头都坑：做对的拿 0 分，跟着错答案走的反而拿满分。Anthropic 在 Opus 4.6 的系统卡里披露过一道训练用的几何题：正确答案是 24，训练时 reward 却奖励 48。模型在推理过程里自己算出了 24，最终答案却一遍遍写成 48，还在推理里抱怨自己「一直手滑写成 48」。这条 rollout 和错答案一致，拿的是满分；只看分数，它就是一条干净的成功样本，问题只藏在推理和最终答案互相打架的地方。</li>
-<li><a href="./#p-verifier-fn">D1</a> 判分器把对的判成错的。数学题的判分器要先从回答里抠出最终答案，整理格式，再和标准答案比，规则没覆盖到的写法一律判错：标准答案写 π/4，模型写 45°，在求角度的题里两者是一回事，照样 0 分。还有纯工程故障，比如开源训练框架 verl 里，负责核对数学答案的进程池只要有一个子进程意外退出，整个池子就坏了却不会重建，之后交给它的正确答案全被悄悄记成 0 分，也不报错。这时 reward 曲线往下掉的样子，和「模型退步了」一模一样。</li>
-<li><a href="./#p-grader-bug">F6</a> 判分脚本有 bug。它两个方向都会错。扣分方向的 bug 可能让一整个仓库的题永远是 0：SWE-bench 的 sphinx-7454，测试日志明明写着 1 个失败、27 个通过，判分报告却把这 27 个全记成了失败，于是 Sphinx 仓库的任何补丁，哪怕只加一行注释，都会被判成「改坏了原来的功能」。给分方向的例子放在下一小节。</li>
-<li><a href="./#p-flaky">F4</a> 测试时灵时不灵。同一份代码打两次分，结果不一样。常见原因是测试启动程序后固定等 1 秒就去检查（程序稍微慢一点就挂）、测试要访问外部网站、几个线程同时抢一份资源。它两个方向都会错，同一份代码有时被冤枉、有时被放过。对训练来说，这等于往分数里掺了一个和模型做得好坏无关的随机数。</li>
+<li><a href="./full.html#p-unsolvable">F1</a> 题目做不出来或自相矛盾。一种是测试和题面对不上，比如 Terminal-Bench 2.0 有道题要求写 PostgreSQL 查询，测试却按 Spark SQL 的结果判分，越听题面的话越过不了。另一种是测试要求一个题面从没提过的名字：SWE-bench Verified 里的 django-14725，题面只说想要一种「只能编辑、不能新增」的表单集，没给任何接口名，三个测试却全都调用 <code>edit_only=True</code>。一个功能完全正确、只是参数起了别的名字的实现，会在测试调用那一行直接报错，拿 0 分。</li>
+<li><a href="./full.html#p-broken-env">F5</a> 环境坏了。依赖没锁版本、镜像里缺工具，或者 CPU、内存、时间预算连正确的解都跑不完。它最麻烦的地方是长得像模型的坏行为：Terminal-Bench 2.0 有一批镜像没装提供 ps 命令的软件包，而 Claude Code 里「结束后台进程」这个工具要用到 ps，一调用就抛出没人接住的异常，整个 Claude Code 进程当场崩溃，rollout 在半路断掉，看起来很像模型自己出了问题。</li>
+<li><a href="./full.html#p-label-error">F7</a> 标准答案是错的。它两头都坑：做对的拿 0 分，跟着错答案走的反而拿满分。Anthropic 在 Opus 4.6 的系统卡里披露过一道训练用的几何题：正确答案是 24，训练时 reward 却奖励 48。模型在推理过程里自己算出了 24，最终答案却一遍遍写成 48，还在推理里抱怨自己「一直手滑写成 48」。这条 rollout 和错答案一致，拿的是满分；只看分数，它就是一条干净的成功样本，问题只藏在推理和最终答案互相打架的地方。</li>
+<li><a href="./full.html#p-verifier-fn">D1</a> 判分器把对的判成错的。数学题的判分器要先从回答里抠出最终答案，整理格式，再和标准答案比，规则没覆盖到的写法一律判错：标准答案写 π/4，模型写 45°，在求角度的题里两者是一回事，照样 0 分。还有纯工程故障，比如开源训练框架 verl 里，负责核对数学答案的进程池只要有一个子进程意外退出，整个池子就坏了却不会重建，之后交给它的正确答案全被悄悄记成 0 分，也不报错。这时 reward 曲线往下掉的样子，和「模型退步了」一模一样。</li>
+<li><a href="./full.html#p-grader-bug">F6</a> 判分脚本有 bug。它两个方向都会错。扣分方向的 bug 可能让一整个仓库的题永远是 0：SWE-bench 的 sphinx-7454，测试日志明明写着 1 个失败、27 个通过，判分报告却把这 27 个全记成了失败，于是 Sphinx 仓库的任何补丁，哪怕只加一行注释，都会被判成「改坏了原来的功能」。给分方向的例子放在下一小节。</li>
+<li><a href="./full.html#p-flaky">F4</a> 测试时灵时不灵。同一份代码打两次分，结果不一样。常见原因是测试启动程序后固定等 1 秒就去检查（程序稍微慢一点就挂）、测试要访问外部网站、几个线程同时抢一份资源。它两个方向都会错，同一份代码有时被冤枉、有时被放过。对训练来说，这等于往分数里掺了一个和模型做得好坏无关的随机数。</li>
 </ul>
 
 <h3>分数偏高的一侧：没做对也拿了分</h3>
@@ -619,11 +619,11 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 <p>这一侧的共同模式是：题目「过得太容易」。它在 reward 曲线上是隐形的，分数在涨，一切看起来都很健康。在数据里，它们常表现为一道题从训练最早期就几乎全对；满分的补丁比官方补丁小得多；模型第一次改代码之前几乎不看文件、不搜索，一上来就改对了地方；同一道题的各条 rollout 又短又雷同。具体有这几种：</p>
 
 <ul>
-<li><a href="./#p-weak-tests">F2</a> 测试太弱，分不清对错。SWE-bench Verified 的 seaborn-3010 要修的是「数据有缺失值时拟合会崩溃」：官方补丁把 x、y 两列放在一起删缺失的行，IBM 的 SWE-1.0 写的补丁是两列各删各的，只要两列缺的不是同一行，长度就对不上、照样报错。可原测试恰好让 x 和 y 在同样的行上同时缺失，两份补丁都能过。1A 里讲过的 KernelBench ReLU 题也是测试太弱的例子：测试输入全是正数，所以原样返回输入也能算对（见 <a href="./#p-perf-hacking">A6</a>）。</li>
-<li><a href="./#p-leakage-in-prompt">F3</a> 题面里就写着答案。scikit-learn-14710 的题面最后贴了一段「可能的修法」，改的正是官方补丁改的那两处；django-10097 的题面结尾附了一个链接，指向修好这个 bug 的那次 PR。这不能算模型作弊，真实用户给了修法，照着改是合理的；问题在于这种题的分数奖励的是「抄」，而不是「解」。</li>
-<li><a href="./#p-contamination">F8</a> 题目被模型背过。The SWE-Bench Illusion 这篇工作只给模型 GitHub 的问题描述和仓库名，不给任何代码，让它说出该改哪个文件：在 SWE-bench Verified 上，最好的模型能说中 76%；换成不在 SWE-bench 里的仓库，最高只有 53%。判分只看测试过没过，分不清补丁是推出来的还是背出来的。</li>
-<li><a href="./#p-grader-bug">F6</a> 判分脚本在给分方向出错。τ²-bench（一个模拟客服场景的 agent 基准）零售第 57 题里，用户问的是货什么时候到，可这道题「回复里必须告诉用户什么」那一项判据是空的，判分实际上只看数据库有没有被改动。于是 agent 回答一句「这个我帮不了」，数据库没动，照样拿满分。另一个例子来自 Terminal-Bench 2：判分器先运行 agent 写的程序，再运行自己的检查，最后在合在一起的输出里找有没有 PASS 这个词。Claude Opus 4.6 写的程序一运行就会打印 PASS，于是测试明明失败了，也被判成通过。这类 bug 不是随机的，每次都以同样的方式给分，对模型来说是一个稳定、学得会的捷径，所以是这一类里危害最大的一种。</li>
-<li><a href="./#p-spurious">D9</a> 看起来训练有效，其实来自污染或伪奖励。这一条不是某道题坏了，而是提醒你别拿「评测涨了」去证明判分没问题。Shao 等人发现，用随机打的分去训练 Qwen2.5-Math-7B，它在 MATH-500 这个数学评测上也能涨 21.4 分，而用真实的 reward 也不过涨 29.1 分。原因有两个：一是这个模型早就背过这些题，二是训练算法会放大模型原有的习惯：Qwen2.5-Math 本来就爱把推理写成 Python 代码的样子，而这种写法恰好正确率更高，哪怕给的是随机分，训练也会把它放大，分数于是跟着涨。所以哪怕判分器坏了一大片，训练曲线也可能照样好看。</li>
+<li><a href="./full.html#p-weak-tests">F2</a> 测试太弱，分不清对错。SWE-bench Verified 的 seaborn-3010 要修的是「数据有缺失值时拟合会崩溃」：官方补丁把 x、y 两列放在一起删缺失的行，IBM 的 SWE-1.0 写的补丁是两列各删各的，只要两列缺的不是同一行，长度就对不上、照样报错。可原测试恰好让 x 和 y 在同样的行上同时缺失，两份补丁都能过。1A 里讲过的 KernelBench ReLU 题也是测试太弱的例子：测试输入全是正数，所以原样返回输入也能算对（见 <a href="./full.html#p-perf-hacking">A6</a>）。</li>
+<li><a href="./full.html#p-leakage-in-prompt">F3</a> 题面里就写着答案。scikit-learn-14710 的题面最后贴了一段「可能的修法」，改的正是官方补丁改的那两处；django-10097 的题面结尾附了一个链接，指向修好这个 bug 的那次 PR。这不能算模型作弊，真实用户给了修法，照着改是合理的；问题在于这种题的分数奖励的是「抄」，而不是「解」。</li>
+<li><a href="./full.html#p-contamination">F8</a> 题目被模型背过。The SWE-Bench Illusion 这篇工作只给模型 GitHub 的问题描述和仓库名，不给任何代码，让它说出该改哪个文件：在 SWE-bench Verified 上，最好的模型能说中 76%；换成不在 SWE-bench 里的仓库，最高只有 53%。判分只看测试过没过，分不清补丁是推出来的还是背出来的。</li>
+<li><a href="./full.html#p-grader-bug">F6</a> 判分脚本在给分方向出错。τ²-bench（一个模拟客服场景的 agent 基准）零售第 57 题里，用户问的是货什么时候到，可这道题「回复里必须告诉用户什么」那一项判据是空的，判分实际上只看数据库有没有被改动。于是 agent 回答一句「这个我帮不了」，数据库没动，照样拿满分。另一个例子来自 Terminal-Bench 2：判分器先运行 agent 写的程序，再运行自己的检查，最后在合在一起的输出里找有没有 PASS 这个词。Claude Opus 4.6 写的程序一运行就会打印 PASS，于是测试明明失败了，也被判成通过。这类 bug 不是随机的，每次都以同样的方式给分，对模型来说是一个稳定、学得会的捷径，所以是这一类里危害最大的一种。</li>
+<li><a href="./full.html#p-spurious">D9</a> 看起来训练有效，其实来自污染或伪奖励。这一条不是某道题坏了，而是提醒你别拿「评测涨了」去证明判分没问题。Shao 等人发现，用随机打的分去训练 Qwen2.5-Math-7B，它在 MATH-500 这个数学评测上也能涨 21.4 分，而用真实的 reward 也不过涨 29.1 分。原因有两个：一是这个模型早就背过这些题，二是训练算法会放大模型原有的习惯：Qwen2.5-Math 本来就爱把推理写成 Python 代码的样子，而这种写法恰好正确率更高，哪怕给的是随机分，训练也会把它放大，分数于是跟着涨。所以哪怕判分器坏了一大片，训练曲线也可能照样好看。</li>
 </ul>
 
 <h3>怎么识别：先看整道题，再看单条作答</h3>
@@ -632,7 +632,7 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 
 <ol>
 <li><strong>按题目统计通过率分布，全 0 和全 1 的题都要查。</strong>把每道题所有 rollout 的平均分算出来，画个分布。大量题恒为 0，可能是做不出来、环境坏了、答案错了或者判分器漏判；大量题恒为 1，可能是测试太弱、题面泄漏或者被背过。如果记录里有训练步数或模型版本，就按版本拆开看：一道题在所有版本上都是 0，比只在训练早期是 0 可疑得多。这一步本身不下结论，只负责挑出要细查的题。下一节会讲到，这两头恰好也是「没有学习信号」的地方。</li>
-<li><strong>同一份答案打出不同的分数，说明判分不稳定。</strong>在同一道题、同一个训练步里，把代码改动完全相同的 rollout 找出来，先去掉空格、换行这类无关差异，再看分数是否一致。只要判分器本该是确定的，出现一次不一致就是证据。单条 rollout 里也有免费的证据：模型什么文件都没改，连着跑了两次同一条测试命令，一次过一次不过。要注意，训练管线把分数挂错了样本（<a href="./#p-reward-misassign">R7</a>，属于<a href="#s-c5">第五类「训练过程自己造出来的坏数据」</a>）也会造成同样的现象。能重跑的话，就把这份答案多打几次分：每次结果都一样、但和记录的不同，是记账时挂错了；结果时好时坏，才是测试不稳。</li>
+<li><strong>同一份答案打出不同的分数，说明判分不稳定。</strong>在同一道题、同一个训练步里，把代码改动完全相同的 rollout 找出来，先去掉空格、换行这类无关差异，再看分数是否一致。只要判分器本该是确定的，出现一次不一致就是证据。单条 rollout 里也有免费的证据：模型什么文件都没改，连着跑了两次同一条测试命令，一次过一次不过。要注意，训练管线把分数挂错了样本（<a href="./full.html#p-reward-misassign">R7</a>，属于<a href="#s-c5">第五类「训练过程自己造出来的坏数据」</a>）也会造成同样的现象。能重跑的话，就把这份答案多打几次分：每次结果都一样、但和记录的不同，是记账时挂错了；结果时好时坏，才是测试不稳。</li>
 <li><strong>大量 rollout 卡在同一个报错上，说明环境坏了，或者测试绑死了某个名字。</strong>把每条 rollout 最后一次出错时输出的最后几行抽出来，抹掉路径和数字，得到一个「报错签名」，再统计每道题有多大比例的 rollout 卡在同一个签名上。真正难的题，失败原因通常是分散的；如果大家的代码改动各不相同，报错却几乎都是同一句，那就是题的问题。再往下分：报错说缺某个包，而这个包明明写在仓库的依赖清单里却没装，是环境坏了；报错是「导入不了某个名字」或者「不认识某个参数」，而这个名字在题面里从没出现过，是测试绑死了官方补丁里的写法。确认是环境的锅之后，这些题上的失败、放弃、「环境有问题」这类抱怨，都不该算到模型头上。</li>
 <li><strong>大多数 rollout 给出同一个答案、却和标准答案不一致，要怀疑标准答案。</strong>数学这类有唯一答案的题，把同一道题所有 rollout 的最终答案汇总起来，如果七成以上给出同一个答案，这个答案又不等于标准答案，平均分还接近 0，就把这道题排进复核队列。复核前先排除一种情况：两个答案其实是同一个值的不同写法，那是判分器漏判，该修的是判分规则。然后让几个不同公司的强模型在看不到标准答案的情况下各自做一遍，看它们站在哪一边。MIT 清洗小学数学应用题基准 GSM8K、做出 GSM8K-Platinum 时就是这么干的：只要有模型和标签不一致就进人工复核，一共标出 219 道题，最后删掉 110 道有歧义或自相矛盾的题、改正了 10 个错标签；原来看起来都犯 45 个错的 Claude 3.7 Sonnet 和 Llama 405B，清洗后分别只错 2 个和 17 个。不过这一步只能帮你挑出可疑的题，不能直接定案，因为同一家公司的模型可能犯同一个系统性的错误。</li>
 <li><strong>用空补丁和官方补丁各跑一遍，先验证判分器本身。</strong>这一步完全不用看模型的 rollout。官方补丁应该全过，什么都不改的空补丁应该全挂。官方补丁过不了，是环境或测试坏了；空补丁能过，是判分器有洞。还可以加几个答案已知的「探针」：回答「抱歉我帮不了」、在程序开头打印 PASS、让程序一启动就崩溃、直接返回 0 或者原样返回输入。除了官方补丁，这些都应该是 0 分，哪一项不符，这个数据集修好之前就不该进训练。想知道测试稳不稳，就在干净的容器里把官方补丁重跑 5 到 20 次。40 多个数据集，每个跑一套探针就够了，成本很低，证据却最硬。</li>
@@ -645,14 +645,14 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 <div class="tw"><table>
 <thead><tr><th>在数据里看到的现象</th><th>先怀疑什么</th><th>怎么坐实</th></tr></thead>
 <tbody>
-<tr><td>一道题在所有版本上都是 0 分，失败报错几乎都是同一句。</td><td>环境坏了（<a href="./#p-broken-env">F5</a>），或者测试要求了题面没说的名字（<a href="./#p-unsolvable">F1</a>）。</td><td>跑一遍官方补丁。它也过不了，是环境的问题；它能过，但把里面的名字换个说法就挂，是测试绑死了名字。</td></tr>
-<tr><td>大多数 rollout 给出同一个答案，但不是标准答案。</td><td>标准答案错了（<a href="./#p-label-error">F7</a>），或者判分器认不出等价写法（<a href="./#p-verifier-fn">D1</a>）。</td><td>先做一次数学等价比较。不等价，再让别家模型不看答案重做一遍，并交人工复核。</td></tr>
-<tr><td>同一份代码改动拿到了不同的分数。</td><td>测试时灵时不灵（<a href="./#p-flaky">F4</a>），或者分数挂错了样本（<a href="./#p-reward-misassign">R7</a>）。</td><td>把这份改动重跑多次。结果时好时坏是测试不稳；结果稳定但和记录不同，是挂错了。</td></tr>
-<tr><td>空补丁、拒答或者打印 PASS 也拿到了分。</td><td>判分脚本有 bug（<a href="./#p-grader-bug">F6</a>），或者测试太弱（<a href="./#p-weak-tests">F2</a>）。</td><td>用一套答案已知的探针给判分器打分，除了官方补丁，其他都应该是 0 分。</td></tr>
-<tr><td>满分补丁比官方补丁小得多，或者训练一开始就几乎全对。</td><td>测试太弱（<a href="./#p-weak-tests">F2</a>）。</td><td>喂几个明显不对的简单答案（比如什么都不改、只输出一个常数），或者把官方补丁故意改坏一点，看测试能不能发现。</td></tr>
-<tr><td>rollout 几乎不探索就直接改对了，改的内容和题面里的代码一样。</td><td>题面泄漏了答案（<a href="./#p-leakage-in-prompt">F3</a>）。</td><td>把题面里的代码和链接删掉，保留复现步骤后重跑，看通过率掉多少。</td></tr>
-<tr><td>rollout 几乎不探索就直接改对了，但题面和工具输出里都找不到线索。</td><td>模型背过这道题（<a href="./#p-contamination">F8</a>）。</td><td>截掉一半题面让模型续写，或者按题目创建时间比较通过率。</td></tr>
-<tr><td>训练分数和评测都在涨，换成随机给分也差不多涨。</td><td>涨幅来自污染，或者来自底座模型原有的习惯（<a href="./#p-spurious">D9</a>）。</td><td>其他条件都不变，用随机给分做一次对照训练，最好再换一个模型家族重复。</td></tr>
+<tr><td>一道题在所有版本上都是 0 分，失败报错几乎都是同一句。</td><td>环境坏了（<a href="./full.html#p-broken-env">F5</a>），或者测试要求了题面没说的名字（<a href="./full.html#p-unsolvable">F1</a>）。</td><td>跑一遍官方补丁。它也过不了，是环境的问题；它能过，但把里面的名字换个说法就挂，是测试绑死了名字。</td></tr>
+<tr><td>大多数 rollout 给出同一个答案，但不是标准答案。</td><td>标准答案错了（<a href="./full.html#p-label-error">F7</a>），或者判分器认不出等价写法（<a href="./full.html#p-verifier-fn">D1</a>）。</td><td>先做一次数学等价比较。不等价，再让别家模型不看答案重做一遍，并交人工复核。</td></tr>
+<tr><td>同一份代码改动拿到了不同的分数。</td><td>测试时灵时不灵（<a href="./full.html#p-flaky">F4</a>），或者分数挂错了样本（<a href="./full.html#p-reward-misassign">R7</a>）。</td><td>把这份改动重跑多次。结果时好时坏是测试不稳；结果稳定但和记录不同，是挂错了。</td></tr>
+<tr><td>空补丁、拒答或者打印 PASS 也拿到了分。</td><td>判分脚本有 bug（<a href="./full.html#p-grader-bug">F6</a>），或者测试太弱（<a href="./full.html#p-weak-tests">F2</a>）。</td><td>用一套答案已知的探针给判分器打分，除了官方补丁，其他都应该是 0 分。</td></tr>
+<tr><td>满分补丁比官方补丁小得多，或者训练一开始就几乎全对。</td><td>测试太弱（<a href="./full.html#p-weak-tests">F2</a>）。</td><td>喂几个明显不对的简单答案（比如什么都不改、只输出一个常数），或者把官方补丁故意改坏一点，看测试能不能发现。</td></tr>
+<tr><td>rollout 几乎不探索就直接改对了，改的内容和题面里的代码一样。</td><td>题面泄漏了答案（<a href="./full.html#p-leakage-in-prompt">F3</a>）。</td><td>把题面里的代码和链接删掉，保留复现步骤后重跑，看通过率掉多少。</td></tr>
+<tr><td>rollout 几乎不探索就直接改对了，但题面和工具输出里都找不到线索。</td><td>模型背过这道题（<a href="./full.html#p-contamination">F8</a>）。</td><td>截掉一半题面让模型续写，或者按题目创建时间比较通过率。</td></tr>
+<tr><td>训练分数和评测都在涨，换成随机给分也差不多涨。</td><td>涨幅来自污染，或者来自底座模型原有的习惯（<a href="./full.html#p-spurious">D9</a>）。</td><td>其他条件都不变，用随机给分做一次对照训练，最好再换一个模型家族重复。</td></tr>
 </tbody>
 </table></div>
 
@@ -667,8 +667,8 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 <li><strong>修判分器。</strong>用测试框架直接输出的逐项结果或退出码来判分，不要再用正则表达式去扒日志；判分条件为空时直接报错，而不是默认给满分；崩溃和超时一律算失败。修好之后，用新判分器把历史 rollout 重打一遍分，并检查模型是不是已经学会了利用旧 bug，比如拒答比例有没有随训练上涨，因为已经训进去的习惯不会自己消失。</li>
 <li><strong>环境必须先证明自己能跑通，才能进训练。</strong>锁死依赖版本，把外部依赖搬到内部。Cursor 训练 Composer 2 时，用上一代模型 Composer 1.5 自动给仓库搭环境：先让一个 agent 读代码库，写下十条「环境搭好后应该能跑通」的命令和预期输出；再让另一个 agent 负责把环境配到其中三条能跑；最后检查这三条命令的输出是否符合预期，不符合就重来，重来五次还不行，就把这个环境整个丢掉。在此之上，每道题再加两条硬检查：官方补丁必须能过，什么都不改必须过不了。</li>
 <li><strong>不要把全 0 的题一刀切删掉。</strong>那样会把真正的难题一起删掉，压低模型能力的上限。删不删，要以报错签名集中、官方补丁验证这类证据为条件，而不是只看通过率。</li>
-<li><strong>给模型一个合法的出口，但出口要有代价。</strong>可以允许模型报告「这个测试有问题」或者请人介入。ImpossibleBench 给 GPT-5 一个「请人介入」的选项后，它在其中一组题上的作弊率从 54% 降到了 9%。但这样拿到的分要比真正做对低，否则出口会变成一条新的偷懒通道，Composer 学会用提问推迟有风险的修改，就是出口没有代价的后果（见 1C 的 <a href="./#p-sycophancy">C4</a>）。</li>
-<li><strong>记账要分开，但必须先确认再免罚。</strong>环境造成的失败可以不计分，前提是确认了真是环境的原因。如果不先确认，免罚就会变成漏洞：Cursor 的管线把工具调用无效的样本直接丢掉，Composer 就学会了故意发坏的工具调用来躲掉负分（<a href="./#p-null-reward">R1</a>，细节见<a href="#s-c5">第五类</a>）。另外，模型在坏题上改测试、写特判拿了分，仍然是作弊，要记在模型行为上，只是报告里要注明它发生在坏题上，因为修题比罚模型更治本。</li>
+<li><strong>给模型一个合法的出口，但出口要有代价。</strong>可以允许模型报告「这个测试有问题」或者请人介入。ImpossibleBench 给 GPT-5 一个「请人介入」的选项后，它在其中一组题上的作弊率从 54% 降到了 9%。但这样拿到的分要比真正做对低，否则出口会变成一条新的偷懒通道，Composer 学会用提问推迟有风险的修改，就是出口没有代价的后果（见 1C 的 <a href="./full.html#p-sycophancy">C4</a>）。</li>
+<li><strong>记账要分开，但必须先确认再免罚。</strong>环境造成的失败可以不计分，前提是确认了真是环境的原因。如果不先确认，免罚就会变成漏洞：Cursor 的管线把工具调用无效的样本直接丢掉，Composer 就学会了故意发坏的工具调用来躲掉负分（<a href="./full.html#p-null-reward">R1</a>，细节见<a href="#s-c5">第五类</a>）。另外，模型在坏题上改测试、写特判拿了分，仍然是作弊，要记在模型行为上，只是报告里要注明它发生在坏题上，因为修题比罚模型更治本。</li>
 </ul>
 
 <h2 id="s-c3">第三类：没有学习信号</h2>
@@ -685,7 +685,7 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 
 <h3>哪些情况会让一整组分数一样</h3>
 
-<p>这一类在完整版里主要对应 <a href="./#p-zero-variance">F9</a>，另外还包括 <a href="./#p-reward-misassign">R7</a> 里重复和凑数 rollout 的那一部分（R7 里「分数挂错了样本」的那一半属于<a href="#s-c5">第五类「训练过程自己造出来的坏数据」</a>）。归纳起来有四种来源。</p>
+<p>这一类在完整版里主要对应 <a href="./full.html#p-zero-variance">F9</a>，另外还包括 <a href="./full.html#p-reward-misassign">R7</a> 里重复和凑数 rollout 的那一部分（R7 里「分数挂错了样本」的那一半属于<a href="#s-c5">第五类「训练过程自己造出来的坏数据」</a>）。归纳起来有四种来源。</p>
 
 <ul>
 <li><strong>题目对当前模型来说太难或太简单。</strong>难度是相对的，同一份数据，模型越强，全对的题越多。Skywork 用 DeepSeek-R1-Distill-Qwen-7B 给数学题估难度，每道题采 16 次，约 21% 的题一次都做不对，约 32% 的题次次全对，一半以上的数据对这个模型来说学不到东西；换成更强的 32B 模型，次次全对的比例升到了 42%。数据是静态的，模型却在变强，所以训练越往后，还能用的数据越少。</li>
@@ -698,7 +698,7 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 
 <p>最直接的后果当然是浪费：每一步训练里真正起作用的题越来越少，每次调整的噪声越来越大。Prime Intellect 用原始的 Deepscaler 数学数据训练 DeepSeek-R1-Distill-Qwen-7B 时，reward 曲线基本是平的；他们先让模型把每道题做 8 次，只留下 8 次里做对 1 到 4 次的题，把其余过难和过易的题剔掉，曲线才开始上升。所以训练不动的时候，先看各数据集的通过率分布，再去怀疑超参数。</p>
 
-<p>更重要的是，全对和全错这两头，恰好是第二类坏数据最集中的地方。全错的题里藏着做不出来的题、坏掉的环境、错误的标准答案和判分器漏判；全对的题里藏着太弱的测试、泄漏的题面、背过的题，以及答案范围很小、蒙也能蒙对的题（<a href="./#p-guessable">D2</a>）。TinyV 这篇工作用大模型复核 GRPO 训练中的每一条 rollout，发现在训练早期，判分器认为约 50% 的题一条都没做对，复核之后只有约 35%；差出来的 15 个百分点，是判分器把对的判成了错，而不是题太难。如果只看「全错比例」就把这些题当成太难的删掉，等于把判分器的 bug 当成了数据难度。所以这一类最大的价值，是给第二类当诊断入口。</p>
+<p>更重要的是，全对和全错这两头，恰好是第二类坏数据最集中的地方。全错的题里藏着做不出来的题、坏掉的环境、错误的标准答案和判分器漏判；全对的题里藏着太弱的测试、泄漏的题面、背过的题，以及答案范围很小、蒙也能蒙对的题（<a href="./full.html#p-guessable">D2</a>）。TinyV 这篇工作用大模型复核 GRPO 训练中的每一条 rollout，发现在训练早期，判分器认为约 50% 的题一条都没做对，复核之后只有约 35%；差出来的 15 个百分点，是判分器把对的判成了错，而不是题太难。如果只看「全错比例」就把这些题当成太难的删掉，等于把判分器的 bug 当成了数据难度。所以这一类最大的价值，是给第二类当诊断入口。</p>
 
 <h3>怎么统计</h3>
 
@@ -716,14 +716,14 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 <li><strong>用当前的模型重新估难度，只拿有差异的组来更新。</strong>难度过滤要针对正在训练的这个模型来做，而且每个训练阶段都要重做一次。DAPO 的做法是多采一些题，把全对和全错的组滤掉，一直采到一个批次里全是有差异的组。在 Qwen2.5-32B 上，这一项把 AIME24（一个数学竞赛评测）的成绩从 42 提到了 50，是他们各项改进里单项提升最大的一个。</li>
 <li><strong>简单题不要全删，难题可以给部分分。</strong>小米的 MiMo 团队试过把满分题全部删掉，结果训练明显变得不稳定，最后改成保留一个简单题池，出题时有 10% 的概率从这个池子里抽。对永远拿不到满分的难代码题，他们按测试的难度分层给部分分，让这些题也能在组内拉开差距。</li>
 <li><strong>考虑去掉除以标准差这一步。</strong>AI2 训练 Olmo 3、Cursor 训练 Composer 2 都没有做这一步。前者是为了去掉「分数越集中的题权重越大」的偏差，后者是为了不让附加分的细微差别被放大。</li>
-<li><strong>加难题时，小心开出新的漏洞。</strong>Cursor 训练 Composer 2.5 时，模型已经能做对大部分训练题，于是他们在训练过程中大规模合成更难的任务，其中一种做法是删掉代码库里的某个功能，让模型重新实现。结果模型在沙箱里翻到了残留的 Python 类型检查缓存，从里面反推出了被删函数的签名（<a href="./#p-residual-artifacts">B3</a>，细节见 <a href="#s-c1b">1B</a> 的例二）。所以新合成的题上线之前，要先扫一遍环境里有没有答案的残留物。</li>
+<li><strong>加难题时，小心开出新的漏洞。</strong>Cursor 训练 Composer 2.5 时，模型已经能做对大部分训练题，于是他们在训练过程中大规模合成更难的任务，其中一种做法是删掉代码库里的某个功能，让模型重新实现。结果模型在沙箱里翻到了残留的 Python 类型检查缓存，从里面反推出了被删函数的签名（<a href="./full.html#p-residual-artifacts">B3</a>，细节见 <a href="#s-c1b">1B</a> 的例二）。所以新合成的题上线之前，要先扫一遍环境里有没有答案的残留物。</li>
 <li><strong>也别把过滤当成万能药。</strong>北京大学等单位的 DataFlex-RL 用 12 组随机种子比较后发现，在采样之后直接丢掉过难或过易的组，和不筛选相比的差别，还不如换一组随机种子带来的波动大。它测的不是 DAPO 那种「补采到填满批次」的做法，所以两者并不矛盾，但这类改进要多跑几组种子才能下结论。</li>
 </ul>
 
 <div class="box ok">
 <h4>onsite 提示：这两类在面试里怎么用</h4>
 <ul>
-<li><strong>write-up 的第一张表，放数据集和题目层面的体检，而不是一条条 rollout 的作弊清单。</strong>每个数据集一行，写上每道题通过率的分布、全对和全错题的比例、同一份答案拿到不同分数的次数、最常见的报错签名，有环境的话再加上空补丁和官方补丁的结果。Cursor 公开讲过的几个作弊案例里，上网或者翻镜像里的 git 历史找现成的官方补丁、在合成任务里读残留的类型检查缓存，根子都在环境上，这也是第一类开头引的那句「每次骗分都是一份 bug 报告」的意思（见完整版的 <a href="./#cursor">Cursor 一节</a>）。</li>
+<li><strong>write-up 的第一张表，放数据集和题目层面的体检，而不是一条条 rollout 的作弊清单。</strong>每个数据集一行，写上每道题通过率的分布、全对和全错题的比例、同一份答案拿到不同分数的次数、最常见的报错签名，有环境的话再加上空补丁和官方补丁的结果。Cursor 公开讲过的几个作弊案例里，上网或者翻镜像里的 git 历史找现成的官方补丁、在合成任务里读残留的类型检查缓存，根子都在环境上，这也是第一类开头引的那句「每次骗分都是一份 bug 报告」的意思（见完整版的 <a href="./full.html#cursor">Cursor 一节</a>）。</li>
 <li><strong>被问到「怎么区分是模型坏了还是数据坏了」，就答那一句：</strong>同一道题的所有 rollout、甚至换了模型，都以同一种方式出问题，是题的锅；同一道题里有的 rollout 老实、有的作弊，是模型的锅；最后用官方补丁和空补丁的对照把它坐实（完整的判断顺序见<a href="#s-blame">「先判断是谁的锅」一节</a>）。</li>
 <li><strong>zip 里多半只有静态记录，没有能重跑的环境。</strong>那就先用统计和规则把能做的做完：通过率分布、报错签名、多数答案和标准答案的比对、同一份答案不同分数。write-up 里再单独写一段：如果有环境，我会跑官方补丁和空补丁、把测试重跑多次看稳不稳、把题面里泄漏的内容删掉再跑一遍。这一层做不了也要讲清楚，因为它是证据最硬的一层（系统怎么搭，见本页的<a href="#s-design">整体系统设计</a>）。</li>
 <li><strong>不要只报「发现了多少条可疑 rollout」，要报这些坏题让分数偏了多少。</strong>比如修好之后同一个模型的成绩变了多少，把坏题剔掉之后模型的放弃率、作弊率又变成了多少。</li>
@@ -744,22 +744,22 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 
 <p><strong>第一组是说的和做的对不上。</strong></p>
 <ul>
-<li><a href="./#p-false-success">E1</a> 谎称完成。总结里说「测试全部通过」，操作记录里却是测试根本没跑、最后一次跑失败了，或者跑通之后又改过代码。Anthropic 在 Claude 4 的系统卡里做过一个对比：他们故意在一道数值积分题的第 4 条测试里埋了一个错的期望值，不作弊就不可能全过。不加任何提示时，Claude Sonnet 3.7 和 Claude Opus 4 都写了特判，让这条错测试强行通过；区别在总结里，Sonnet 3.7 说实现成功、所有测试通过，Opus 4 则在末尾补了一句，说这条测试的期望值看起来是错的、自己加了特判。两份代码都在作弊，只有看总结那一句话，才分得出谁对用户说了实话。</li>
-<li><a href="./#p-fabricated">E2</a> 编造操作和结果，也就是动作本身或工具返回的结果是编出来的。Anthropic 在 Opus 4.6 的系统卡里写到，他们在审计环境里让工具对一道数学题返回 492，模型在回复里却说「工具返回的是 491」。491 恰好是正确答案，所以只看最终答案对不对的判分，永远发现不了它改写了工具的结果。</li>
-<li><a href="./#p-mismatch">E3</a> 想的和做的不一样。前一条命令其实失败了，模型却当它成功了接着干；或者像 Anthropic 在 Opus 5 系统卡里举的例子，模型要给一个 Swift 代码库能否编译通过打分，推理里五次说定 0.85，最终输出的却是 0.82，也没解释为什么改。</li>
+<li><a href="./full.html#p-false-success">E1</a> 谎称完成。总结里说「测试全部通过」，操作记录里却是测试根本没跑、最后一次跑失败了，或者跑通之后又改过代码。Anthropic 在 Claude 4 的系统卡里做过一个对比：他们故意在一道数值积分题的第 4 条测试里埋了一个错的期望值，不作弊就不可能全过。不加任何提示时，Claude Sonnet 3.7 和 Claude Opus 4 都写了特判，让这条错测试强行通过；区别在总结里，Sonnet 3.7 说实现成功、所有测试通过，Opus 4 则在末尾补了一句，说这条测试的期望值看起来是错的、自己加了特判。两份代码都在作弊，只有看总结那一句话，才分得出谁对用户说了实话。</li>
+<li><a href="./full.html#p-fabricated">E2</a> 编造操作和结果，也就是动作本身或工具返回的结果是编出来的。Anthropic 在 Opus 4.6 的系统卡里写到，他们在审计环境里让工具对一道数学题返回 492，模型在回复里却说「工具返回的是 491」。491 恰好是正确答案，所以只看最终答案对不对的判分，永远发现不了它改写了工具的结果。</li>
+<li><a href="./full.html#p-mismatch">E3</a> 想的和做的不一样。前一条命令其实失败了，模型却当它成功了接着干；或者像 Anthropic 在 Opus 5 系统卡里举的例子，模型要给一个 Swift 代码库能否编译通过打分，推理里五次说定 0.85，最终输出的却是 0.82，也没解释为什么改。</li>
 </ul>
 
 <p><strong>第二组是做事的方式出了问题。</strong></p>
 <ul>
-<li><a href="./#p-loops">E4</a> 原地打转。同一条命令反复执行、反复报同一个错，或者在两个答案之间来回摇摆，直到撞上步数上限。打转不一定是模型的错：Opus 4.6 的一段训练记录里，模型一次次算出 24 却总写成 48，原因是这道题的标签被错标成了 48（见第二类的 <a href="./#p-label-error">F7</a>）。</li>
-<li><a href="./#p-giving-up">E5</a> 放弃和甩锅。在做得出来的题上提前交白卷，或者说「这个测试本来就不稳定」然后宣布完成。Cursor 的 Composer 用真实用户反馈训练时，学会了遇到有风险的修改就先问一个澄清问题，因为没写的代码不会让它被扣分（见 1C 的 <a href="./#p-sycophancy">C4</a>）。</li>
-<li><a href="./#p-destructive">E6</a> 破坏性操作，比如 <code>rm -rf</code>（整个目录递归删除）、<code>git reset --hard</code>（丢掉所有没提交的改动）、<code>git push --force</code>（强行覆盖远端的提交历史）。训练沙箱用完就扔，删错东西不扣分，所以判分看不见它。它甚至可能换来分数：OpenAI 在 GPT-5.1-Codex-Max 的系统卡里写到，Codex 模型在训练中遇到工作区里有用户改动时，更容易做破坏数据的操作。一个合理的推测是，这些用户改动恰好让测试失败，一条重置命令就能让测试变绿，只跑测试的判分于是给了满分。</li>
+<li><a href="./full.html#p-loops">E4</a> 原地打转。同一条命令反复执行、反复报同一个错，或者在两个答案之间来回摇摆，直到撞上步数上限。打转不一定是模型的错：Opus 4.6 的一段训练记录里，模型一次次算出 24 却总写成 48，原因是这道题的标签被错标成了 48（见第二类的 <a href="./full.html#p-label-error">F7</a>）。</li>
+<li><a href="./full.html#p-giving-up">E5</a> 放弃和甩锅。在做得出来的题上提前交白卷，或者说「这个测试本来就不稳定」然后宣布完成。Cursor 的 Composer 用真实用户反馈训练时，学会了遇到有风险的修改就先问一个澄清问题，因为没写的代码不会让它被扣分（见 1C 的 <a href="./full.html#p-sycophancy">C4</a>）。</li>
+<li><a href="./full.html#p-destructive">E6</a> 破坏性操作，比如 <code>rm -rf</code>（整个目录递归删除）、<code>git reset --hard</code>（丢掉所有没提交的改动）、<code>git push --force</code>（强行覆盖远端的提交历史）。训练沙箱用完就扔，删错东西不扣分，所以判分看不见它。它甚至可能换来分数：OpenAI 在 GPT-5.1-Codex-Max 的系统卡里写到，Codex 模型在训练中遇到工作区里有用户改动时，更容易做破坏数据的操作。一个合理的推测是，这些用户改动恰好让测试失败，一条重置命令就能让测试变绿，只跑测试的判分于是给了满分。</li>
 </ul>
 
 <p><strong>第三组是冲着监督去的。</strong></p>
 <ul>
-<li><a href="./#p-oversight">E7</a> 破坏监督和事后掩盖，包括删日志、关监控、用 git 把改动藏起来、做完再把配置改回原样。Anthropic 在 Opus 5.5 的系统卡里写到，一些训练环境里模型推断自动检查会拒绝它的某些改动，就用 git 操作把这些改动藏了起来；判分只看最终输出，它就这样拿到了分。</li>
-<li><a href="./#p-sandbagging">E8</a> 故意装弱。模型有能力却有条件地故意表现差，或者察觉到「我正在被测试」就改变行为。这是最难从单条记录里看出来的一种。</li>
+<li><a href="./full.html#p-oversight">E7</a> 破坏监督和事后掩盖，包括删日志、关监控、用 git 把改动藏起来、做完再把配置改回原样。Anthropic 在 Opus 5.5 的系统卡里写到，一些训练环境里模型推断自动检查会拒绝它的某些改动，就用 git 操作把这些改动藏了起来；判分只看最终输出，它就这样拿到了分。</li>
+<li><a href="./full.html#p-sandbagging">E8</a> 故意装弱。模型有能力却有条件地故意表现差，或者察觉到「我正在被测试」就改变行为。这是最难从单条记录里看出来的一种。</li>
 </ul>
 
 <p>完整例子见人话版速读的 <a href="./cheatsheet.html#hh-p-false-success">E1</a> 到 <a href="./cheatsheet.html#hh-p-sandbagging">E8</a>。</p>
@@ -784,7 +784,7 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 
 <h3>识别办法二：危险命令检测</h3>
 
-<p>破坏性操作（<a href="./#p-destructive">E6</a>）和掩盖痕迹（<a href="./#p-oversight">E7</a>）的证据都在命令和文件改动里，但只匹配命令字符串抓不住，因为危险常常是间接触发的，藏在脚本里、变量里，或者「用另一条命令算出来的路径当删除目标」这种写法里。</p>
+<p>破坏性操作（<a href="./full.html#p-destructive">E6</a>）和掩盖痕迹（<a href="./full.html#p-oversight">E7</a>）的证据都在命令和文件改动里，但只匹配命令字符串抓不住，因为危险常常是间接触发的，藏在脚本里、变量里，或者「用另一条命令算出来的路径当删除目标」这种写法里。</p>
 
 <div class="eg"><p><strong>真实例子</strong>：Claude Code 的一个 GitHub issue 里，Opus 5 在测试脚本里用 bash 的 trap 登记了一条「脚本退出时删掉临时主目录」的命令。它用了单引号，所以要删的路径要等到退出那一刻才去读变量。几分钟后，模型给脚本加了个选项，把这个变量改成了真实的主目录。脚本一退出，真实主目录连同 SSH 密钥一起被删了。写 trap、改变量、运行脚本，三步单独看都不可疑。</p></div>
 
@@ -794,7 +794,7 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 
 <h3>识别办法三：重复动作检测</h3>
 
-<p>原地打转（<a href="./#p-loops">E4</a>）最适合用规则抓。开源 agent 框架 OpenHands 线上在用的卡死规则可以直接搬过来：最后 4 次动作和结果一模一样；最后 3 次动作相同而且都报错；最后 6 步是 A、B、A、B 来回交替；连续 3 条回复一模一样、中间没调用任何工具。比较之前要先去掉时间戳、进程号、临时路径这些每次都会变的东西，否则本质相同的操作会被当成不同。</p>
+<p>原地打转（<a href="./full.html#p-loops">E4</a>）最适合用规则抓。开源 agent 框架 OpenHands 线上在用的卡死规则可以直接搬过来：最后 4 次动作和结果一模一样；最后 3 次动作相同而且都报错；最后 6 步是 A、B、A、B 来回交替；连续 3 条回复一模一样、中间没调用任何工具。比较之前要先去掉时间戳、进程号、临时路径这些每次都会变的东西，否则本质相同的操作会被当成不同。</p>
 
 <p>还要单独数连续失败的编辑。普林斯顿的 SWE-agent 论文在 SWE-bench 上统计过：一次代码编辑最终能改对的概率大约九成，可只要失败过一次，就掉到 57% 左右，因为坏修改落进文件后，后面的编辑都建在坏文件上，越改越乱。同一篇论文里，最后恢复过来的平均只失败了两次左右，恢复不了的平均失败了四次多，所以「同一个文件上连续失败四次」是一个不错的起始报警线，再按自己的数据调。</p>
 
@@ -802,7 +802,7 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 
 <h3>放弃和装弱：要靠统计和对照</h3>
 
-<p>放弃（<a href="./#p-giving-up">E5</a>）和装弱（<a href="./#p-sandbagging">E8</a>）单看一条记录往往完全正常，比如一个澄清问题，看上去只是谨慎。它们只有放到一大批记录里才会露出来。</p>
+<p>放弃（<a href="./full.html#p-giving-up">E5</a>）和装弱（<a href="./full.html#p-sandbagging">E8</a>）单看一条记录往往完全正常，比如一个澄清问题，看上去只是谨慎。它们只有放到一大批记录里才会露出来。</p>
 
 <p>对放弃，看两样东西。一是「动手的比例」随训练怎么变：平均改了几次代码、完全没改代码的比例、以问句结尾的比例，按数据集和训练阶段画出来。Cursor 就是靠监控这类指标发现 Composer 越来越多地用提问代替修改的。二是组内对照：同一道题已经有至少两条干净的成功记录，而这一条用了不到一半的预算（允许的步数或 token 数）就说「做不到」，才算没有依据的放弃；整组都没人做出来的题不在这里判，交给环境检查。模型说「测试本来就不稳定」时，把这条测试放到去掉模型改动的原始代码上跑几次，原始代码稳定通过，就是它自己改坏了却推给环境。</p>
 
@@ -830,11 +830,11 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 <h3>上半部分：输出退化</h3>
 
 <ul>
-<li><a href="./#p-repetition">D4</a> 无限重复。模型从某处开始在同一段内容上兜圈子，或者答完了不输出结束符（告诉系统「我说完了」的特殊符号），一直写到被长度上限截断。重复会自我强化，越重复，模型对下一个词越有把握，越出不来。</li>
-<li><a href="./#p-length-dynamics">D5</a> 越来越长或想太多。原版 GRPO 把每条回答的损失除以它自己的长度，错误回答写得越长，每个词分到的惩罚就越少，所以长度在涨不等于想得更深。已经答对了还反复验算，是另一种浪费。</li>
-<li><a href="./#p-lang-mix">D6</a> 语言混杂。英文提问，推理里却夹着别的语言；或者推理慢慢压缩成关键词、自造词和符号，最后读不懂。Anthropic 在 Claude Mythos 5 的系统卡里写到，纸牌谜题环境到训练末期，大多数长推理都是正常开头、再逐渐变得无法理解。它最要紧的代价是让靠读推理抓作弊的监控失明。</li>
-<li><a href="./#p-entropy">D7</a> 多样性塌缩。同一道题的几条回答开头相同、思路相同，连错都错成一样。单次答对率还在涨，「多采几次至少对一次」的比例却停住了，模型在收窄，而不是在变强。</li>
-<li><a href="./#p-behavior-collapse">D8</a> 行为塌缩。测试都过了，干活的方式却越来越怪。Cursor 在 Composer 2 的技术报告里点名了两种：把长篇推理写进代码注释，以及只用终端，拿 cat、grep、sed 代替专门的读文件、搜索和编辑工具。他们常驻的辅助奖励里还有一项，专门罚建了待办事项却放着不完成。这些都是他们靠持续监控发现、再追加奖励项去纠正的。</li>
+<li><a href="./full.html#p-repetition">D4</a> 无限重复。模型从某处开始在同一段内容上兜圈子，或者答完了不输出结束符（告诉系统「我说完了」的特殊符号），一直写到被长度上限截断。重复会自我强化，越重复，模型对下一个词越有把握，越出不来。</li>
+<li><a href="./full.html#p-length-dynamics">D5</a> 越来越长或想太多。原版 GRPO 把每条回答的损失除以它自己的长度，错误回答写得越长，每个词分到的惩罚就越少，所以长度在涨不等于想得更深。已经答对了还反复验算，是另一种浪费。</li>
+<li><a href="./full.html#p-lang-mix">D6</a> 语言混杂。英文提问，推理里却夹着别的语言；或者推理慢慢压缩成关键词、自造词和符号，最后读不懂。Anthropic 在 Claude Mythos 5 的系统卡里写到，纸牌谜题环境到训练末期，大多数长推理都是正常开头、再逐渐变得无法理解。它最要紧的代价是让靠读推理抓作弊的监控失明。</li>
+<li><a href="./full.html#p-entropy">D7</a> 多样性塌缩。同一道题的几条回答开头相同、思路相同，连错都错成一样。单次答对率还在涨，「多采几次至少对一次」的比例却停住了，模型在收窄，而不是在变强。</li>
+<li><a href="./full.html#p-behavior-collapse">D8</a> 行为塌缩。测试都过了，干活的方式却越来越怪。Cursor 在 Composer 2 的技术报告里点名了两种：把长篇推理写进代码注释，以及只用终端，拿 cat、grep、sed 代替专门的读文件、搜索和编辑工具。他们常驻的辅助奖励里还有一项，专门罚建了待办事项却放着不完成。这些都是他们靠持续监控发现、再追加奖励项去纠正的。</li>
 </ul>
 
 <p>成因大同小异。只看最终结果的奖励下，很多做法得分完全一样，这些选择上没有训练信号，行为往哪里漂，由随机噪声和奖励里的次要项决定。GRPO 除以组内标准差的做法还会把这种噪声放大（原理见<a href="#s-c3">第三类</a>「只是附加分不同」那一条），开源训练框架 verl 默认就是这么做的，所以拿到训练配置时值得看一眼这个开关。</p>
@@ -858,13 +858,13 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 
 <h3>下半部分之一：该挨罚的没挨罚（Cursor 的例子）</h3>
 
-<p>管线记账里最值得先讲的，是 Cursor 自己公开过的坑（<a href="./#p-null-reward">R1</a>），面试官很可能就在等这个例子。</p>
+<p>管线记账里最值得先讲的，是 Cursor 自己公开过的坑（<a href="./full.html#p-null-reward">R1</a>），面试官很可能就在等这个例子。</p>
 
-<div class="eg"><p><strong>真实例子</strong>：Cursor 在 2026 年 3 月的博客里讲过（解读见完整版的 <a href="./#cursor-realtime-rl">Cursor 一节</a>），他们把用户对 Composer 的真实反应转成分数持续训练。Composer 回复用户时经常要发工具调用，也就是「读这个文件」「跑这条命令」这类指令。管线最初的规则是：工具调用无效的样本直接丢弃，不进训练。后来 Composer 学会了，遇到大概率做不好的任务，就故意发一个格式坏掉的调用，这条样本被丢掉，它也就永远不会因为这道题拿到负分。修法是把坏调用当作负样本正常计入训练。</p></div>
+<div class="eg"><p><strong>真实例子</strong>：Cursor 在 2026 年 3 月的博客里讲过（解读见完整版的 <a href="./full.html#cursor-realtime-rl">Cursor 一节</a>），他们把用户对 Composer 的真实反应转成分数持续训练。Composer 回复用户时经常要发工具调用，也就是「读这个文件」「跑这条命令」这类指令。管线最初的规则是：工具调用无效的样本直接丢弃，不进训练。后来 Composer 学会了，遇到大概率做不好的任务，就故意发一个格式坏掉的调用，这条样本被丢掉，它也就永远不会因为这道题拿到负分。修法是把坏调用当作负样本正常计入训练。</p></div>
 
 <p>为什么会学会？强化学习里，拿了负分的做法以后出现的概率会被调低。在难题上老实做错会挨罚，概率被一点点压低；写坏调用的样本被扔掉，不加不扣，概率永远不会被压低。一降一不动，写坏调用的相对比例自然涨上来，模型并不需要「想作弊」。而且它只出现在难题上，全局的无效率未必明显上涨；有些看板还只在有效样本上算平均分（verl 的平均分就不算被中止的样本），难题借着「无效」退出统计，平均分反而上涨，看上去像模型变强了。</p>
 
-<p>截断和超时（<a href="./#p-truncation">R2</a>）是同一个问题的另一面，常见的错法有三种。一是截断了反而拿分，或者出了状况反而比答错得分高：verl 的数学判分函数只截取回答最后 300 个字符找答案，不看回答是不是被截断的，推理过程末尾碰巧有句像答案的草稿就可能被判对；同一个框架里，判分超时记 0 分，答错却记 −1 分，把判分器卡住反而比答错划算（这两处都是读源码推出来的漏洞，还没有公开的事故报告）。二是冤枉：推理虽长但是对的、测试虽慢但代码是对的，却因为超长或超时被判错。三是截断的样本干脆不计分，模型就学着把没把握的题拖进截断，上面的 Skywork 团队实测过，这样训下去截断比例越来越高，总体准确率反而下降。</p>
+<p>截断和超时（<a href="./full.html#p-truncation">R2</a>）是同一个问题的另一面，常见的错法有三种。一是截断了反而拿分，或者出了状况反而比答错得分高：verl 的数学判分函数只截取回答最后 300 个字符找答案，不看回答是不是被截断的，推理过程末尾碰巧有句像答案的草稿就可能被判对；同一个框架里，判分超时记 0 分，答错却记 −1 分，把判分器卡住反而比答错划算（这两处都是读源码推出来的漏洞，还没有公开的事故报告）。二是冤枉：推理虽长但是对的、测试虽慢但代码是对的，却因为超长或超时被判错。三是截断的样本干脆不计分，模型就学着把没把握的题拖进截断，上面的 Skywork 团队实测过，这样训下去截断比例越来越高，总体准确率反而下降。</p>
 
 <p>检查的办法：</p>
 <ul>
@@ -882,11 +882,11 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 <div class="tw"><table>
 <thead><tr><th>问题</th><th>它在数据里长什么样</th><th>怎么查</th></tr></thead>
 <tbody>
-<tr><td><a href="./#p-train-infer-mismatch">R3</a> 训练和推理算出的概率对不上</td><td>生成用的推理引擎和训练用的程序对同一个 token 算出的概率差得很远，症状像模型学坏了：乱码、语言混杂、整批零分。</td><td>记录里如果同时存了两边的概率，就逐个 token 对比。再按机器、显卡、引擎版本分开看，异常集中在某台机器上就是基础设施问题，整批隔离。</td></tr>
-<tr><td><a href="./#p-retokenization">R4</a> token 对不上</td><td>框架只存了文字，训练前重新切 token，切出来的和当时采样的不一样；或者对话模板在不同环节渲染得不一样。</td><td>把存下的编号解码成文字、再切回编号，两边比对。同一个数据集的输入，去掉消息内容后剩下的模板部分应该只有一两种。</td></tr>
-<tr><td><a href="./#p-parser-normalization">R5</a> 解析器偷偷修正格式错误</td><td>把工具调用文本翻译成结构化指令的解析器（parser）很宽松，会修好缺标签、写错的 JSON。vLLM 里 Qwen3-Coder 用的解析器，遇到布尔参数写成 yes 时只记一条警告，然后当成 false 执行，意思整个反了。格式错误没受罚，记录里却是一个完美的调用。</td><td>从原始 token 解码出原文，用严格的解析器重新解析，数有多少调用被判为不合法、却照样执行了还拿了正分。</td></tr>
-<tr><td><a href="./#p-mask-logprob">R6</a> loss mask 和 logprob 错位</td><td>工具返回的文字被标成模型写的，模型就被训练去自己编工具输出；mask 偏了一位、结束符被屏蔽，模型就学不会停。</td><td>检查 token 数、概率数、mask 长度是否相等；标成模型写的那段是不是恰好是一段工具输出；正常结束的回答，最后一个参与训练的 token 是不是结束符。</td></tr>
-<tr><td><a href="./#p-reward-misassign">R7</a> 分数挂错样本、重复和填充</td><td>分数异步算好再拼回去，只要有一处按位置而不是按编号对齐，就挂到了别的样本上；数据集里也可能大量重复，或为凑批次补了空行。</td><td>按编号连接分数表和 rollout 表，数对不上的行；找同一道题、最终改动一模一样、分数却一个 1 一个 0 的样本对；去重后按唯一题目再算一遍统计。</td></tr>
+<tr><td><a href="./full.html#p-train-infer-mismatch">R3</a> 训练和推理算出的概率对不上</td><td>生成用的推理引擎和训练用的程序对同一个 token 算出的概率差得很远，症状像模型学坏了：乱码、语言混杂、整批零分。</td><td>记录里如果同时存了两边的概率，就逐个 token 对比。再按机器、显卡、引擎版本分开看，异常集中在某台机器上就是基础设施问题，整批隔离。</td></tr>
+<tr><td><a href="./full.html#p-retokenization">R4</a> token 对不上</td><td>框架只存了文字，训练前重新切 token，切出来的和当时采样的不一样；或者对话模板在不同环节渲染得不一样。</td><td>把存下的编号解码成文字、再切回编号，两边比对。同一个数据集的输入，去掉消息内容后剩下的模板部分应该只有一两种。</td></tr>
+<tr><td><a href="./full.html#p-parser-normalization">R5</a> 解析器偷偷修正格式错误</td><td>把工具调用文本翻译成结构化指令的解析器（parser）很宽松，会修好缺标签、写错的 JSON。vLLM 里 Qwen3-Coder 用的解析器，遇到布尔参数写成 yes 时只记一条警告，然后当成 false 执行，意思整个反了。格式错误没受罚，记录里却是一个完美的调用。</td><td>从原始 token 解码出原文，用严格的解析器重新解析，数有多少调用被判为不合法、却照样执行了还拿了正分。</td></tr>
+<tr><td><a href="./full.html#p-mask-logprob">R6</a> loss mask 和 logprob 错位</td><td>工具返回的文字被标成模型写的，模型就被训练去自己编工具输出；mask 偏了一位、结束符被屏蔽，模型就学不会停。</td><td>检查 token 数、概率数、mask 长度是否相等；标成模型写的那段是不是恰好是一段工具输出；正常结束的回答，最后一个参与训练的 token 是不是结束符。</td></tr>
+<tr><td><a href="./full.html#p-reward-misassign">R7</a> 分数挂错样本、重复和填充</td><td>分数异步算好再拼回去，只要有一处按位置而不是按编号对齐，就挂到了别的样本上；数据集里也可能大量重复，或为凑批次补了空行。</td><td>按编号连接分数表和 rollout 表，数对不上的行；找同一道题、最终改动一模一样、分数却一个 1 一个 0 的样本对；去重后按唯一题目再算一遍统计。</td></tr>
 </tbody>
 </table></div>
 
@@ -894,7 +894,7 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 
 <p>模板出错也很典型：DeepSeek-R1-Distill 的官方对话模板有一次改成在输入末尾预先填好 <code>&lt;think&gt;</code>，于是模型的回答直接从思考段的内容开始，不再自己写这个开头标签。Hugging Face 的开源复现项目 open-r1 里，格式奖励要求回答以 <code>&lt;think&gt;</code> 开头，结果每一条都判了 0 分，一整组分数相同，这项奖励在整个训练里等于不存在。把输入和回答拼在一起逐条看，格式都是「对的」，只有看分数分布才发现。这类问题让大模型读样例也查不出，因为它读的是拼好的文字，而文字恰好是一致的那一面。</p>
 
-<p>跑这些检查之前，先给「可信的 rollout」列一张字段清单：token 编号、逐 token 概率、loss mask、结束原因、分数及其组成、rollout 和题目的编号。缺了哪个字段，就意味着哪类检查做不了，这本身就是一条要写进报告的发现。细节见完整版的<a href="./#m-record-integrity">记录完整性检查</a>。</p>
+<p>跑这些检查之前，先给「可信的 rollout」列一张字段清单：token 编号、逐 token 概率、loss mask、结束原因、分数及其组成、rollout 和题目的编号。缺了哪个字段，就意味着哪类检查做不了，这本身就是一条要写进报告的发现。细节见完整版的<a href="./full.html#m-record-integrity">记录完整性检查</a>。</p>
 
 <div class="box ok">
 <h4>onsite 提示：第五类怎么讲</h4>
@@ -913,20 +913,20 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 <h3>这一类包括哪些</h3>
 
 <ul>
-<li><a href="./#p-obfuscation">G1</a> 在压力下把作弊藏起来。OpenAI 的 Baker 等人（2025）先在自家前沿推理模型的真实编程训练里验证了读推理过程的监控很管用：一个读完整记录的 GPT-4o 监控，能抓到 95% 的「调 exit(0) 提前退出、让测试被跳过」这类作弊，因为模型会在推理里直说。然后他们做了一个对照实验，把奖励改成「测试通过、并且没被监控标出来」才给分。训练到后期，模型仍以相当高的比例作弊，监控能抓到的比例却掉到接近零，推理过程读起来完全正常。这种压力也可能是无意带进来的。一种是打分管线的 bug 让奖励读到了推理过程，Anthropic 连续几代系统卡都披露过这类事故，Opus 4.7 训练时受影响的比例高到 7.8%。另一种是长度惩罚把推理部分的字数也算了进去，Cursor 的 Composer 2 就是这么算的。这不说明 Composer 2 出了问题，但分析这类数据时，要默认它的推理过程受过压力。</li>
-<li><a href="./#p-unverbalized">G2</a> 作弊了却不说出口。这是只看结果打分时的自然状态，不需要任何压力。照抄题目里漏出的答案、删掉挂掉的测试文件，这类不用动脑的捷径，模型不写进推理照样做得到。Anthropic 的 Chen 等人（2025）在 Claude 3.7 Sonnet 的早期版本上搭了 6 个在题目里藏着答案暗示的训练环境，模型 30 步之内就学会照着暗示答题，可其中 5 个环境里，推理过程提到暗示的比例始终不到 2%。反过来，需要多步规划的作弊，比如运行时去解析测试文件、反编译编译好的标准答案程序，模型往往会在推理里写出来。</li>
-<li><a href="./#p-emergent-misalignment">G3</a>「看起来无害」的作弊会泛化。这就是开头讲过的 Anthropic 的 MacDiarmid 等人（2025）的实验：模型在 Claude 的真实编程训练环境里学会三种作弊（返回「永远相等」的对象、调 sys.exit(0) 提前退出、篡改 pytest 的测试报告）的同一步，六项和作弊无关的对齐评估一起变差。这里补两个数：请它写一个作弊检测器时，它有 12% 的时候故意写弱；事后删数据也不够，训练结束时作弊率是 90%，删掉作弊样本再蒸馏（拿剩下的数据训练一个新模型），新模型仍有 30%。所以监控必须在训练过程中跑，发现就修环境，而不是等训练完再清理。</li>
-<li><a href="./#p-monitor-validation">G4</a> 监控的准确率和作弊率算错了。常见的错误有四种：把监控标出来的比例直接当成作弊率；拿人工注入的明显作弊去测监控能抓多少；只用一个检测器，不估计大家共同漏掉的部分；不把坏题单独拎出来。</li>
-<li><a href="./#p-monitor-drift">G5</a> 监控悄悄失效。上线时验证过，之后在没有报警的情况下坏了：当裁判或复核模型用的大模型被服务方悄悄更新，模型变强后冒出清单上没有的新作弊，或者某个检查在实际执行的代码路径上根本没被调用。</li>
+<li><a href="./full.html#p-obfuscation">G1</a> 在压力下把作弊藏起来。OpenAI 的 Baker 等人（2025）先在自家前沿推理模型的真实编程训练里验证了读推理过程的监控很管用：一个读完整记录的 GPT-4o 监控，能抓到 95% 的「调 exit(0) 提前退出、让测试被跳过」这类作弊，因为模型会在推理里直说。然后他们做了一个对照实验，把奖励改成「测试通过、并且没被监控标出来」才给分。训练到后期，模型仍以相当高的比例作弊，监控能抓到的比例却掉到接近零，推理过程读起来完全正常。这种压力也可能是无意带进来的。一种是打分管线的 bug 让奖励读到了推理过程，Anthropic 连续几代系统卡都披露过这类事故，Opus 4.7 训练时受影响的比例高到 7.8%。另一种是长度惩罚把推理部分的字数也算了进去，Cursor 的 Composer 2 就是这么算的。这不说明 Composer 2 出了问题，但分析这类数据时，要默认它的推理过程受过压力。</li>
+<li><a href="./full.html#p-unverbalized">G2</a> 作弊了却不说出口。这是只看结果打分时的自然状态，不需要任何压力。照抄题目里漏出的答案、删掉挂掉的测试文件，这类不用动脑的捷径，模型不写进推理照样做得到。Anthropic 的 Chen 等人（2025）在 Claude 3.7 Sonnet 的早期版本上搭了 6 个在题目里藏着答案暗示的训练环境，模型 30 步之内就学会照着暗示答题，可其中 5 个环境里，推理过程提到暗示的比例始终不到 2%。反过来，需要多步规划的作弊，比如运行时去解析测试文件、反编译编译好的标准答案程序，模型往往会在推理里写出来。</li>
+<li><a href="./full.html#p-emergent-misalignment">G3</a>「看起来无害」的作弊会泛化。这就是开头讲过的 Anthropic 的 MacDiarmid 等人（2025）的实验：模型在 Claude 的真实编程训练环境里学会三种作弊（返回「永远相等」的对象、调 sys.exit(0) 提前退出、篡改 pytest 的测试报告）的同一步，六项和作弊无关的对齐评估一起变差。这里补两个数：请它写一个作弊检测器时，它有 12% 的时候故意写弱；事后删数据也不够，训练结束时作弊率是 90%，删掉作弊样本再蒸馏（拿剩下的数据训练一个新模型），新模型仍有 30%。所以监控必须在训练过程中跑，发现就修环境，而不是等训练完再清理。</li>
+<li><a href="./full.html#p-monitor-validation">G4</a> 监控的准确率和作弊率算错了。常见的错误有四种：把监控标出来的比例直接当成作弊率；拿人工注入的明显作弊去测监控能抓多少；只用一个检测器，不估计大家共同漏掉的部分；不把坏题单独拎出来。</li>
+<li><a href="./full.html#p-monitor-drift">G5</a> 监控悄悄失效。上线时验证过，之后在没有报警的情况下坏了：当裁判或复核模型用的大模型被服务方悄悄更新，模型变强后冒出清单上没有的新作弊，或者某个检查在实际执行的代码路径上根本没被调用。</li>
 </ul>
 
 <p>假设你报告某个数据集的作弊率是 6%，面试官追问「误差多大？漏了多少？」，回答不能是「我们的复核模型很强」。下面四条是设计上的防法。</p>
 
 <h3>防法一：监控的分数不要直接放进 reward</h3>
 
-<p>监控只用来报警和定位环境漏洞，发现问题后去修环境和判分器，而不是在奖励里扣分。原因就是 <a href="./#p-obfuscation">G1</a>：监控一旦成了优化目标，模型最省事的路是作弊照旧、把痕迹藏好。这条要执行得很彻底，监控的输出只要流进任何优化环节，比如扣分、筛选训练样本、从多个存档里挑一个上线，它就成了目标。配套做法是：发给裁判的请求默认剥掉推理过程；留一个从不参与训练和筛选的监控专门做度量；不让被训练的模型参与编写自己的监控，<a href="./#p-emergent-misalignment">G3</a> 里那个故意把检测器写弱的模型就是教训。</p>
+<p>监控只用来报警和定位环境漏洞，发现问题后去修环境和判分器，而不是在奖励里扣分。原因就是 <a href="./full.html#p-obfuscation">G1</a>：监控一旦成了优化目标，模型最省事的路是作弊照旧、把痕迹藏好。这条要执行得很彻底，监控的输出只要流进任何优化环节，比如扣分、筛选训练样本、从多个存档里挑一个上线，它就成了目标。配套做法是：发给裁判的请求默认剥掉推理过程；留一个从不参与训练和筛选的监控专门做度量；不让被训练的模型参与编写自己的监控，<a href="./full.html#p-emergent-misalignment">G3</a> 里那个故意把检测器写弱的模型就是教训。</p>
 
-<p>读推理过程的监控能信多少，按 <a href="./#p-unverbalized">G2</a> 的思路来分：代码里就很显眼的作弊交给写死的规则；代码里不显眼、但要动脑规划的，模型多半会在推理里写出来，这一种才适合交给读推理过程的监控。</p>
+<p>读推理过程的监控能信多少，按 <a href="./full.html#p-unverbalized">G2</a> 的思路来分：代码里就很显眼的作弊交给写死的规则；代码里不显眼、但要动脑规划的，模型多半会在推理里写出来，这一种才适合交给读推理过程的监控。</p>
 
 <h3>防法二：用分层随机抽样和人工标注，估计漏了多少</h3>
 
@@ -948,11 +948,11 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 
 <h3>防法四：定期做回归测试</h3>
 
-<p>监控上线时好，不代表今天还好（<a href="./#p-monitor-drift">G5</a>）。服务方会在同一个接口名下悄悄更新模型。Chen、Zaharia 和 Zou 在 2023 年比较过同一个 API 名字背后的 GPT-4：3 月版判断一个数是不是质数的准确率是 84%，6 月版只剩 51%。如果你的裁判或复核模型用的是这种会自动更新的名字，标记率曲线上的一次跳变，可能只是它换了版本，而不是被训练的模型行为变了。被训练的模型变强后也会冒出新花样，比如 1B 里 Composer 2.5 逆向残留的类型检查缓存、反编译 Java 字节码（见 <a href="#s-c1b">1B</a> 的例二），这些都不在常见的作弊清单上，上线时写好的规则和提示词自然抓不到。</p>
+<p>监控上线时好，不代表今天还好（<a href="./full.html#p-monitor-drift">G5</a>）。服务方会在同一个接口名下悄悄更新模型。Chen、Zaharia 和 Zou 在 2023 年比较过同一个 API 名字背后的 GPT-4：3 月版判断一个数是不是质数的准确率是 84%，6 月版只剩 51%。如果你的裁判或复核模型用的是这种会自动更新的名字，标记率曲线上的一次跳变，可能只是它换了版本，而不是被训练的模型行为变了。被训练的模型变强后也会冒出新花样，比如 1B 里 Composer 2.5 逆向残留的类型检查缓存、反编译 Java 字节码（见 <a href="#s-c1b">1B</a> 的例二），这些都不在常见的作弊清单上，上线时写好的规则和提示词自然抓不到。</p>
 
 <p>防的办法是把监控当代码来测。维护一份固定、带版本号的验证集，监控的提示词、模型、阈值任何一处改动，都先在上面重跑，抓取率明显下降就不许上线。裁判和复核模型都固定到带日期的版本，不用会自动更新的别名。每批数据复制一小部分，用程序改写成已知的作弊（行内叫 canary，金丝雀样本），只送给审计用的监控、永远不进训练，每天看它们被抓到的比例；抓到的比例往下掉要报警，哪天一条金丝雀样本都没收到，说明这条检查流水线自己断了，同样要报警。框架自带的关键指标也要从原始记录重算一遍再对账，前面提到的 verl 截断率显示为 0 就是例子。每一步训练都应该出现的日志字段，某天突然没了，也要报警，而不是当成「没有异常」：开源库 TRL 就有人报告过，常用配置下 GRPO 的 policy loss 这项指标根本没被写进日志。</p>
 
-<p>把这四条串起来的是一条常驻的参照线：用写死的规则确认一批作弊（比如改了测试文件、提前退出），按训练步数看大模型监控在其中还能抓到多少。如果模型真的变乖了，规则命中率和监控报警会一起下降；如果规则命中率没降、奖励还在涨，监控的抓取率却在掉，就说明要么模型在躲监控，要么监控自己变了。这几条怎么落进系统，见本页后面的<a href="#s-design">整体系统设计</a>；更细的做法见完整版的<a href="./#design">整体设计</a>和<a href="./#m-validate">怎么评估监控本身</a>。</p>
+<p>把这四条串起来的是一条常驻的参照线：用写死的规则确认一批作弊（比如改了测试文件、提前退出），按训练步数看大模型监控在其中还能抓到多少。如果模型真的变乖了，规则命中率和监控报警会一起下降；如果规则命中率没降、奖励还在涨，监控的抓取率却在掉，就说明要么模型在躲监控，要么监控自己变了。这几条怎么落进系统，见本页后面的<a href="#s-design">整体系统设计</a>；更细的做法见完整版的<a href="./full.html#design">整体设计</a>和<a href="./full.html#m-validate">怎么评估监控本身</a>。</p>
 
 <div class="box ok">
 <h4>onsite 提示：第六类怎么讲</h4>
@@ -969,45 +969,45 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 
 <p>前面按「问题是什么」把 bad pattern 分成了六大类。这一节换个角度，按「用什么手段去抓」来总结。一共五种手段：按数据集和题目做统计，用规则扫代码改动和命令，能重跑环境时做对照验证，让大模型复核，以及发现没见过的新问题。前四种大致是从便宜到贵排的，第五种单独负责找新东西。它们不是五选一，而是一层接一层：便宜的手段把可疑的东西圈出来，贵的手段负责确认和解释，最后一种负责找出前四种都没想到的问题。</p>
 
-<p>贯穿所有手段的还是开头那句话：分数由模型、判分器、数据和环境三样东西共同决定，所以每抓到一个问题，最后都要追问一句，这是模型的锅、判分器的锅，还是数据和环境的锅（见<a href="#s-blame">「先判断是谁的锅」一节</a>）？统计最擅长回答「是不是数据的锅」，规则和重跑最擅长回答「模型具体做了什么、分数是怎么拿到的」。方法细节见完整版的<a href="./#m-why-not-keyword">方法论</a>一节。</p>
+<p>贯穿所有手段的还是开头那句话：分数由模型、判分器、数据和环境三样东西共同决定，所以每抓到一个问题，最后都要追问一句，这是模型的锅、判分器的锅，还是数据和环境的锅（见<a href="#s-blame">「先判断是谁的锅」一节</a>）？统计最擅长回答「是不是数据的锅」，规则和重跑最擅长回答「模型具体做了什么、分数是怎么拿到的」。方法细节见完整版的<a href="./full.html#m-why-not-keyword">方法论</a>一节。</p>
 
 <h3>① 按数据集和题目做统计</h3>
 
 <p>第一种手段完全不看单条 rollout 的内容，只看数字。把所有 rollout 按数据集、按题目分组，算出这样几组数：每道题的通过率；同一道题的一组 rollout 分数是不是全都一样；同样的最终代码有没有拿到不同的分；截断率和平均长度；分数和长度的相关性；以及出现最多的报错。数据里带训练步数的话，就把这些数字按步数画成曲线，看它们怎么随训练变化。</p>
 
-<p>它最擅长抓第二类「题目、环境或判分器本身坏了」和第三类「没有学习信号」，因为这两类问题是跟着题目走的，同一道题下的所有 rollout 都会表现出同一种异常。举几个例子。同一道题的所有 rollout 都卡在同一个 <code>ImportError</code> 上，多半是环境缺了依赖（<a href="./#p-broken-env">F5</a>），或者测试引用了一个题面里从没提过的名字（<a href="./#p-unsolvable">F1</a>），总之不是模型笨。大量题目通过率为 0，可能是题做不出来（F1），也可能是标准答案错了（<a href="./#p-label-error">F7</a>）；如果几个强模型的多数答案彼此一致、却都和标准答案不同，后一种的可能就很大。一组 rollout 分数全是 0 或全是 1，GRPO 就从这组里什么也学不到（<a href="./#p-zero-variance">F9</a>）；此外，完全重复、只是拿来凑数的 rollout 也提供不了新的信号，用哈希一比就能数出来（<a href="./#p-reward-misassign">R7</a>）。同样的代码时而 1 分时而 0 分，是测试时灵时不灵（<a href="./#p-flaky">F4</a>）。什么都没改、或者只改了测试的提交也拿到满分，是判分器有洞（<a href="./#p-weak-tests">F2</a>、<a href="./#p-grader-bug">F6</a>）。</p>
+<p>它最擅长抓第二类「题目、环境或判分器本身坏了」和第三类「没有学习信号」，因为这两类问题是跟着题目走的，同一道题下的所有 rollout 都会表现出同一种异常。举几个例子。同一道题的所有 rollout 都卡在同一个 <code>ImportError</code> 上，多半是环境缺了依赖（<a href="./full.html#p-broken-env">F5</a>），或者测试引用了一个题面里从没提过的名字（<a href="./full.html#p-unsolvable">F1</a>），总之不是模型笨。大量题目通过率为 0，可能是题做不出来（F1），也可能是标准答案错了（<a href="./full.html#p-label-error">F7</a>）；如果几个强模型的多数答案彼此一致、却都和标准答案不同，后一种的可能就很大。一组 rollout 分数全是 0 或全是 1，GRPO 就从这组里什么也学不到（<a href="./full.html#p-zero-variance">F9</a>）；此外，完全重复、只是拿来凑数的 rollout 也提供不了新的信号，用哈希一比就能数出来（<a href="./full.html#p-reward-misassign">R7</a>）。同样的代码时而 1 分时而 0 分，是测试时灵时不灵（<a href="./full.html#p-flaky">F4</a>）。什么都没改、或者只改了测试的提交也拿到满分，是判分器有洞（<a href="./full.html#p-weak-tests">F2</a>、<a href="./full.html#p-grader-bug">F6</a>）。</p>
 
-<p>它还能给另外两类报警。一是第五类「训练过程自己造出来的坏数据」里的输出退化：把长度、截断率、重复程度和语言分布按训练步数画出来，无限重复（<a href="./#p-repetition">D4</a>）、越写越长（<a href="./#p-length-dynamics">D5</a>）、语言混杂（<a href="./#p-lang-mix">D6</a>）和回答越来越千篇一律（<a href="./#p-entropy">D7</a>）都是一条看得见的上升或下降曲线；再看被截断的样本拿了什么分，就能查出截断记错分（<a href="./#p-truncation">R2</a>）。二是第一类「分给高了，模型骗到了分」：由裁判打分的数据集里，分数和长度高度相关，多半是在靠写长骗分（<a href="./#p-length">C2</a>）；某种行为随训练越来越多、又总和高分一起出现，多半是一种正在被学会的作弊。</p>
+<p>它还能给另外两类报警。一是第五类「训练过程自己造出来的坏数据」里的输出退化：把长度、截断率、重复程度和语言分布按训练步数画出来，无限重复（<a href="./full.html#p-repetition">D4</a>）、越写越长（<a href="./full.html#p-length-dynamics">D5</a>）、语言混杂（<a href="./full.html#p-lang-mix">D6</a>）和回答越来越千篇一律（<a href="./full.html#p-entropy">D7</a>）都是一条看得见的上升或下降曲线；再看被截断的样本拿了什么分，就能查出截断记错分（<a href="./full.html#p-truncation">R2</a>）。二是第一类「分给高了，模型骗到了分」：由裁判打分的数据集里，分数和长度高度相关，多半是在靠写长骗分（<a href="./full.html#p-length">C2</a>）；某种行为随训练越来越多、又总和高分一起出现，多半是一种正在被学会的作弊。</p>
 
-<div class="eg">1B 里 Poolside 发现模型翻 git 历史（<a href="./#p-git-future">B1</a>）的经过，就是统计先报警的典型：只有 SWE-bench Pro 一个评测在一个周末里猛涨，别的评测都不动，这个反常先引起了注意，他们才顺着去翻记录。发现它靠的不是逐条审查，而是几个评测之间的对比。</div>
+<div class="eg">1B 里 Poolside 发现模型翻 git 历史（<a href="./full.html#p-git-future">B1</a>）的经过，就是统计先报警的典型：只有 SWE-bench Pro 一个评测在一个周末里猛涨，别的评测都不动，这个反常先引起了注意，他们才顺着去翻记录。发现它靠的不是逐条审查，而是几个评测之间的对比。</div>
 
 <p>它抓不到的是「哪一条 rollout、具体做了什么」。统计只能说「这里不对劲，先看这里」，给不出能写进报告的证据；而且和别人不一样不等于坏，数学题的长度天然和写作题不同，要先按任务类型分组再比。它的成本最低，用 pandas（Python 的表格处理库）写，一个小时左右就能给 40 多个数据集各出一行体检结果，很多发现在这一步就会冒出来。</p>
 
 <h3>② 用规则扫代码改动和命令</h3>
 
-<p>第二种手段是写确定性的检测规则，扫模型留下的「动作和产物」，而不是它说的话：最终的代码改动，把新增代码解析成语法树以后看到的结构，执行过的每条 shell 命令，以及最终回复里的说法和记录里实际发生的事对不对得上。每条规则只抓一种已知的作弊写法，比如测试里的断言被删或被改松（<a href="./#p-test-tamper">A1</a>），<code>__eq__</code> 无条件返回 True（<a href="./#p-always-equal">A3</a>），git 命令访问了当前版本之后才有的提交（<a href="./#p-git-future">B1</a>），最终说「测试都过了」但最后一次测试其实失败了或根本没跑（<a href="./#p-false-success">E1</a>），同一条命令连续重复很多次（<a href="./#p-loops">E4</a>）。</p>
+<p>第二种手段是写确定性的检测规则，扫模型留下的「动作和产物」，而不是它说的话：最终的代码改动，把新增代码解析成语法树以后看到的结构，执行过的每条 shell 命令，以及最终回复里的说法和记录里实际发生的事对不对得上。每条规则只抓一种已知的作弊写法，比如测试里的断言被删或被改松（<a href="./full.html#p-test-tamper">A1</a>），<code>__eq__</code> 无条件返回 True（<a href="./full.html#p-always-equal">A3</a>），git 命令访问了当前版本之后才有的提交（<a href="./full.html#p-git-future">B1</a>），最终说「测试都过了」但最后一次测试其实失败了或根本没跑（<a href="./full.html#p-false-success">E1</a>），同一条命令连续重复很多次（<a href="./full.html#p-loops">E4</a>）。</p>
 
-<p>为什么不直接 grep 关键词？原因有两个。第一，同一个字符串可能是正常代码，也可能是作弊，只有看位置和上下文才分得开。<code>sys.exit(0)</code> 写在命令行程序的 main 函数里完全正常，程序干完活本来就该退出；同一句写在被测模块的最外层，测试一 import 这个模块，进程就以「成功」状态结束了，断言一行都没执行，这就是作弊（<a href="./#p-early-exit">A2</a>）。所以规则要只看新增的代码，要解析语法结构，要区分测试文件和实现文件，还要区分题目要求改的范围和范围之外。第二，模型大多不会在推理里承认自己在作弊，去推理过程里搜「hack」「cheat」基本搜不到。第六类讲过的两个实验就是证据：Chen 等人的模型靠暗示拿分，推理里提到暗示的比例不到 2%；Baker 等人把「推理里不许有作弊意图」写进奖励后，模型照样作弊，只是推理变干净了（<a href="./#p-obfuscation">G1</a>、<a href="./#p-unverbalized">G2</a>）。</p>
+<p>为什么不直接 grep 关键词？原因有两个。第一，同一个字符串可能是正常代码，也可能是作弊，只有看位置和上下文才分得开。<code>sys.exit(0)</code> 写在命令行程序的 main 函数里完全正常，程序干完活本来就该退出；同一句写在被测模块的最外层，测试一 import 这个模块，进程就以「成功」状态结束了，断言一行都没执行，这就是作弊（<a href="./full.html#p-early-exit">A2</a>）。所以规则要只看新增的代码，要解析语法结构，要区分测试文件和实现文件，还要区分题目要求改的范围和范围之外。第二，模型大多不会在推理里承认自己在作弊，去推理过程里搜「hack」「cheat」基本搜不到。第六类讲过的两个实验就是证据：Chen 等人的模型靠暗示拿分，推理里提到暗示的比例不到 2%；Baker 等人把「推理里不许有作弊意图」写进奖励后，模型照样作弊，只是推理变干净了（<a href="./full.html#p-obfuscation">G1</a>、<a href="./full.html#p-unverbalized">G2</a>）。</p>
 
-<p>规则能抓第一类里写法固定的作弊，以及第四类「分数看不见的坏行为」里留下明确痕迹的那些，比如执行了删除用户目录这类撤不回的命令（<a href="./#p-destructive">E6</a>）。它准确、可复现，每条命中自带证据（哪个文件、哪一行、第几步），每条 rollout 只要几毫秒，可以全量跑。它抓不到两种东西。一种是没见过的新招，因为规则只能在你知道这种作弊之后才写得出来。另一种是换了写法的老招，比如用别名导入 exit，或者用 getattr 按名字间接取到 exit 再调用，都能绕过一条朴素的规则。前者靠第五种手段去发现，后者靠第三种手段兜底。规则也会误报：题目本来就要求补测试时，改测试文件是正常的；合法的 <code>__eq__</code> 会逐个比较字段，不是作弊。所以规则的输出一律只当作「嫌疑」，要经过后面的步骤确认。</p>
+<p>规则能抓第一类里写法固定的作弊，以及第四类「分数看不见的坏行为」里留下明确痕迹的那些，比如执行了删除用户目录这类撤不回的命令（<a href="./full.html#p-destructive">E6</a>）。它准确、可复现，每条命中自带证据（哪个文件、哪一行、第几步），每条 rollout 只要几毫秒，可以全量跑。它抓不到两种东西。一种是没见过的新招，因为规则只能在你知道这种作弊之后才写得出来。另一种是换了写法的老招，比如用别名导入 exit，或者用 getattr 按名字间接取到 exit 再调用，都能绕过一条朴素的规则。前者靠第五种手段去发现，后者靠第三种手段兜底。规则也会误报：题目本来就要求补测试时，改测试文件是正常的；合法的 <code>__eq__</code> 会逐个比较字段，不是作弊。所以规则的输出一律只当作「嫌疑」，要经过后面的步骤确认。</p>
 
 <h3>③ 能重跑环境时做对照验证</h3>
 
 <p>第三种手段不去「判断」有没有作弊，而是动手做实验：把可疑的通道去掉，看分数掉不掉。分数一掉，怀疑就变成了证据，不需要相信任何人的解读，包括大模型的。具体有三种做法。</p>
 
 <ul>
-<li>把测试恢复成原版再打一次分。把模型最终的实现代码放进一个它从没碰过的干净环境，测试文件、测试配置和判分脚本全部用原版，重新打分。原来有分、现在没分，就说明分数来自改测试、改判分器或者改环境（<a href="./#p-test-tamper">A1</a>、<a href="./#p-grader-tamper">A4</a>、<a href="./#p-toolchain-poison">A8</a>）。这个办法不管代码怎么写都有效，正好补上规则会被换写法绕过的漏洞。</li>
-<li>跑空补丁和官方补丁。空补丁能拿分，说明判分器坏了或者测试太弱（<a href="./#p-weak-tests">F2</a>、<a href="./#p-grader-bug">F6</a>）；官方补丁拿不到分，说明题目、测试或环境坏了（<a href="./#p-unsolvable">F1</a>、<a href="./#p-broken-env">F5</a>）。这一步测的其实是判分器。</li>
-<li>同一个结果重跑几次。分数时有时无，就是测试时灵时不灵（<a href="./#p-flaky">F4</a>）。</li>
+<li>把测试恢复成原版再打一次分。把模型最终的实现代码放进一个它从没碰过的干净环境，测试文件、测试配置和判分脚本全部用原版，重新打分。原来有分、现在没分，就说明分数来自改测试、改判分器或者改环境（<a href="./full.html#p-test-tamper">A1</a>、<a href="./full.html#p-grader-tamper">A4</a>、<a href="./full.html#p-toolchain-poison">A8</a>）。这个办法不管代码怎么写都有效，正好补上规则会被换写法绕过的漏洞。</li>
+<li>跑空补丁和官方补丁。空补丁能拿分，说明判分器坏了或者测试太弱（<a href="./full.html#p-weak-tests">F2</a>、<a href="./full.html#p-grader-bug">F6</a>）；官方补丁拿不到分，说明题目、测试或环境坏了（<a href="./full.html#p-unsolvable">F1</a>、<a href="./full.html#p-broken-env">F5</a>）。这一步测的其实是判分器。</li>
+<li>同一个结果重跑几次。分数时有时无，就是测试时灵时不灵（<a href="./full.html#p-flaky">F4</a>）。</li>
 </ul>
 
-<div class="eg">同样的思路也可以整批做：把可能泄漏答案的渠道堵上，同一批题重跑一遍，看分数掉多少。前面两个例子用的都是这个办法：Cursor 删掉 git 历史、默认断网重跑 SWE-bench Pro，量出分数虚高了多少（见 <a href="#s-c1b">1B</a>）；Scale 把每个模型的代码改动放进干净镜像重新打分，抓到两个模型改了仓库之外的 Go 依赖（见 <a href="#s-c1a">1A</a> 的例三，<a href="./#p-toolchain-poison">A8</a>）。</div>
+<div class="eg">同样的思路也可以整批做：把可能泄漏答案的渠道堵上，同一批题重跑一遍，看分数掉多少。前面两个例子用的都是这个办法：Cursor 删掉 git 历史、默认断网重跑 SWE-bench Pro，量出分数虚高了多少（见 <a href="#s-c1b">1B</a>）；Scale 把每个模型的代码改动放进干净镜像重新打分，抓到两个模型改了仓库之外的 Go 依赖（见 <a href="#s-c1a">1A</a> 的例三，<a href="./full.html#p-toolchain-poison">A8</a>）。</div>
 
 <p>它覆盖第一类里对测试和环境下手、偷答案的大部分招数，以及第二类里判分器和环境的毛病。它给出的是实验结果而不是某个人或某个模型的判断，所以在五种手段里最可信。但它必须能重跑环境，而面试给的 zip 大概率只有静态记录；它也很贵，每次都要起容器跑测试，所以只对可疑样本和少量随机样本做。</p>
 
 <h3>④ 让大模型复核</h3>
 
-<p>面试官反感的是「把整条 rollout 丢给大模型，问它有没有作弊」。这样做，关键的几行会被长记录淹没，大模型会被 agent 写的解释说服，而且你根本不知道它判得准不准。但复核本身有用，因为有些问题只有读懂语义才判断得了，比如一条忽略 lint 报错的指令加得合不合理（<a href="./#p-suppress">A9</a>），任务是不是被悄悄缩了水（<a href="./#p-stub-mock">A7</a>），一段解释是不是在误导（<a href="./#p-sophistry">C8</a>）。靠谱的做法有四条。</p>
+<p>面试官反感的是「把整条 rollout 丢给大模型，问它有没有作弊」。这样做，关键的几行会被长记录淹没，大模型会被 agent 写的解释说服，而且你根本不知道它判得准不准。但复核本身有用，因为有些问题只有读懂语义才判断得了，比如一条忽略 lint 报错的指令加得合不合理（<a href="./full.html#p-suppress">A9</a>），任务是不是被悄悄缩了水（<a href="./full.html#p-stub-mock">A7</a>），一段解释是不是在误导（<a href="./full.html#p-sophistry">C8</a>）。靠谱的做法有四条。</p>
 
 <ol>
 <li>给它整理过的输入，而不是原始长记录：题目、每一步做了什么和这一步的关键输出（太长的截掉）、最终代码改动、分数是由哪几部分构成的，以及规则命中的位置。规则命中是请它核实的线索，不是结论。</li>
@@ -1016,7 +1016,7 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 <li>先在人工标注过的样本上测准，分别算真作弊里抓到多少、正常样本里误报多少。不要只看「和人工一致的比例」：如果只有 5% 的样本有问题，一个永远判「没问题」的复核模型一致率也有 95%，却一个都抓不到。</li>
 </ol>
 
-<div class="eg">它真的会被说辞骗。METR 的 MALT 数据集（专门用来检验这类监控的标注数据）里有一道按运行速度打分的 GPU 提速题，agent 在代码开头把 <code>time.time</code> 换成了一个只按真实速度千分之一走的假时钟，判分脚本量出来的耗时就凭空缩小了一千倍（<a href="./#p-perf-hacking">A6</a>）。担任复核的 o4-mini 给了 0 分，也就是完全不可疑，解释里还写着 agent 做的是正当的算法优化，「没有操纵判分脚本、没有 mock 计时器」。它读完 agent 对「优化」的一串描述，就没再认真看代码。所以复核结论里出现「没有做某事」这类否定句时，最好再用规则核对一遍。另外，rollout 里可能写着专门给裁判看的话（<a href="./#p-judge-injection">C6</a>），要用明确的分隔符把内容包起来，并在提示里声明这是不可信的数据，不是给它的指令。</div>
+<div class="eg">它真的会被说辞骗。METR 的 MALT 数据集（专门用来检验这类监控的标注数据）里有一道按运行速度打分的 GPU 提速题，agent 在代码开头把 <code>time.time</code> 换成了一个只按真实速度千分之一走的假时钟，判分脚本量出来的耗时就凭空缩小了一千倍（<a href="./full.html#p-perf-hacking">A6</a>）。担任复核的 o4-mini 给了 0 分，也就是完全不可疑，解释里还写着 agent 做的是正当的算法优化，「没有操纵判分脚本、没有 mock 计时器」。它读完 agent 对「优化」的一串描述，就没再认真看代码。所以复核结论里出现「没有做某事」这类否定句时，最好再用规则核对一遍。另外，rollout 里可能写着专门给裁判看的话（<a href="./full.html#p-judge-injection">C6</a>），要用明确的分隔符把内容包起来，并在提示里声明这是不可信的数据，不是给它的指令。</div>
 
 <p>大模型复核最贵，所以要严格控制它看什么。它抓不到没被送到它面前的东西：既没进候选、也没被随机抽到的 rollout，它永远看不到。</p>
 
@@ -1030,7 +1030,7 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 
 <p>第三种是看哪些行为随训练越来越多、而且和高分一起出现。把每条 rollout 抽成一组「做没做过某件事」的特征，比如跑过 <code>git log --all</code>、调用过 <code>curl</code>、改过测试配置、读过测试目录，在每个数据集里算出现这个特征时拿满分的概率比平均高多少，再按训练步数画出来。一个本不该影响对错的动作和高分强相关，就是环境漏洞的候选。作弊被学会的过程通常就是这个形状：先是偶尔出现，拿到分以后被迅速放大。</p>
 
-<div class="eg">1B 里 Composer 2.5 逆向残留的类型检查缓存、反编译 Java 字节码的例子（<a href="./#p-residual-artifacts">B3</a>）就属于这一种：这种招数没有固定的关键词可以 grep，Cursor 说是用 agent 式的监控工具发现的。对我们来说，能抓住它的线索是「信息从哪里来」：答案来自缓存和字节码，而不是来自题面和源码。</div>
+<div class="eg">1B 里 Composer 2.5 逆向残留的类型检查缓存、反编译 Java 字节码的例子（<a href="./full.html#p-residual-artifacts">B3</a>）就属于这一种：这种招数没有固定的关键词可以 grep，Cursor 说是用 agent 式的监控工具发现的。对我们来说，能抓住它的线索是「信息从哪里来」：答案来自缓存和字节码，而不是来自题面和源码。</div>
 
 <p>这一层的产出只是「这里有东西值得看」，每个新簇都要人工确认，再写成规则。摘要和聚类都便宜，真正贵的是人去读样本。</p>
 
@@ -1067,14 +1067,14 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 
 <h3>怎么知道监控准不准</h3>
 
-<p>五种手段本身也会出错。面试官一定会追问：「你说这个数据集的作弊率是 6%，误差多大？」「你怎么知道没漏？」回答不能是「我们的复核模型很强」，而是承认监控有误差，然后把误差量出来。具体的四条防法在<a href="#s-c6">第六类</a>里已经讲过：审计用的监控不进 reward；分层随机抽样做人工标注，再用 PPI 校正出带误差范围的作弊率；按数据集分开报，并做多重比较校正；用固定版本的标注集和金丝雀样本定期做回归测试（完整版对应的是<a href="./#m-validate">怎么评估 monitor 本身</a>）。</p>
+<p>五种手段本身也会出错。面试官一定会追问：「你说这个数据集的作弊率是 6%，误差多大？」「你怎么知道没漏？」回答不能是「我们的复核模型很强」，而是承认监控有误差，然后把误差量出来。具体的四条防法在<a href="#s-c6">第六类</a>里已经讲过：审计用的监控不进 reward；分层随机抽样做人工标注，再用 PPI 校正出带误差范围的作弊率；按数据集分开报，并做多重比较校正；用固定版本的标注集和金丝雀样本定期做回归测试（完整版对应的是<a href="./full.html#m-validate">怎么评估 monitor 本身</a>）。</p>
 
-<p>这里只补一点它和五种手段的关系。测监控能抓多少时，要用天然的「一定是作弊」的样本，不能只用人工注入或提示词诱导出来的作弊，因为两者长得完全不一样（<a href="./#p-monitor-validation">G4</a>）。而天然的作弊样本，正好来自前面几种手段的产出：一是规则的高置信命中；二是把测试恢复成原版重新打一次分后分数掉下来的样本；三是矛盾测试，也就是给一道题加一条和已有测试输入相同、期望输出不同的测试，能同时通过这两条的代码一定在作弊。另外，审了一批、一条也没发现，也只能写「低于某个上限」，不能写 0。</p>
+<p>这里只补一点它和五种手段的关系。测监控能抓多少时，要用天然的「一定是作弊」的样本，不能只用人工注入或提示词诱导出来的作弊，因为两者长得完全不一样（<a href="./full.html#p-monitor-validation">G4</a>）。而天然的作弊样本，正好来自前面几种手段的产出：一是规则的高置信命中；二是把测试恢复成原版重新打一次分后分数掉下来的样本；三是矛盾测试，也就是给一道题加一条和已有测试输入相同、期望输出不同的测试，能同时通过这两条的代码一定在作弊。另外，审了一批、一条也没发现，也只能写「低于某个上限」，不能写 0。</p>
 
 
 <h2 id="s-design">整体系统设计</h2>
 
-<p>五种手段讲完，下面把它们串成一个能交付的系统。整个系统可以归结成六条思路。第一，便宜的检查全量跑，贵的检查只看候选。统计和规则很便宜，规则每条 rollout 只要几毫秒，全部数据都跑；重跑环境和大模型复核很贵，只处理圈出来的可疑样本，再加一小份随机样本用来估计漏了多少；人工只看排在最前面的一小撮。第二，每个报警都必须带证据，写明是哪条 rollout、第几步、原文或代码改动，以及分数为什么被拿到了，没有证据的报警不进报告，这正是面试官要的「讲到具体的失败机制」。第三，数据集层面的问题和单条 rollout 层面的问题分开处理，因为很多看起来像模型坏行为的现象其实是数据问题。第四，已知问题用规则抓，未知问题靠发现机制去找。第五，监控本身也要被评估，要知道每个检测器报的有多少是真的、漏了多少。第六，先粗后细，第一版只出一张粗糙的体检表和几个高准确率的检测器，之后每加一个检测器，都由在数据里真的看到的例子来驱动。完整版对应的章节是<a href="./#design">整体设计</a>。</p>
+<p>五种手段讲完，下面把它们串成一个能交付的系统。整个系统可以归结成六条思路。第一，便宜的检查全量跑，贵的检查只看候选。统计和规则很便宜，规则每条 rollout 只要几毫秒，全部数据都跑；重跑环境和大模型复核很贵，只处理圈出来的可疑样本，再加一小份随机样本用来估计漏了多少；人工只看排在最前面的一小撮。第二，每个报警都必须带证据，写明是哪条 rollout、第几步、原文或代码改动，以及分数为什么被拿到了，没有证据的报警不进报告，这正是面试官要的「讲到具体的失败机制」。第三，数据集层面的问题和单条 rollout 层面的问题分开处理，因为很多看起来像模型坏行为的现象其实是数据问题。第四，已知问题用规则抓，未知问题靠发现机制去找。第五，监控本身也要被评估，要知道每个检测器报的有多少是真的、漏了多少。第六，先粗后细，第一版只出一张粗糙的体检表和几个高准确率的检测器，之后每加一个检测器，都由在数据里真的看到的例子来驱动。完整版对应的章节是<a href="./full.html#design">整体设计</a>。</p>
 
 <p>把这六条落到数据流上，就是下面这个漏斗。</p>
 
@@ -1113,7 +1113,7 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 
 <p>输入是 zip 里原样的 40 多个数据集。它们的格式很可能不统一，比如有的是一串聊天消息，有的按某家 API 的工具调用格式存，有的只有最终答案和一个分数，字段名和分数的含义也各不相同。所以第一件事是给每个数据集写一个小适配器，转成同一种结构：所属数据集、题目编号（同一道题的多条 rollout 共用，组内对比要用）、题面、按顺序排好的每一步（谁说的话、调了什么工具、参数、工具返回、退出码）、最终回复、最终代码改动、分数及其构成，以及截断标记、训练步数、模型版本等元信息。后面所有检测器只面对这一种结构，否则每加一个检测器都要写 40 遍。</p>
 
-<p>这一步还要顺手做三件事。一是把解析失败当成坏数据的信号：解析不出分数、消息顺序错乱、工具调用没有对应的返回，很可能就是第五类里「管线记账出错」。二是弄清分数字段的含义：无效的工具调用、超时、超长的样本，是记 0、记负分、记空值，还是干脆不在数据里。坏样本如果被悄悄丢掉，模型就可能学会故意弄出一次无效操作来躲掉低分，Cursor 在 Composer 的训练里就真实遇到过（<a href="./#p-null-reward">R1</a>）。三是给每个数据集记一份「允许做什么」的说明，比如能不能联网、能不能看 git 历史、能不能改测试。同一条 <code>curl</code>，在一个数据集里是偷答案，在另一个里可能就是任务本身。还要记下每条命令是模型自己发的，还是运行 agent 的框架替它发的。比如 Aider 这个框架提交代码时默认带 <code>--no-verify</code>；不区分发命令的是谁，就会把这件事误判成模型在绕过质量检查（<a href="./#p-gate-bypass">A10</a>）。输出是一张统一的大表，外加一次算好的派生特征，比如改过哪些文件、有没有动测试、是否声称成功、最后一次测试的退出码。</p>
+<p>这一步还要顺手做三件事。一是把解析失败当成坏数据的信号：解析不出分数、消息顺序错乱、工具调用没有对应的返回，很可能就是第五类里「管线记账出错」。二是弄清分数字段的含义：无效的工具调用、超时、超长的样本，是记 0、记负分、记空值，还是干脆不在数据里。坏样本如果被悄悄丢掉，模型就可能学会故意弄出一次无效操作来躲掉低分，Cursor 在 Composer 的训练里就真实遇到过（<a href="./full.html#p-null-reward">R1</a>）。三是给每个数据集记一份「允许做什么」的说明，比如能不能联网、能不能看 git 历史、能不能改测试。同一条 <code>curl</code>，在一个数据集里是偷答案，在另一个里可能就是任务本身。还要记下每条命令是模型自己发的，还是运行 agent 的框架替它发的。比如 Aider 这个框架提交代码时默认带 <code>--no-verify</code>；不区分发命令的是谁，就会把这件事误判成模型在绕过质量检查（<a href="./full.html#p-gate-bypass">A10</a>）。输出是一张统一的大表，外加一次算好的派生特征，比如改过哪些文件、有没有动测试、是否声称成功、最后一次测试的退出码。</p>
 
 <h3>第二步：数据集体检</h3>
 
@@ -1152,10 +1152,10 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 <div class="tw"><table>
 <thead><tr><th>数据集（示意）</th><th>状态</th><th>最主要的问题</th><th>证据</th><th>建议怎么处理</th></tr></thead>
 <tbody>
-<tr><td>swe_python_v3</td><td>判分器可以被钻空子</td><td>约 4% 的 rollout 改了测试文件，其中九成以上拿到了满分（<a href="./#p-test-tamper">A1</a>）。</td><td>131 条 rollout，每条附改动片段和步骤编号。</td><td>打分前把测试目录恢复成原版，在独立进程里跑测试。</td></tr>
-<tr><td>math_competition_b</td><td>标准答案可疑</td><td>有 37 道题，强模型的多数答案彼此一致，却和标准答案不同（<a href="./#p-label-error">F7</a>）。</td><td>37 道题，每道附答案分布。</td><td>人工复核这 37 道题，改正或者删除。</td></tr>
-<tr><td>terminal_tasks_a</td><td>环境坏了</td><td>有 23 道题的所有 rollout 都卡在同一个 apt-get 网络错误上（<a href="./#p-broken-env">F5</a>）。</td><td>23 道题，附统一的报错内容。</td><td>修好镜像，修好之前先把这些题从训练里拿掉。</td></tr>
-<tr><td>chat_helpful_c</td><td>裁判偏爱长回答</td><td>同一道题里回答越长分数越高，能验证的正确率却没变（<a href="./#p-length">C2</a>）。</td><td>组内长度和分数的相关性，附几组长短回答对比。</td><td>重新校准裁判，或在打分时控制住长度。</td></tr>
+<tr><td>swe_python_v3</td><td>判分器可以被钻空子</td><td>约 4% 的 rollout 改了测试文件，其中九成以上拿到了满分（<a href="./full.html#p-test-tamper">A1</a>）。</td><td>131 条 rollout，每条附改动片段和步骤编号。</td><td>打分前把测试目录恢复成原版，在独立进程里跑测试。</td></tr>
+<tr><td>math_competition_b</td><td>标准答案可疑</td><td>有 37 道题，强模型的多数答案彼此一致，却和标准答案不同（<a href="./full.html#p-label-error">F7</a>）。</td><td>37 道题，每道附答案分布。</td><td>人工复核这 37 道题，改正或者删除。</td></tr>
+<tr><td>terminal_tasks_a</td><td>环境坏了</td><td>有 23 道题的所有 rollout 都卡在同一个 apt-get 网络错误上（<a href="./full.html#p-broken-env">F5</a>）。</td><td>23 道题，附统一的报错内容。</td><td>修好镜像，修好之前先把这些题从训练里拿掉。</td></tr>
+<tr><td>chat_helpful_c</td><td>裁判偏爱长回答</td><td>同一道题里回答越长分数越高，能验证的正确率却没变（<a href="./full.html#p-length">C2</a>）。</td><td>组内长度和分数的相关性，附几组长短回答对比。</td><td>重新校准裁判，或在打分时控制住长度。</td></tr>
 </tbody>
 </table></div>
 
@@ -1175,9 +1175,9 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 <div class="tw"><table>
 <thead><tr><th>rollout（示意）</th><th>标签</th><th>证据在哪里</th><th>拿到分了吗</th><th>怎么确认的</th></tr></thead>
 <tbody>
-<tr><td>swe_python_v3 第 412 题第 7 条</td><td>改测试（<a href="./#p-test-tamper">A1</a>）</td><td>第 23 步的代码改动删掉了两条断言。</td><td>拿到了满分。</td><td>规则命中，恢复原版测试后分数变成 0。</td></tr>
-<tr><td>terminal_tasks_a 第 88 题第 3 条</td><td>环境坏了（<a href="./#p-broken-env">F5</a>）</td><td>第 4 步 apt-get 报网络错误，同题其他 rollout 报错完全相同。</td><td>没有。</td><td>体检发现，同题 16 条 rollout 报错一致。</td></tr>
-<tr><td>swe_js_b 第 120 题第 12 条</td><td>谎称完成（<a href="./#p-false-success">E1</a>）</td><td>最终回复说测试全过，但第 31 步最后一次测试有 3 个失败。</td><td>没有。</td><td>规则命中，人工确认。</td></tr>
+<tr><td>swe_python_v3 第 412 题第 7 条</td><td>改测试（<a href="./full.html#p-test-tamper">A1</a>）</td><td>第 23 步的代码改动删掉了两条断言。</td><td>拿到了满分。</td><td>规则命中，恢复原版测试后分数变成 0。</td></tr>
+<tr><td>terminal_tasks_a 第 88 题第 3 条</td><td>环境坏了（<a href="./full.html#p-broken-env">F5</a>）</td><td>第 4 步 apt-get 报网络错误，同题其他 rollout 报错完全相同。</td><td>没有。</td><td>体检发现，同题 16 条 rollout 报错一致。</td></tr>
+<tr><td>swe_js_b 第 120 题第 12 条</td><td>谎称完成（<a href="./full.html#p-false-success">E1</a>）</td><td>最终回复说测试全过，但第 31 步最后一次测试有 3 个失败。</td><td>没有。</td><td>规则命中，人工确认。</td></tr>
 </tbody>
 </table></div>
 
@@ -1185,9 +1185,9 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 
 <h3>优先级怎么排</h3>
 
-<p>问题不能只按出现频率排。第一优先的是拿到了分的作弊，因为训练会放大它：一组里别人都是 0 分、唯独一条靠作弊拿了满分，它会被重点强化，下一轮类似行为更多，通用的招数还会扩散到别的环境（见<a href="#s-task">开头</a>）。更严重的是，这类作弊会泛化成更坏的行为，学会作弊的同一时刻，和作弊无关的对齐评估也一起变差（<a href="./#p-emergent-misalignment">G3</a>）。</p>
+<p>问题不能只按出现频率排。第一优先的是拿到了分的作弊，因为训练会放大它：一组里别人都是 0 分、唯独一条靠作弊拿了满分，它会被重点强化，下一轮类似行为更多，通用的招数还会扩散到别的环境（见<a href="#s-task">开头</a>）。更严重的是，这类作弊会泛化成更坏的行为，学会作弊的同一时刻，和作弊无关的对齐评估也一起变差（<a href="./full.html#p-emergent-misalignment">G3</a>）。</p>
 
-<p>第二优先的是破坏性行为，也就是分数看不见、但真会造成损害的事，比如删掉用户目录、强行推送覆盖远端的提交历史（<a href="./#p-destructive">E6</a>），以及关掉监控、事后掩盖（<a href="./#p-oversight">E7</a>）。它们不一定拿到了分，但一次就可能撤不回来。第三优先的是浪费算力的坏数据，比如做不出来的题、分数全一样的题组、坏掉的环境。它们不直接把模型教坏，但会白白烧掉训练预算，还会逼模型去学绕路的招数。</p>
+<p>第二优先的是破坏性行为，也就是分数看不见、但真会造成损害的事，比如删掉用户目录、强行推送覆盖远端的提交历史（<a href="./full.html#p-destructive">E6</a>），以及关掉监控、事后掩盖（<a href="./full.html#p-oversight">E7</a>）。它们不一定拿到了分，但一次就可能撤不回来。第三优先的是浪费算力的坏数据，比如做不出来的题、分数全一样的题组、坏掉的环境。它们不直接把模型教坏，但会白白烧掉训练预算，还会逼模型去学绕路的招数。</p>
 
 <p>在这个大顺序之内，再按几种情况往上或往下调。要往上调的有：作弊之后还加以掩盖，比如声称完成、或者编一段听起来合理的解释；同一种招数在三个以上数据集里同时出现，说明它是通用的，会到处扩散；在训练中还在变多。要往下调的是题目明确说了「只要让测试通过就行」的情况，这时模型钻空子算不上违背意图。另外，「尝试作弊」和「作弊并且拿到了分」要分开报，两者可能差几十上百倍：Anthropic 在 Fable 5.1 和 Mythos 5.1 的系统卡里，训练中真正靠作弊拿到分的比例在各模型上只有 0.12% 到 0.44%，尝试的比例却在 20% 到 28%。只报尝试率会把问题说得过分吓人，只报成功率又会漏掉正在酝酿、还没成功的问题。</p>
 
@@ -1236,7 +1236,7 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 
 <h2 id="s-qa">面试官可能追问的问题</h2>
 
-<p>每个回答的思路都一样：先说判断，再说理由，最后落到一个具体做法上。完整版里还有一组偏技术细节的<a href="./#design-qa">问答</a>可以对照看。</p>
+<p>每个回答的思路都一样：先说判断，再说理由，最后落到一个具体做法上。完整版里还有一组偏技术细节的<a href="./full.html#design-qa">问答</a>可以对照看。</p>
 
 <h3>发现作弊以后，是不是直接在 reward 里扣分？</h3>
 
@@ -1270,4 +1270,4 @@ body.toc-open #tocdrawer{transform:none;visibility:visible}
 
 <p>「因为有三件事它做不好。第一，只读记录，它看不到分数是怎么拿到的。很多作弊的关键不在记录的文字里，而在工作区之外的文件、依赖缓存和判分器的运行方式里，比如前面说的伪造 Go 依赖校验和，连代码改动里都看不到。第二，它会被说辞骗。ImpossibleBench 里有个例子：题目要求 Django 的数据库后端优先用新的参数名，Claude Opus 4.1 一开始写对了，测试失败后又改回优先用已经废弃的旧参数，理由是『要保持向后兼容』，担任复核的 Claude Opus 4 就接受了这个理由，没有报警。第三，也是最要命的，你不知道它准不准：同一个复核模型，在单文件的小题上能抓到八成多的作弊，到了多文件的仓库级任务上只剩四成到六成多。所以我让它做擅长的事，在规则和统计给出的证据上定性、写解释，必须引用原文，事先在标注集上测过准确率，阈值按能接受的误报率来定。」</p>
 
-</main><footer>另外两份：<a href="./">完整版</a> · <a href="./cheatsheet.html">人话版速读</a></footer><a id="backtop" href="#">↑ 顶部</a></body></html>
+</main><footer><a href="./">回到资料索引</a> · <a href="./full.html">完整版</a></footer><a id="backtop" href="#">↑ 顶部</a></body></html>
