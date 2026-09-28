@@ -97,7 +97,203 @@ svg.arch .ahead{fill:#5d6d7a}
 footer{border-top:1px solid var(--line);margin-top:80px;padding-top:26px;padding-bottom:60px;font-size:14px;color:var(--muted)}
 #backtop{position:fixed;right:18px;bottom:18px;background:var(--ink);color:#fff;border-radius:999px;padding:8px 14px;font-size:13px;text-decoration:none;opacity:.8}
 @media(max-width:720px){header,main,footer{padding:0 16px}.toc{grid-template-columns:1fr}.pattern{padding:4px 16px 14px}h2{font-size:24px}h2.part{font-size:26px}.detect td:first-child{white-space:normal}}
-</style></head><body>
+</style><style>
+#tocbtn{position:fixed;top:14px;right:14px;z-index:50;background:var(--ink);color:#fff;border:0;border-radius:999px;padding:8px 15px;font-size:14px;font-weight:650;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+#tocbtn:hover{background:#26394a}
+#tocdrawer{position:fixed;top:0;right:0;height:100vh;height:100dvh;width:min(380px,88vw);background:#fff;z-index:60;box-shadow:-8px 0 30px rgba(0,0,0,.15);transform:translateX(105%);transition:transform .2s ease;display:flex;flex-direction:column;visibility:hidden}
+body.toc-open #tocdrawer{transform:none;visibility:visible}
+#tocshade{position:fixed;inset:0;background:rgba(15,25,35,.28);z-index:55}
+.td-head{display:flex;justify-content:space-between;align-items:center;padding:14px 16px 8px;font-size:16px}
+#tocclose{border:0;background:none;font-size:18px;cursor:pointer;color:var(--muted);padding:4px 8px}
+#tocfilter{margin:0 16px 8px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:14px}
+.td-body{position:relative;overflow-y:auto;padding:0 12px 40px 16px;font-size:14px;line-height:1.5;flex:1}
+.td-body a{display:block;padding:4px 7px;border-radius:6px;text-decoration:none;color:var(--ink)}
+.td-body a:hover{background:#eef4f7}
+.td-body a.active{background:#dfecf2;color:var(--accent);font-weight:650}
+.td-grp{font-size:12px;font-weight:750;letter-spacing:.08em;color:var(--muted);margin:16px 0 4px 7px}
+.td-cat summary{cursor:pointer;padding:3px 0 3px 2px;font-weight:650}
+.td-cat summary a{display:inline;padding:2px 4px}
+.td-cat .n{font-size:12px;color:var(--muted);font-weight:500}
+.td-body a.td-card{padding-left:22px;font-size:13.5px}
+.td-card .c{display:inline-block;min-width:30px;font:700 12px Consolas,monospace;color:var(--muted)}
+@media(min-width:1400px){body.toc-open{padding-right:380px}}
+@media print{#tocbtn,#tocdrawer,#tocshade{display:none!important}}
+</style></head><body id="top">
+<button id="tocbtn" aria-controls="tocdrawer" aria-expanded="false">☰ 目录</button>
+<div id="tocshade" hidden></div>
+<aside id="tocdrawer" aria-label="目录" aria-hidden="true">
+<div class="td-head"><strong>目录</strong><button id="tocclose" aria-label="关闭目录">✕</button></div>
+<input id="tocfilter" type="search" placeholder="搜索编号或关键词，如 A3、git、flaky" aria-label="搜索目录">
+<nav class="td-body">
+<div class="td-grp">开篇</div>
+<a href="#top">页首 · 读法建议</a>
+<a href="#cursor">Cursor 自己公开过的坑</a>
+<a href="#anthropic">Anthropic model card 的演进</a>
+<a href="#zh-reading">中文资料导读（知乎）</a>
+<div class="td-grp">第一部分 · Bad pattern 图鉴</div>
+<a href="#overview">总览表</a>
+<details class="td-cat"><summary><a href="#cat-A">A · 对测试与评测器下手</a> <span class="n">12</span></summary>
+<a class="td-card" href="#p-test-tamper" title="修改、弱化或删除测试"><span class="c">A1</span>修改、弱化或删除测试</a>
+<a class="td-card" href="#p-early-exit" title="提前退出与让测试「不算数」（sys.exit(0)、SkipTest、skip/xfail、-k/--deselect）"><span class="c">A2</span>提前退出与让测试「不算数」</a>
+<a class="td-card" href="#p-always-equal" title="重载比较运算符（AlwaysEqual、__torch_function__ 劫持）"><span class="c">A3</span>重载比较运算符</a>
+<a class="td-card" href="#p-grader-tamper" title="在评测进程内篡改测试框架与评分器（conftest.py 改报告、monkeypatch evaluator/计时器、读 grader 调用栈）"><span class="c">A4</span>在评测进程内篡改测试框架与评分器</a>
+<a class="td-card" href="#p-special-casing" title="针对测试的特判与硬编码（含测试环境探测、调用栈判断、只查外延的 verifier）"><span class="c">A5</span>针对测试的特判与硬编码</a>
+<a class="td-card" href="#p-perf-hacking" title="性能/计时类任务的度量作弊（显存复用、伪造时钟、按测试 shape 走捷径）"><span class="c">A6</span>性能/计时类任务的度量作弊</a>
+<a class="td-card" href="#p-stub-mock" title="桩实现、mock 表演、静默缩水与偷换任务"><span class="c">A7</span>桩实现、mock 表演、静默缩水与偷换任务</a>
+<a class="td-card" href="#p-toolchain-poison" title="污染共享环境与工具链（二进制替身、假包、改依赖/锁文件、stub 掉报错的库）"><span class="c">A8</span>污染共享环境与工具链</a>
+<a class="td-card" href="#p-suppress" title="压制报错：lint/type 忽略指令与宽泛吞异常"><span class="c">A9</span>压制报错：lint/type 忽略指令与宽泛吞异常</a>
+<a class="td-card" href="#p-gate-bypass" title="绕过质量门禁：--no-verify、|| true、削弱门禁配置、不跑门禁、对风格指标的 Goodhart"><span class="c">A10</span>绕过质量门禁：--no-verify、|| true、削弱门禁配置、不跑门禁、对风格指标的 Goodhart</a>
+<a class="td-card" href="#p-formal-bypass" title="形式化验证的逃生口：sorry/admit/assume(false)、伪造公理、移出信任边界、native_decide、checker 漏洞"><span class="c">A11</span>形式化验证的逃生口：sorry/admit/assume(false)、伪造公理、移出信任边界、native_decide、checker 漏洞</a>
+<a class="td-card" href="#p-formal-spec" title="改尺子：篡改 spec、空洞 spec、利用错误形式化"><span class="c">A12</span>改尺子：篡改 spec、空洞 spec、利用错误形式化</a>
+</details>
+<details class="td-cat"><summary><a href="#cat-B">B · 偷答案与越界：利用环境</a> <span class="n">5</span></summary>
+<a class="td-card" href="#p-git-future" title="从 .git 的「未来状态」里翻出官方修复（git log --all、tags、reflog）"><span class="c">B1</span>从 .git 的「未来状态」里翻出官方修复</a>
+<a class="td-card" href="#p-network-retrieval" title="联网取答案：上游查找、装新版本包、下载 benchmark 数据集"><span class="c">B2</span>联网取答案：上游查找、装新版本包、下载 benchmark 数据集</a>
+<a class="td-card" href="#p-residual-artifacts" title="沙箱里残留的答案与工件（类型检查缓存、字节码、参考模型、grader 对象）"><span class="c">B3</span>沙箱里残留的答案与工件</a>
+<a class="td-card" href="#p-grader-inference" title="评测元数据泄漏与「猜 grader」：按推断出的评分标准作答"><span class="c">B4</span>评测元数据泄漏与「猜 grader」：按推断出的评分标准作答</a>
+<a class="td-card" href="#p-out-of-band" title="绕过规定接口直接改状态、越权与沙箱逃逸（改棋盘文件、延长超时、Docker API、用凭证）"><span class="c">B5</span>绕过规定接口直接改状态、越权与沙箱逃逸</a>
+</details>
+<details class="td-cat"><summary><a href="#cat-C">C · 骗 judge 与 reward model</a> <span class="n">11</span></summary>
+<a class="td-card" href="#p-rm-overopt" title="Reward model 过优化：proxy 分数一直涨，真实质量先升后降（Goodhart 总图景）"><span class="c">C1</span>Reward model 过优化：proxy 分数一直涨，真实质量先升后降</a>
+<a class="td-card" href="#p-length" title="长度与啰嗦 hacking"><span class="c">C2</span>长度与啰嗦 hacking</a>
+<a class="td-card" href="#p-format-bias" title="格式与风格偏置利用（列表、加粗、emoji、模板）"><span class="c">C3</span>格式与风格偏置利用</a>
+<a class="td-card" href="#p-sycophancy" title="谄媚与用户反馈 hacking"><span class="c">C4</span>谄媚与用户反馈 hacking</a>
+<a class="td-card" href="#p-master-key" title="「万能钥匙」：生成式 verifier / judge 被空格、标点、开场白骗出满分"><span class="c">C5</span>「万能钥匙」：生成式 verifier / judge 被空格、标点、开场白骗出满分</a>
+<a class="td-card" href="#p-judge-injection" title="对评分器的 prompt injection 与「对评审说话」"><span class="c">C6</span>对评分器的 prompt injection 与「对评审说话」</a>
+<a class="td-card" href="#p-rubric-gaming" title="Rubric 博弈、退化合规与改写评测资产"><span class="c">C7</span>Rubric 博弈、退化合规与改写评测资产</a>
+<a class="td-card" href="#p-sophistry" title="误导评估者（U-Sophistry）与「演给 grader 看」"><span class="c">C8</span>误导评估者（U-Sophistry）与「演给 grader 看」</a>
+<a class="td-card" href="#p-judge-bias" title="Judge 的结构性偏置：位置偏置、自我偏好、同源评估"><span class="c">C9</span>Judge 的结构性偏置：位置偏置、自我偏好、同源评估</a>
+<a class="td-card" href="#p-prm-hacking" title="过程奖励模型（PRM）的步骤 hacking"><span class="c">C10</span>过程奖励模型（PRM）的步骤 hacking</a>
+<a class="td-card" href="#p-epistemic" title="认知姿态 hacking：过度谨慎的套话与装作验证过的过度自信"><span class="c">C11</span>认知姿态 hacking：过度谨慎的套话与装作验证过的过度自信</a>
+</details>
+<details class="td-cat"><summary><a href="#cat-D">D · RLVR 与推理训练里看得见的坏模式</a> <span class="n">9</span></summary>
+<a class="td-card" href="#p-verifier-fn" title="规则 verifier 假阴性与 reward 管线的静默 bug"><span class="c">D1</span>规则 verifier 假阴性与 reward 管线的静默 bug</a>
+<a class="td-card" href="#p-guessable" title="可猜题与「答案对、推理错」的 flawed positive"><span class="c">D2</span>可猜题与「答案对、推理错」的 flawed positive</a>
+<a class="td-card" href="#p-format-tag" title="格式与标签投机（跳过思考、多个答案标签、推理塞进答案）"><span class="c">D3</span>格式与标签投机</a>
+<a class="td-card" href="#p-repetition" title="退化重复、不出 EOS、死循环直到截断"><span class="c">D4</span>退化重复、不出 EOS、死循环直到截断</a>
+<a class="td-card" href="#p-length-dynamics" title="长度偏置、过度思考与欠思考"><span class="c">D5</span>长度偏置、过度思考与欠思考</a>
+<a class="td-card" href="#p-lang-mix" title="语言混杂与推理可读性漂移"><span class="c">D6</span>语言混杂与推理可读性漂移</a>
+<a class="td-card" href="#p-entropy" title="熵塌缩、熵爆炸与模式坍缩（含无标签自奖励的共识坍缩）"><span class="c">D7</span>熵塌缩、熵爆炸与模式坍缩</a>
+<a class="td-card" href="#p-behavior-collapse" title="行为塌缩与推理外溢（CoT 写进注释、只用 terminal、建了 TODO 不做、工具调用投机）"><span class="c">D8</span>行为塌缩与推理外溢</a>
+<a class="td-card" href="#p-spurious" title="污染与伪奖励增益（随机 reward 也涨分）"><span class="c">D9</span>污染与伪奖励增益</a>
+</details>
+<details class="td-cat"><summary><a href="#cat-E">E · Agent 轨迹里的坏行为</a> <span class="n">8</span></summary>
+<a class="td-card" href="#p-false-success" title="虚假完成声明与「不跑就交」"><span class="c">E1</span>虚假完成声明与「不跑就交」</a>
+<a class="td-card" href="#p-fabricated" title="捏造行动、工具结果与出处"><span class="c">E2</span>捏造行动、工具结果与出处</a>
+<a class="td-card" href="#p-mismatch" title="忽视环境反馈，以及「想的和做的不一样」"><span class="c">E3</span>忽视环境反馈，以及「想的和做的不一样」</a>
+<a class="td-card" href="#p-loops" title="循环、卡死与答案来回摇摆"><span class="c">E4</span>循环、卡死与答案来回摇摆</a>
+<a class="td-card" href="#p-giving-up" title="放弃、回避与甩锅"><span class="c">E5</span>放弃、回避与甩锅</a>
+<a class="td-card" href="#p-destructive" title="破坏性与不可逆操作"><span class="c">E6</span>破坏性与不可逆操作</a>
+<a class="td-card" href="#p-oversight" title="破坏监督与事后掩盖"><span class="c">E7</span>破坏监督与事后掩盖</a>
+<a class="td-card" href="#p-sandbagging" title="Sandbagging 与评估情境感知"><span class="c">E8</span>Sandbagging 与评估情境感知</a>
+</details>
+<details class="td-cat"><summary><a href="#cat-F">F · 数据与环境本身的问题（bad data）</a> <span class="n">9</span></summary>
+<a class="td-card" href="#p-unsolvable" title="不可解、矛盾、欠规格与测试过窄（假阴性型坏题，也是 hacking 的诱因）"><span class="c">F1</span>不可解、矛盾、欠规格与测试过窄</a>
+<a class="td-card" href="#p-weak-tests" title="测试太弱（假阳性型坏题）"><span class="c">F2</span>测试太弱</a>
+<a class="td-card" href="#p-leakage-in-prompt" title="题面泄漏答案"><span class="c">F3</span>题面泄漏答案</a>
+<a class="td-card" href="#p-flaky" title="Flaky 与非确定性评分"><span class="c">F4</span>Flaky 与非确定性评分</a>
+<a class="td-card" href="#p-broken-env" title="环境漂移、构建失败与资源限制（伪装成 agent 的坏行为）"><span class="c">F5</span>环境漂移、构建失败与资源限制</a>
+<a class="td-card" href="#p-grader-bug" title="判分脚手架 bug（日志解析错、空判据满分、子串匹配）"><span class="c">F6</span>判分脚手架 bug</a>
+<a class="td-card" href="#p-label-error" title="错误参考答案与标签（以及由此引发的 answer thrashing）"><span class="c">F7</span>错误参考答案与标签</a>
+<a class="td-card" href="#p-contamination" title="数据污染与记忆"><span class="c">F8</span>数据污染与记忆</a>
+<a class="td-card" href="#p-zero-variance" title="难度失配、零方差组与分布偏斜"><span class="c">F9</span>难度失配、零方差组与分布偏斜</a>
+</details>
+<details class="td-cat"><summary><a href="#cat-R">R · Reward 管线与 rollout 记录的完整性（infra 造出来的坏数据）</a> <span class="n">7</span></summary>
+<a class="td-card" href="#p-null-reward" title="「无效即免罚」：坏 tool call / 异常终止被过滤而不是被惩罚"><span class="c">R1</span>「无效即免罚」：坏 tool call / 异常终止被过滤而不是被惩罚</a>
+<a class="td-card" href="#p-truncation" title="截断、超时与异常终止的记账错误"><span class="c">R2</span>截断、超时与异常终止的记账错误</a>
+<a class="td-card" href="#p-train-infer-mismatch" title="训练与推理引擎的概率不一致（隐性 off-policy）"><span class="c">R3</span>训练与推理引擎的概率不一致</a>
+<a class="td-card" href="#p-retokenization" title="Token 级不一致：retokenization、chat template 不一致、多轮 think 被剥离"><span class="c">R4</span>Token 级不一致：retokenization、chat template 不一致、多轮 think 被剥离</a>
+<a class="td-card" href="#p-parser-normalization" title="Tool-call parser 自动纠错，掩盖模型真实的格式错误"><span class="c">R5</span>Tool-call parser 自动纠错，掩盖模型真实的格式错误</a>
+<a class="td-card" href="#p-mask-logprob" title="Loss mask 归属与 logprob 元数据错位"><span class="c">R6</span>Loss mask 归属与 logprob 元数据错位</a>
+<a class="td-card" href="#p-reward-misassign" title="Reward 与样本错配，以及重复、填充的 rollout"><span class="c">R7</span>Reward 与样本错配，以及重复、填充的 rollout</a>
+</details>
+<details class="td-cat"><summary><a href="#cat-G">G · 监控本身的陷阱</a> <span class="n">5</span></summary>
+<a class="td-card" href="#p-obfuscation" title="优化压力下的混淆：CoT 干净，照样 hack（含 reward 意外读到 CoT 的 pipeline bug）"><span class="c">G1</span>优化压力下的混淆：CoT 干净，照样 hack</a>
+<a class="td-card" href="#p-unverbalized" title="不说出口的 hack 与 CoT 事后合理化（以及会自曝的情形）"><span class="c">G2</span>不说出口的 hack 与 CoT 事后合理化</a>
+<a class="td-card" href="#p-emergent-misalignment" title="「无害」hack 的泛化：从改测试到 misalignment，以及只做离线过滤为什么不够"><span class="c">G3</span>「无害」hack 的泛化：从改测试到 misalignment，以及只做离线过滤为什么不够</a>
+<a class="td-card" href="#p-monitor-validation" title="Monitor 评估的陷阱：标记率不等于 hack 率、注入的 hack 让 recall 虚高、40 个 dataset 之间不同质"><span class="c">G4</span>Monitor 评估的陷阱：标记率不等于 hack 率、注入的 hack 让 recall 虚高、40 个 dataset 之间不同质</a>
+<a class="td-card" href="#p-monitor-drift" title="Monitor 的漂移与静默失效"><span class="c">G5</span>Monitor 的漂移与静默失效</a>
+</details>
+<div class="td-grp">第二部分 · 识别方法工具箱</div>
+<a href="#m-why-not-keyword">1. 为什么只靠 keyword、只靠「LLM 看一眼」不行</a>
+<a href="#m-rules">2. 确定性规则与静态分析</a>
+<a href="#m-counterfactual">3. 反事实、对照与金丝雀</a>
+<a href="#m-llm-monitor">4. LLM transcript monitor 的工程做法</a>
+<a href="#m-discovery">5. 发现未知模式</a>
+<a href="#m-judge-monitor">6. 针对 judge 和 reward model 的监控</a>
+<a href="#m-whitebox">7. 白盒与廉价学习型检测</a>
+<a href="#m-train-metrics">训练期指标面板：单条 rollout 看不出、曲线上一眼能看出的问题</a>
+<a href="#m-dataset-level">数据集 / task 级体检：先把数据和环境的问题剥出来</a>
+<a href="#m-record-integrity">rollout 记录完整性检查：infra 造出来的坏数据</a>
+<a href="#m-formal">形式化类 dataset 的专门审计</a>
+<a href="#m-validate">怎么评估 monitor 本身</a>
+<div class="td-grp">第三部分 · Overall 设计</div>
+<a href="#design-principles">设计原则（每条都能在面试里展开）</a>
+<a href="#design-arch">系统架构</a>
+<a href="#design-schema">第 0 步：统一 schema（onsite 最先要写的代码）</a>
+<a href="#design-l0">L0 · 数据集 / task 级体检：先看这张表，再看任何一条 rollout</a>
+<a href="#design-l1">L1 · 确定性检测器：为什么要 AST 和 diff，不能只靠 keyword</a>
+<a href="#design-l2">L2 · 反事实复核：把「怀疑」变成「证明」</a>
+<a href="#design-l3">L3 · LLM monitor：怎么做才不是「给个 prompt 让它 judge」</a>
+<a href="#design-l4">L4 · 未知模式发现：怎么找到「easy 之外的」</a>
+<a href="#design-l5">Triage、输出和闭环</a>
+<a href="#design-plan">onsite 时间分配建议（先粗后细）</a>
+<a href="#design-repo">代码结构</a>
+<a href="#design-qa">面试官可能追问的问题，以及回答要点</a>
+<div class="td-grp">其他</div>
+<a href="./cheatsheet.html">速查页（单独页面）</a>
+<a href="#refs">参考资料</a>
+</nav></aside>
+<script>
+(function(){
+  var b=document.body,btn=document.getElementById('tocbtn'),dr=document.getElementById('tocdrawer'),
+      sh=document.getElementById('tocshade'),cl=document.getElementById('tocclose'),f=document.getElementById('tocfilter'),
+      body=dr.querySelector('.td-body');
+  function wide(){return window.matchMedia('(min-width:1400px)').matches}
+  function set(o){
+    b.classList.toggle('toc-open',o);btn.setAttribute('aria-expanded',o?'true':'false');dr.setAttribute('aria-hidden',o?'false':'true');
+    sh.hidden=!o||wide();
+    try{localStorage.setItem('rm-toc-open',o&&wide()?'1':'0')}catch(e){}
+    if(o){reveal();}
+  }
+  btn.addEventListener('click',function(){set(!b.classList.contains('toc-open'))});
+  cl.addEventListener('click',function(){set(false)});
+  sh.addEventListener('click',function(){set(false)});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'&&b.classList.contains('toc-open'))set(false)});
+  body.addEventListener('click',function(e){var a=e.target.closest('a');if(a&&!wide())set(false)});
+  try{if(localStorage.getItem('rm-toc-open')==='1'&&wide())set(true)}catch(e){}
+  f.addEventListener('input',function(){
+    var q=f.value.trim().toLowerCase();
+    body.querySelectorAll('a').forEach(function(a){
+      var hit=!q||(a.textContent+' '+(a.title||'')).toLowerCase().indexOf(q)>=0;a.style.display=hit?'':'none';});
+    body.querySelectorAll('details.td-cat').forEach(function(d){
+      if(!q){d.style.display='';return}
+      var any=[].some.call(d.querySelectorAll('a.td-card'),function(a){return a.style.display!=='none'});
+      var head=d.querySelector('summary a');if(any)head.style.display='';
+      d.style.display=(any||head.style.display!=='none')?'':'none';d.open=any;});
+  });
+  var links={};body.querySelectorAll('a[href^="#"]').forEach(function(a){links[a.getAttribute('href').slice(1)]=a});
+  var targets=[],cur=null,tick=false;
+  function collect(){
+    targets=Object.keys(links).map(function(id){return document.getElementById(id)}).filter(Boolean);
+    targets.sort(function(x,y){return x.compareDocumentPosition(y)&Node.DOCUMENT_POSITION_FOLLOWING?-1:1});
+  }
+  function reveal(){
+    if(!cur||!links[cur.id])return;var a=links[cur.id],d=a.closest('details');if(d&&!f.value)d.open=true;
+    var top=a.offsetTop;if(top<body.scrollTop||top>body.scrollTop+body.clientHeight-40)body.scrollTop=top-body.clientHeight/3;
+  }
+  function upd(){
+    tick=false;var best=null;
+    for(var i=0;i<targets.length;i++){if(targets[i].getBoundingClientRect().top<140)best=targets[i];else break}
+    if(best!==cur){if(cur&&links[cur.id])links[cur.id].classList.remove('active');cur=best;
+      if(cur&&links[cur.id]){links[cur.id].classList.add('active');if(b.classList.contains('toc-open'))reveal();}}
+  }
+  function start(){collect();upd();
+    window.addEventListener('scroll',function(){if(!tick){tick=true;requestAnimationFrame(upd)}},{passive:true});}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
+  window.addEventListener('resize',function(){sh.hidden=!b.classList.contains('toc-open')||wide()});
+})();
+</script>
 <header>
 <nav class="top"><a href="../">← Changyi Yang</a></nav>
 <div class="eyebrow">RL 数据质量 · REWARD HACKING · 面试准备</div>
