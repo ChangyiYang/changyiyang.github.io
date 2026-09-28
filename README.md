@@ -5,6 +5,7 @@ Changyi Yang 的 decks & proposals 总站。
 👉 <https://changyiyang.github.io/>
 
 ## 目录
+- [`rollout-monitoring/`](https://changyiyang.github.io/rollout-monitoring/) — RL rollout 坏模式图鉴与监控系统设计：66 个 reward hacking / 坏数据 pattern 的出处、案例、机制与检测，外加分层 monitor 设计
 - [`sglang-overlap/`](https://changyiyang.github.io/sglang-overlap/) — SGLang SBO / TBO 源码长文：6 张架构与时序图、ping-pong 调度、当前版本支持边界
 - [`minicpm-routing-audit/`](https://changyiyang.github.io/minicpm-routing-audit/) — MiniCPM-o 4.5 实时升级路由器：27 轮 probe-only 实验、严格因果读出与失败边界（18 slides）
 - [`weekly-progress-2026-08-31/`](https://changyiyang.github.io/weekly-progress-2026-08-31/) — concise English weekly engineering update: six measurable moves across B300, AMD, DSpark, data, parity, and E2E evaluation
