@@ -1,0 +1,460 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claude Code 与 Codex 的插件系统 · 2026-10</title>
+<meta name="description" content="Claude Code 的 14 种插件组件与 10 月 1 日发布的 mods（在 Claude Code 进程内运行的 TS/JS 事件处理器），Codex 的 Agent Plugins 跨厂商标准，以及两边的接口清单与例子。">
+<link rel="canonical" href="https://changyiyang.github.io/agent-plugins/">
+<meta property="og:title" content="Claude Code 与 Codex 的插件系统"><meta property="og:type" content="article"><meta property="og:locale" content="zh_CN">
+<style>
+:root{--ink:#17212b;--muted:#627182;--line:#e1e7ec;--accent:#236477;--warn:#a13c35;--ok:#2f6b55;--amber:#a8621c;--violet:#6a4c93;--bg:#fff;--soft:#f5f9fa;--code-bg:#f4f6f8;--pre-bg:#10212b;--pre-ink:#e6edf3;--card:#fcfdfe;--th:#f4f7f9}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:20px}
+body{margin:0;overflow-wrap:break-word;background:var(--bg);color:var(--ink);font:16px/1.85 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+a{color:var(--accent);text-underline-offset:3px}
+a:hover{color:#0e7490}
+header,main,footer{max-width:1080px;margin:auto;padding:0 28px}
+header{padding-top:36px}
+nav.top{font-size:14px;color:var(--muted)}
+.eyebrow{margin-top:46px;color:var(--accent);font-size:12px;font-weight:750;letter-spacing:.14em}
+h1{font-size:clamp(30px,4.4vw,48px);line-height:1.23;letter-spacing:-.03em;margin:14px 0 24px}
+h1 small{display:block;font-size:.46em;letter-spacing:0;margin-top:16px;font-weight:600;color:#526374;line-height:1.5}
+.lead{font-size:18.5px;max-width:900px}
+.meta{font-size:13px;color:var(--muted);margin:22px 0 28px}
+.intro{border-left:4px solid var(--accent);background:var(--soft);padding:18px 24px;margin:28px 0}
+.intro p{margin:0 0 10px}.intro p:last-child{margin:0}
+.toc{display:grid;grid-template-columns:1fr 1fr;gap:4px 28px;border:1px solid var(--line);padding:22px 26px;border-radius:9px;margin:32px 0 56px;font-size:14px;line-height:1.7}
+.toc a{text-decoration:none}
+.toc .grp{grid-column:1/-1;font-weight:750;color:var(--muted);font-size:12px;letter-spacing:.1em;margin-top:10px}
+h2{font-size:27px;letter-spacing:-.02em;margin:64px 0 6px;padding-top:12px;border-top:1px solid var(--line)}
+h3{font-size:19px;margin:38px 0 8px;letter-spacing:-.01em}
+h4{font-size:16px;margin:26px 0 6px;color:#2b3a47}
+p{margin:12px 0}
+code{background:var(--code-bg);padding:.12em .36em;border-radius:4px;font-size:.88em;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+pre{background:var(--pre-bg);color:var(--pre-ink);padding:18px 20px;border-radius:9px;overflow-x:auto;font-size:13.5px;line-height:1.7;margin:18px 0}
+pre code{background:none;padding:0;color:inherit;font-size:inherit}
+table{border-collapse:collapse;width:100%;margin:20px 0;font-size:14.5px}
+th,td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}
+th{background:var(--th);font-weight:700}
+td code{font-size:.9em}
+.note{background:var(--soft);border:1px solid var(--line);border-radius:9px;padding:16px 20px;margin:22px 0;font-size:15px}
+.warn{background:#fdf5f4;border:1px solid #efd8d5;border-left:4px solid var(--warn);border-radius:0 9px 9px 0;padding:16px 20px;margin:22px 0;font-size:15px}
+.ok{background:#f3f9f6;border:1px solid #d6e8df;border-left:4px solid var(--ok);border-radius:0 9px 9px 0;padding:16px 20px;margin:22px 0;font-size:15px}
+.tag{display:inline-block;font-size:12px;padding:2px 9px;border-radius:999px;background:var(--soft);border:1px solid var(--line);color:var(--muted);margin-right:6px}
+.tag.new{background:#f3f9f6;border-color:#d6e8df;color:var(--ok);font-weight:700}
+ul,ol{padding-left:24px}
+li{margin:7px 0}
+footer{margin:80px 0 60px;padding-top:24px;border-top:1px solid var(--line);font-size:14px;color:var(--muted)}
+@media(max-width:720px){.toc{grid-template-columns:1fr}header,main,footer{padding:0 18px}}
+</style>
+</head>
+<body>
+<header>
+<nav class="top"><a href="../">← Decks &amp; Proposals</a></nav>
+<div class="eyebrow">CODING AGENT · 扩展机制</div>
+<h1>Claude Code 与 Codex 的插件系统<small>14 种组件、进程内运行的 mods，和一个跨厂商标准——两家把"可扩展"做成了两件不同的事</small></h1>
+<p class="lead">2026 年 10 月 1 日 Claude Code 发布了 <b>mods</b>：用 TypeScript 写、<b>跑在 Claude Code 自己进程里</b>的事件处理器，能画 UI、拦截工具调用、替换内置功能。同一时期 Codex 走了另一条路——采纳 <b>Agent Plugins</b> 这个由 Amazon / Cursor / Microsoft / OpenAI / Vercel 共同治理的跨厂商打包标准。这页把两边的接口清单、文件结构和例子都列出来。</p>
+<p class="meta">整理于 2026-10-02 · 以官方文档为准 · Claude Code mods 需要 v2.1.287+</p>
+</header>
+
+<main>
+
+<div class="intro">
+<p><b>一句话对比。</b>Claude Code 把扩展做<b>深</b>：14 种组件，外加一层能进到渲染和事件循环里的 mods。Codex 把扩展做<b>宽</b>：组件种类少，但采用了能跨客户端复用的开放标准。</p>
+<p><b>一个值得注意的事实：</b>Agent Plugins 标准的技术指导委员会里有 Amazon、Cursor、Microsoft、OpenAI、Vercel，<b>没有 Anthropic</b>。</p>
+</div>
+
+<div class="toc">
+  <div class="grp">CLAUDE CODE</div>
+  <a href="#cc-components">1 · 插件的 14 种组件</a>
+  <a href="#cc-detail">2 · 每种组件怎么写</a>
+  <div class="grp">MODS（10 月 1 日发布）</div>
+  <a href="#mods-what">3 · mod 是什么、跟谁不一样</a>
+  <a href="#mods-example">4 · 一个完整的最小 mod</a>
+  <a href="#mods-events">5 · 事件清单</a>
+  <a href="#mods-api">6 · $ API 与渲染点</a>
+  <a href="#mods-limits">7 · 限制、内置 mod 与安全</a>
+  <div class="grp">CODEX</div>
+  <a href="#codex">8 · Codex 的插件</a>
+  <a href="#standard">9 · Agent Plugins 跨厂商标准</a>
+  <div class="grp">对比与选择</div>
+  <a href="#compare">10 · 横向对比</a>
+  <a href="#examples">11 · 三个例子</a>
+  <a href="#pick">12 · 怎么选</a>
+</div>
+
+<h2 id="cc-components">1 · Claude Code 插件的 14 种组件</h2>
+
+<p>一个 plugin 就是<b>一个目录加一份 manifest</b>。manifest 在 <code>.claude-plugin/plugin.json</code>，给插件一个名字；其余组件按约定目录摆放，每一种都可选，一个都不加也是合法插件。</p>
+
+<table>
+<thead><tr><th>组件</th><th>路径</th><th>作用</th></tr></thead>
+<tbody>
+<tr><td><b>Manifest</b></td><td><code>.claude-plugin/plugin.json</code></td><td>必需。名字、版本、描述、各组件位置的覆盖键</td></tr>
+<tr><td><b>Skills</b></td><td><code>skills/&lt;name&gt;/SKILL.md</code></td><td>描述匹配任务时 Claude 自动加载；也能当 <code>/plugin:name</code> 命令跑。<b>新写的东西都该用它</b></td></tr>
+<tr><td><b>Commands</b></td><td><code>commands/*.md</code></td><td>旧格式，已被 skills 取代。只建议用来搬迁 <code>.claude/commands/</code> 里的老文件</td></tr>
+<tr><td><b>Agents</b></td><td><code>agents/*.md</code></td><td>子 agent，自带指令和独立上下文窗口。支持子目录嵌套命名</td></tr>
+<tr><td><b>Hooks</b></td><td><code>hooks/hooks.json</code></td><td>生命周期触发：shell 命令、HTTP 请求、MCP 工具调用、给模型的 prompt，或一个子 agent</td></tr>
+<tr><td><b>MCP servers</b></td><td><code>.mcp.json</code></td><td>给 Claude 加工具</td></tr>
+<tr><td><b>LSP servers</b></td><td><code>.lsp.json</code></td><td>语言诊断与代码导航。插件只负责配置连接，<b>不负责装 binary</b></td></tr>
+<tr><td><b>Workflows</b></td><td><code>workflows/*.js</code></td><td>一个 <code>meta</code> 块加脚本体，编排多个子 agent，以 <code>/plugin:name</code> 运行</td></tr>
+<tr><td><b>Executables</b></td><td><code>bin/*</code></td><td>插件启用期间进 Bash 工具的 <code>PATH</code>，Claude 可以当普通命令调。排在用户自己的 PATH 之后，<b>盖不掉 <code>git</code>/<code>ls</code></b></td></tr>
+<tr><td><b>Monitors</b></td><td><code>monitors/monitors.json</code></td><td>整个 session 后台跑的 shell 命令，输出作为通知送到 Claude 面前</td></tr>
+<tr><td><b>Channels</b></td><td>manifest <code>channels</code> + MCP</td><td>让外部系统（聊天软件之类）把消息发进 session</td></tr>
+<tr><td><b>Settings</b></td><td><code>settings.json</code></td><td>只有 <code>agent</code> 和 <code>subagentStatusLine</code> 两个键生效，其余丢弃</td></tr>
+<tr><td><b>Themes</b></td><td><code>themes/*.json</code></td><td>配色主题，进 <code>/theme</code> 选择器</td></tr>
+<tr><td><b>Output styles</b></td><td><code>output-styles/*.md</code></td><td>输出风格，进 <code>/output-style</code></td></tr>
+</tbody>
+</table>
+
+<div class="note"><b>一个容易踩的坑：</b>插件根目录的 <code>CLAUDE.md</code> <b>不会</b>被当成项目上下文加载。要在插件里放指令，写成 skill。<code>claude plugin validate</code> 会对这种文件报 <code>CLAUDE.md at the plugin root is not loaded as project context</code>。</div>
+
+<h2 id="cc-detail">2 · 每种组件怎么写</h2>
+
+<h3>Skills — 新代码的默认选择</h3>
+<pre><code>my-plugin/
+├── .claude-plugin/plugin.json
+└── skills/review/SKILL.md</code></pre>
+<pre><code>---
+description: Reviews a pull request for style and test coverage. Use when asked to review code.
+---
+
+Review the changed files. Report style problems first, then missing tests.</code></pre>
+<p>加载后 <code>/my-plugin:review</code> 就能跑。命名规则是 <code>/&lt;plugin&gt;:&lt;目录名&gt;</code>；frontmatter 里的 <code>name</code> 只替换最后一段，插件前缀保留。谁能调用（Claude、用户、还是都行）也由 frontmatter 控制。</p>
+
+<h3>Agents — 子 agent</h3>
+<pre><code>---
+name: security-reviewer
+description: Reviews code changes for security issues. Use after edits to authentication or input handling.
+model: sonnet
+---
+
+You are a security reviewer. Read the changed files and report injection,
+authentication, and secrets-handling risks.</code></pre>
+<p>用户可以用 <code>@agent-my-plugin:security-reviewer</code> 显式调用。支持的 frontmatter 字段：<code>name</code>、<code>description</code>、<code>model</code>、<code>effort</code>、<code>maxTurns</code>、<code>tools</code>、<code>disallowedTools</code>、<code>skills</code>、<code>memory</code>、<code>background</code>、<code>omitClaudeMd</code>、<code>isolation</code>（只接受 <code>"worktree"</code>）、<code>color</code>。</p>
+<div class="warn"><b>被忽略的字段：</b><code>permissionMode</code>、<code>hooks</code>、<code>mcpServers</code>、<code>initialPrompt</code>。<b>agent 文件没法自己加 hook 或 MCP server</b>——这是故意的权限边界，要加就加到插件层。而且 frontmatter 解析失败时 agent <b>照样加载</b>，只是所有字段被忽略，描述变成 <code>Agent from my-plugin plugin</code>。这种静默降级只能靠 <code>claude plugin validate</code> 发现。</div>
+
+<h3>Hooks</h3>
+<pre><code>{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          { "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/format.sh\"" }
+        ]
+      }
+    ]
+  }
+}</code></pre>
+<p>格式跟 <code>settings.json</code> 里的 <code>hooks</code> 对象一样，所以已有的 settings hook 可以原样抄进来。</p>
+
+<h3>LSP / Executables / Monitors</h3>
+<pre><code>// .lsp.json —— 注意是直接映射，外面不套对象
+{ "gopls": { "command": "gopls", "args": ["serve"],
+             "extensionToLanguage": { ".go": "go" } } }</code></pre>
+<pre><code>// monitors/monitors.json
+[ { "name": "error-log", "command": "tail -F ./logs/error.log",
+    "description": "Application error log" } ]</code></pre>
+<div class="note"><code>claude plugin validate</code> <b>不读</b> <code>.lsp.json</code>。任一条目非法整个文件在加载时被跳过，只在 <code>/plugin</code> 的 <b>Errors</b> 标签页里出现 <code>Invalid LSP server config</code>。另外 LSP server 必须把日志打到 stderr——Claude Code 把 stdout 全当协议消息读。</div>
+
+<h2 id="mods-what">3 · Mods：10 月 1 日发布的那一层</h2>
+
+<p><span class="tag new">2026-10-01</span> <span class="tag">需要 v2.1.287+</span> <span class="tag">默认开启</span></p>
+
+<p>前面十四种组件有个共同点：<b>它们都在 Claude Code 外面</b>。skill 给文本，MCP 给工具，settings hook 跑一个脚本。<b>mod 不一样——它的代码跑在 Claude Code 自己的进程里。</b></p>
+
+<p>一个 mod 就是一个插件，里面是 JavaScript / TypeScript 写的<b>事件处理器</b>。工具被调用、prompt 被提交、界面某一块要被画出来，Claude Code 就调你的函数；你的函数可以<b>观察</b>它、<b>改写</b>它，或者<b>直接接管</b>。</p>
+
+<div class="note"><b>命名上的混乱，先说清楚：</b>Claude Code 把两种东西都叫 hook。官方文档的约定是——在 mods 相关页面里，"hook" 指 mod 的处理函数，配置在 settings 文件里的那种叫 "settings hook"。</div>
+
+<h3>mod 能干别人干不了的事</h3>
+<ul>
+<li><b>画界面</b>——transcript 旁边的侧栏（pane），或 prompt 上方的横条（band），带标签页、按钮、输入框</li>
+<li><b>重画 Claude Code 自己的界面</b>——替换或重新配色它自己画的部分：工具调用那一行、spinner、提问对话框</li>
+<li><b>插进一次工具调用或一次请求</b>——把工具调用<b>挂起</b>去问用户一句话、不跑工具直接返回结果、或者把某一次请求发给<b>另一个模型</b></li>
+<li><b>注册立即执行的命令</b>——一个 <code>/command</code> 直接跑你的函数，<b>不发起 Claude 轮次</b>，甚至能在 Claude 正忙的时候跑</li>
+<li><b>hook 之间共享数据</b>——同一个 mod 的 hook 共享文件里的变量，一个记录另一个展示</li>
+</ul>
+
+<h3>官方给的四者对比</h3>
+<table>
+<thead><tr><th></th><th>Mod</th><th>Settings hook</th><th>Skill</th><th>MCP server</th></tr></thead>
+<tbody>
+<tr><th>是什么</th><td>插件里的函数，Claude Code 在<b>自己进程内</b>调用</td><td>生命周期事件上跑的 shell 命令 / HTTP 请求 / prompt</td><td>一个 <code>SKILL.md</code> 指令文件</td><td>外部进程或服务，给 Claude 工具</td></tr>
+<tr><th>能改什么</th><td>工具调用、prompt、命令、轮次、<b>界面绘制</b></td><td>事件放不放行、工具调用的参数和结果、给 Claude 加的上下文</td><td>Claude 知道什么、做什么</td><td>Claude 有哪些工具</td></tr>
+<tr><th>能画界面吗</th><td><b>能</b></td><td>不能</td><td>不能</td><td>不能</td></tr>
+<tr><th>写什么语言</th><td>JavaScript / TypeScript</td><td>脚本 + settings.json 条目</td><td>Markdown</td><td>任意语言</td></tr>
+<tr><th>什么时候选它</th><td>要侧栏、要横条、要自定义命令、要改写事件</td><td>已经有脚本，只想拦/放/记日志</td><td>总在聊天里粘同一段指令</td><td>Claude 要连外部系统</td></tr>
+</tbody>
+</table>
+
+<h2 id="mods-example">4 · 一个完整的最小 mod</h2>
+
+<p>三个文件：</p>
+<pre><code>first-mod/
+├── .claude-plugin/plugin.json   # 插件 manifest
+└── hooks/
+    ├── hooks.json               # modules: ["./register.js"]
+    └── register.js              # 代码本体（hooks module）</code></pre>
+
+<p>下面是官方的完整 <code>register.js</code>。它数 Claude 调了多少次工具，并把计数显示在 spinner 旁边，效果是 <code>Thinking · tool calls: 3…</code>：</p>
+
+<pre><code>// 计数，被下面两个 hook 共享
+let calls = 0
+
+// mod 加载时 Claude Code 调一次
+export function register(on) {
+  // 每次 Claude 准备用工具时跑
+  on('tool.call', async ($, e, next) =&gt; {
+    calls += 1
+    // 请求重绘界面，好让新计数显示出来
+    $.ui.invalidate('ui.render')
+    // 让工具照常运行
+    return next(e)
+  })
+
+  // 每次 Claude Code 画 spinner 时跑
+  on('ui.render', { component: 'Spinner' }, async ($, e, next) =&gt; {
+    // 保留 Claude Code 自己的 spinner，在它后面加上计数
+    return next({ ...e, props: { ...e.props, suffix: ' · tool calls: ' + calls + '…' } })
+  })
+}</code></pre>
+
+<p>三个参数值得记：</p>
+<table>
+<thead><tr><th>参数</th><th>是什么</th></tr></thead>
+<tbody>
+<tr><td><code>$</code></td><td>mods API。调用要写全命名空间，如 <code>$.fs.read('notes.md')</code></td></tr>
+<tr><td><code>e</code></td><td>事件输入，<b>深度冻结</b>的纯数据。要改就传一份副本给 <code>next</code></td></tr>
+<tr><td><code>next(e)</code></td><td>下一个处理器，middleware 那套。跑完后面的 hook，再跑 Claude Code 自己的行为</td></tr>
+</tbody>
+</table>
+<p>另外 <code>next.signal</code> 是事件被放弃时触发的 <code>AbortSignal</code>；<code>next.budget.remainingMs</code> 是这个 hook 还剩多少时间；<code>next.origin</code> 告诉你事件是谁发的（Claude Code 自己是 <code>{ plugin: 'engine', tier: 'core' }</code>）。</p>
+
+<p>一个 hook 对事件只有三种处理方式：<b>观察</b>（原样 <code>next(e)</code>）、<b>改写</b>（<code>next({ ...e, text })</code>）、<b>接管</b>（不调 <code>next</code>，直接返回一个对象，比如 <code>{ deny: '请用文件工具。' }</code>）。</p>
+
+<h2 id="mods-events">5 · 事件清单</h2>
+
+<h3>工具</h3>
+<table><thead><tr><th>事件</th><th>何时触发</th><th>可以返回</th></tr></thead><tbody>
+<tr><td><code>tool.call</code></td><td>工具即将运行</td><td><code>next(e)</code> / <code>{ deny: reason }</code> / <code>{ result }</code></td></tr>
+<tr><td><code>tool.check</code></td><td>Claude Code 决定工具调用是否放行时（在 <code>tool.call</code> 和 <code>PreToolUse</code> 之后）</td><td><code>{ decision }</code>：<code>allow</code>/<code>ask</code>/<code>deny</code></td></tr>
+<tr><td><code>tool.describe</code></td><td>每个工具的描述首次发给 Claude 时，各一次</td><td><code>{ description }</code></td></tr>
+</tbody></table>
+
+<h3>Prompt 与 Claude 读到的东西</h3>
+<table><thead><tr><th>事件</th><th>何时触发</th></tr></thead><tbody>
+<tr><td><code>prompt.submit</code></td><td>prompt 被提交。可改写文本、加上下文，或 <code>{ drop: reason }</code> 丢弃</td></tr>
+<tr><td><code>prompt.fill</code> / <code>prompt.suggest</code> / <code>prompt.edit</code></td><td>文本进入输入框（草稿 / 暗色建议）、用户编辑输入框</td></tr>
+<tr><td><code>prompt.compose</code> / <code>prompt.section</code></td><td>渲染 system prompt / 每个命名段落各一次。<code>{ text: null }</code> 可以<b>删掉整段 system prompt</b></td></tr>
+<tr><td><code>prompt.context</code> / <code>prompt.attachment</code></td><td>每个会话首条消息的上下文 / Claude Code 自己加的消息（如 reminder）</td></tr>
+<tr><td><code>skill.prompt</code></td><td>skill 的文本为 Claude 展开时</td></tr>
+<tr><td><code>attribution.text</code></td><td>生成 commit / PR 的署名文本时</td></tr>
+</tbody></table>
+
+<h3>轮次、会话、子 agent</h3>
+<table><thead><tr><th>事件</th><th>何时触发</th></tr></thead><tbody>
+<tr><td><code>turn.start</code> / <code>turn.step</code> / <code>turn.complete</code></td><td>轮次开始 / <b>每一次发往模型的请求</b>（可改 <code>model</code>、<code>effort</code>）/ 轮次结束</td></tr>
+<tr><td><code>session.start</code> / <code>session.end</code></td><td>首个 prompt 之前（每个 mod 一次）/ 会话结束或 <code>/clear</code>、<code>/resume</code>、<code>/branch</code></td></tr>
+<tr><td><code>session.compact</code></td><td>即将压缩对话，可 <code>{ skip: reason }</code></td></tr>
+<tr><td><code>session.send</code> / <code>session.receive</code></td><td>与<b>其他 session 或 agent</b> 收发消息</td></tr>
+<tr><td><code>session.append</code> / <code>session.measure</code></td><td>每条留存记录写入前 / 每轮之后与用量百分比变化时</td></tr>
+<tr><td><code>agent.offer</code> / <code>agent.spawn</code></td><td>子 agent 类型被提供给 Claude（可 <code>{ isOffered: false }</code> 藏掉）/ 子 agent 即将启动（可改 model 或拒绝）</td></tr>
+</tbody></table>
+
+<h3>界面与其他</h3>
+<table><thead><tr><th>事件</th><th>何时触发</th></tr></thead><tbody>
+<tr><td><code>ui.render</code></td><td>某个渲染点即将绘制</td></tr>
+<tr><td><code>ui.press</code> / <code>ui.input</code> / <code>ui.select</code></td><td>mod 画的 Button / Input / Select 被使用</td></tr>
+<tr><td><code>ui.focus</code> / <code>ui.scroll</code> / <code>ui.close</code> / <code>ui.message</code></td><td>焦点或滚动位置变化 / pane 关闭 / <code>Client</code> 元素回传数据</td></tr>
+<tr><td><code>command.run</code> / <code>command.describe</code></td><td>命令即将运行 / 为命令列表描述每个命令</td></tr>
+<tr><td><code>config.set</code> / <code>config.describe</code></td><td><code>/config</code> 某行即将改变（可拒绝）/ 描述每一行</td></tr>
+<tr><td><code>plugin.register</code></td><td><b>另一个 mod 的代码即将加载</b>，<code>e.uses</code> 列出它用到的事件、API 调用、环境变量，可 <code>{ refuse: reason }</code> 拒绝它</td></tr>
+<tr><td><code>classic.&lt;Event&gt;</code></td><td>每个 settings hook 事件，如 <code>classic.Stop</code>、<code>classic.PostToolUse</code></td></tr>
+</tbody></table>
+
+<div class="note"><b>每个 mods API 方法本身也是事件。</b><code>fs.read</code>、<code>model.complete</code>、<code>ui.open</code> 都能被 hook。挂上去就能<b>拦截排在你后面的那些 mod 的调用</b>，返回 <code>{ deny: reason }</code> 或 <code>{ value }</code>。企业版的策略 mod 就是这么实现的。</div>
+
+<h2 id="mods-api">6 · <code>$</code> API 与渲染点</h2>
+
+<table>
+<thead><tr><th>命名空间</th><th>方法</th></tr></thead>
+<tbody>
+<tr><td><code>$.ui</code></td><td><code>resolve</code> <code>invalidate</code> <code>open</code> <code>close</code> <code>panes</code> <code>focus</code> <code>scroll</code> <code>toast</code> <code>status</code> <code>log</code> <code>notice</code> <code>ask</code> <code>copy</code> <code>blit</code></td></tr>
+<tr><td><code>$.command</code> / <code>$.tool</code> / <code>$.agent</code></td><td>各有 <code>register</code> <code>list</code>，加上 <code>run</code> / <code>call</code>+<code>check</code> / <code>spawn</code></td></tr>
+<tr><td><code>$.model</code></td><td><code>complete</code> <code>fork</code> <code>classify</code></td></tr>
+<tr><td><code>$.prompt</code></td><td><code>submit</code> <code>read</code> <code>fill</code> <code>suggest</code> <code>compose</code></td></tr>
+<tr><td><code>$.session</code></td><td><code>messages</code> <code>cwd</code> <code>model</code> <code>turns</code> <code>id</code> <code>repo</code> <code>usage</code> <code>compact</code> <code>send</code> <code>append</code> <code>authorize</code> 等</td></tr>
+<tr><td><code>$.fs</code> / <code>$.store</code> / <code>$.state</code></td><td>文件读写 / <b>全机器共享</b>的 KV 存储 / 响应式状态</td></tr>
+<tr><td><code>$.http</code> / <code>$.process</code> / <code>$.mcp</code></td><td><code>fetch</code> / <code>run</code> <code>spawn</code> / <code>call</code> <code>connect</code></td></tr>
+<tr><td><code>$.env</code> / <code>$.settings</code> / <code>$.config</code> / <code>$.clock</code> / <code>$.audio</code> / <code>$.telemetry</code></td><td>环境变量、设置读取、<code>/config</code>、定时器、<code>play</code>+<code>speak</code>、埋点</td></tr>
+</tbody>
+</table>
+
+<div class="ok"><b>一个设计上的巧思：</b>hook 要做任何超出自身代码的事（画图、读文件、起进程、发网络请求），<b>只能走 mods API，没有别的路</b>。正因为如此，<code>claude plugin validate</code> 能在你安装之前<b>静态列出</b>一个 mod 会碰哪些事件、做哪些调用：
+<pre><code>claude plugin validate ./some-mod
+# 输出里的 hooks: 和 calls: 两行就是它的能力清单</code></pre></div>
+
+<h3>渲染点（<code>ui.render</code> 的 <code>e.component</code>）</h3>
+<p><code>Pane</code>（侧栏）、<code>AbovePrompt</code>（prompt 上方横条）、<code>UserMessage</code>、<code>AssistantMessage</code>、<code>ToolUse</code> / <code>ToolResult</code> / <code>ToolGroup</code>、<code>CommandOutput</code>、<code>AskUserQuestion</code>、<code>ToolProgress</code>、<code>Spinner</code>、<code>TurnDuration</code>、<code>InfoNotice</code>、<code>SessionMode</code>、<code>PromptHint</code>。</p>
+<p>可用元素：<code>Box</code>、<code>Text</code>、<code>Button</code>、<code>Link</code>、<code>Code</code>、<code>Markdown</code>、<code>Input</code>、<code>Select</code>、<code>Svg</code>（仅桌面端）、<code>Client</code>、<code>Raster</code>（仅终端，彩色格子）、<code>Image</code>（仅终端）。</p>
+
+<h2 id="mods-limits">7 · 限制、内置 mod 与安全</h2>
+
+<table>
+<thead><tr><th>限制</th><th>值</th></tr></thead>
+<tbody>
+<tr><td>单个 hook 处理一个事件的执行时间（不含 <code>next</code> 内部）</td><td>10 秒</td></tr>
+<tr><td>全部 <code>session.end</code> hook 合计</td><td>1.5 秒</td></tr>
+<tr><td><code>$.process.run</code> 超时</td><td>默认 30 秒，最多 10 分钟</td></tr>
+<tr><td><code>$.model.complete</code> 的 <code>maxTokens</code></td><td>默认 1024，最高 64,000</td></tr>
+<tr><td><code>$.fs</code> 单文件读写</td><td>4 MiB</td></tr>
+<tr><td><code>$.store</code> 总量</td><td>4 MiB JSON</td></tr>
+<tr><td>重绘节流</td><td>每秒 10 次，可见 pane 与横条 30 次</td></tr>
+</tbody>
+</table>
+
+<h3>Claude Code 自己有些功能就是 mod</h3>
+<p>在 <code>/plugin</code> 的 <b>Installed</b> 标签页下的 <b>Built-in</b> 能看到。<code>cc-plugin-diff</code> 接管了 <code>/diff</code> 并画它的侧栏；<code>cc-plugin-agents-md</code> 负责把 <code>AGENTS.md</code> 当项目指令加载；<code>cc-plugin-sec-default</code> 是保护企业托管配置的守卫。部分源码公开在 <a href="https://github.com/anthropics/claude-code/tree/main/mods">anthropics/claude-code 的 mods 目录</a>。</p>
+<p>官方的示例 mod 在 <a href="https://github.com/anthropics/claude-code-playground/tree/main/claude-code/mods">claude-code-playground</a>：<code>token-weather</code>（在 prompt 上方画上下文窗口预报）、<code>blast-radius</code>（拦住 <code>rm -rf</code> 或 force push 这类危险命令，展示影响范围并给出继续/取消按钮）、<code>replay-theater</code>（<code>/replay</code> 逐步回放上一轮的文件编辑）。</p>
+
+<div class="warn"><b>mod 不在沙箱里。</b>它以你的权限、在 Claude Code 进程内运行，能读写你账号能碰的任何文件、起进程、发网络请求、读环境变量和设置里的 API key、看见你每一条 prompt 和每一次工具调用、<b>在你被问到之前就替你批准工具调用</b>、花你的额度调模型。就算你开了 sandboxing，那只隔离 Claude 跑的 Bash 命令，<b>mod 起的进程在沙箱外面</b>。
+<p style="margin:10px 0 0">唯一画不了的是权限确认框——mod 改不了它给你看的内容。</p></div>
+
+<h2 id="codex">8 · Codex 的插件</h2>
+
+<p>Codex 的插件组件少得多：</p>
+<ul>
+<li><b>Skills</b>——可复用的指令包，和 Claude 的 skills 概念一致</li>
+<li><b>MCP servers</b>——连 GitHub、Slack、Google Drive 这类外部系统</li>
+<li><b>Browser extensions</b>——工作流需要的浏览器能力</li>
+<li><b>Hooks</b>——在 Codex runtime 的生命周期点上运行的命令</li>
+</ul>
+
+<p>目录结构：</p>
+<pre><code>my-plugin/
+├── plugin.json          # Agent Plugins schema
+├── mcp.json             # 可选，mcpServers
+├── skills/              # 自动发现，manifest 里不用声明
+├── assets/
+└── hooks/               # 可选</code></pre>
+<p>旧版 Codex 兼容路径是 <code>.codex-plugin/plugin.json</code>。OpenAI 专属的东西放在 <code>extensions.com.openai</code> 下面：<code>interface</code>（展示用的名称、图标、分类）、<code>apps</code>（已注册 MCP server 映射）、<code>hooks</code>（生命周期 hook 引用）。</p>
+
+<p>子 agent 不走插件，走配置文件。<code>~/.codex/config.toml</code>（或项目级 <code>.codex/config.toml</code>）里：</p>
+<pre><code>[mcp_servers.my-server]
+command = "node"
+args = ["server.js"]
+
+[agents.reviewer]
+description = "Reviews code changes"
+config_file = "agents/reviewer.toml"</code></pre>
+<p>项目指令走根目录的 <code>AGENTS.md</code>，Codex 每次运行前读它。</p>
+
+<h2 id="standard">9 · Agent Plugins：跨厂商标准</h2>
+
+<p>Codex 的 <code>plugin.json</code> 开头是这个：</p>
+<pre><code>"$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json"</code></pre>
+
+<p><a href="https://agent-plugins.org">Agent Plugins</a> 自称"<b>开放、厂商中立</b>的可复用组件打包标准"，目标是解决"各家 AI agent 客户端各搞一套插件格式"的碎片化。它定义：固定位置的目录结构（<code>plugin.json</code> + <code>skills/</code> + <code>mcp.json</code>）、manifest 字段、以及两类组件——Agent Skills 和 MCP servers（stdio、Streamable HTTP、或旧的 HTTP+SSE）。各家的私有功能通过<b>反向域名扩展命名空间</b>挂上去，比如 OpenAI 的 <code>extensions.com.openai</code>。</p>
+
+<div class="note"><b>初始技术指导委员会：Amazon、Cursor、Microsoft、OpenAI、Vercel。</b>名单里没有 Anthropic。</div>
+
+<p>这解释了两边的分叉：Codex 选择让插件<b>能跨客户端复用</b>，代价是组件类型要收敛到各家的公约数；Claude Code 选择把能力<b>做到自己进程里</b>，代价是这些东西天然不可移植——一个画 Claude Code 侧栏的 mod，换个客户端没有任何意义。</p>
+
+<h2 id="compare">10 · 横向对比</h2>
+
+<table>
+<thead><tr><th></th><th>Claude Code</th><th>Codex</th></tr></thead>
+<tbody>
+<tr><th>组件种类</th><td>14 种</td><td>4 种（skills / MCP / browser extensions / hooks）</td></tr>
+<tr><th>Manifest</th><td><code>.claude-plugin/plugin.json</code>（自有格式）</td><td><code>plugin.json</code>（Agent Plugins 1.0.0 开放标准）</td></tr>
+<tr><th>跨客户端可移植</th><td>否</td><td><b>是</b>，这是设计目标</td></tr>
+<tr><th>能改宿主界面</th><td><b>能</b>（mods）</td><td>否</td></tr>
+<tr><th>能拦截/改写事件</th><td><b>能</b>，进程内，细到每次模型请求</td><td>生命周期 hook 粒度</td></tr>
+<tr><th>子 agent</th><td>插件组件 <code>agents/*.md</code></td><td>配置文件 <code>[agents.*]</code></td></tr>
+<tr><th>项目指令</th><td><code>CLAUDE.md</code>（并经内置 mod 支持 <code>AGENTS.md</code>）</td><td><code>AGENTS.md</code></td></tr>
+<tr><th>扩展代码语言</th><td>JS / TS（mods），其余是 Markdown + JSON</td><td>Markdown + JSON，hook 是命令</td></tr>
+<tr><th>安装前能静态审计能力</th><td><b>能</b>，<code>claude plugin validate</code> 列出事件和 API 调用</td><td>未见等价机制</td></tr>
+</tbody>
+</table>
+
+<h2 id="examples">11 · 三个例子</h2>
+
+<h3>例 1 · 把危险命令拦下来问一句（mod）</h3>
+<p>这是 <code>blast-radius</code> 那类 mod 的骨架：在 <code>tool.call</code> 上挂钩，命中危险模式就<b>不放行</b>，先用 <code>$.ui.ask</code> 问用户：</p>
+<pre><code>const RISKY = /\brm\s+-rf\b|\bgit\s+push\s+--force\b|\bDROP\s+TABLE\b/i
+
+export function register(on) {
+  on('tool.call', { tool: 'Bash' }, async ($, e, next) =&gt; {
+    if (!RISKY.test(e.input?.command ?? '')) return next(e)
+
+    const answer = await $.ui.ask({
+      title: '这条命令可能不可逆',
+      body: e.input.command,
+      options: ['继续', '取消'],
+    })
+    // 取消就直接接管事件，工具根本不会运行
+    if (answer !== '继续') return { deny: '用户取消了这条命令。' }
+    return next(e)
+  })
+}</code></pre>
+<p>注意 <code>{ tool: 'Bash' }</code> 这个 matcher——它让这个 hook 只在 Bash 调用上触发，别的工具连函数都不进。</p>
+
+<h3>例 2 · 把某一类请求换个模型跑（mod）</h3>
+<p><code>turn.step</code> 在<b>每一次</b>发往模型的请求前触发，并且允许改 <code>model</code> 和 <code>effort</code>：</p>
+<pre><code>export function register(on) {
+  on('turn.step', async function* ($, e, next) {
+    // 上下文已经很满时，换一个上下文更大的模型
+    const { context } = await $.session.usage()
+    if (context.percent &gt; 80) {
+      return yield* next({ ...e, model: 'claude-opus-5' })
+    }
+    return yield* next(e)
+  })
+}</code></pre>
+<div class="note"><code>turn.step</code> 和 <code>process.spawn</code> 的 hook 是 <b>async generator</b>（要写 <code>function*</code> 和 <code>yield* next(e)</code>），其余事件的 hook 是普通 async 函数。这是最容易写错的地方。</div>
+
+<h3>例 3 · 一个能同时给 Codex 和别家用的插件</h3>
+<pre><code>team-review/
+├── plugin.json
+│   {
+│     "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+│     "name": "team-review",
+│     "version": "1.0.0",
+│     "description": "Our code review conventions and the PR tooling",
+│     "extensions": {
+│       "com.openai": {
+│         "interface": { "displayName": "Team Review" }
+│       }
+│     }
+│   }
+├── mcp.json          # { "mcpServers": { "gh": { ... } } }
+└── skills/
+    └── review/SKILL.md</code></pre>
+<p>因为只用了标准里的 skills 和 MCP，任何实现了 Agent Plugins 的客户端都能加载它；OpenAI 专属的展示信息收在 <code>extensions.com.openai</code> 里，别家忽略即可。</p>
+
+<h2 id="pick">12 · 怎么选</h2>
+
+<ul>
+<li><b>只是想固化一段反复粘贴的指令</b> → skill。两家都支持，最便宜。</li>
+<li><b>要连外部系统</b> → MCP server。两家都支持，而且在 Agent Plugins 标准里，可移植。</li>
+<li><b>要强制一条每次都必须成立的规则</b> → hook，不要用 skill。skill 是 Claude "可以"读，hook 是"一定"跑。</li>
+<li><b>要界面、要拦截、要替换内置行为</b> → 只有 Claude Code mods 能做，而且<b>放弃可移植性</b>。</li>
+<li><b>要给整个团队发一套东西</b> → 如果团队同时用 Claude Code 和 Codex，把能放进标准的（skills + MCP）放进标准，各家专属的部分单独打包。</li>
+</ul>
+
+<div class="warn"><b>装之前先审。</b>两边的插件都以你的权限运行。Claude Code 至少提供了 <code>claude plugin validate</code> 做安装前的静态能力清单——用它。</div>
+
+<h2>来源</h2>
+<ul>
+<li><a href="https://code.claude.com/docs/en/plugins/components">Claude Code · Add components to a plugin</a>（14 种组件）</li>
+<li><a href="https://code.claude.com/docs/en/plugins/mods/overview">Claude Code · Mods overview</a></li>
+<li><a href="https://code.claude.com/docs/en/plugins/mods/reference">Claude Code · Mods reference</a>（事件、API、渲染点、限制）</li>
+<li><a href="https://github.com/anthropics/claude-code/blob/main/mods/types/claude-code.d.ts">mods 的 TypeScript 声明</a>（最完整的参考，但可能比你装的版本旧）</li>
+<li><a href="https://learn.chatgpt.com/docs/plugins">Codex / ChatGPT · Plugins</a></li>
+<li><a href="https://developers.openai.com/codex/config-reference">Codex · Configuration reference</a></li>
+<li><a href="https://agent-plugins.org">Agent Plugins 标准</a></li>
+</ul>
+
+</main>
+<footer>Changyi Yang · 整理于 2026-10-02 · 文档随版本变动，以官方为准</footer>
+</body></html>
