@@ -1,8 +1,8 @@
 <!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>会积累经验的编码助手：产品形态</title>
-<meta name="description" content="不在旁边包一层，而是让产出物本身就是宿主认识的东西。用户只学一个新命令，其余全是他本来就会的。">
+<title>Recall：一个会攒经验的 Claude Code mod</title>
+<meta name="description" content="它在你干活时记录，在你需要时把记录提炼成一份经验插件。提供 /recall 一组命令；装卸换版本用 Claude Code 自带的。">
 <link rel="canonical" href="https://changyiyang.github.io/evolve-loop/">
-<meta property="og:title" content="会积累经验的编码助手：产品形态"><meta property="og:type" content="article"><meta property="og:locale" content="zh_CN">
+<meta property="og:title" content="Recall：一个会攒经验的 Claude Code mod"><meta property="og:type" content="article"><meta property="og:locale" content="zh_CN">
 <style>
 :root{--ink:#17212b;--muted:#627182;--line:#e1e7ec;--accent:#236477;--warn:#a13c35;--ok:#2f6b55;--amber:#a8621c;--bg:#fff;--soft:#f5f9fa;--code-bg:#f4f6f8;--pre-bg:#10212b;--pre-ink:#e6edf3;--th:#f4f7f9}
 *{box-sizing:border-box}
@@ -16,18 +16,18 @@ nav.top{font-size:14px;color:var(--muted)}
 h1{font-size:clamp(30px,4.4vw,46px);line-height:1.23;letter-spacing:-.03em;margin:14px 0 22px}
 .lead{font-size:18.5px}
 .meta{font-size:13px;color:var(--muted);margin:20px 0 10px}
-h2{font-size:25px;letter-spacing:-.02em;margin:58px 0 6px;padding-top:12px;border-top:1px solid var(--line)}
-h3{font-size:18px;margin:32px 0 6px;letter-spacing:-.01em}
+h2{font-size:25px;letter-spacing:-.02em;margin:56px 0 6px;padding-top:12px;border-top:1px solid var(--line)}
+h3{font-size:17.5px;margin:30px 0 6px;letter-spacing:-.01em}
 p{margin:12px 0}
 code{background:var(--code-bg);padding:.12em .36em;border-radius:4px;font-size:.88em;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
-pre{background:var(--pre-bg);color:var(--pre-ink);padding:16px 20px;border-radius:9px;overflow-x:auto;font-size:13.5px;line-height:1.7;margin:16px 0}
+pre{background:var(--pre-bg);color:var(--pre-ink);padding:16px 20px;border-radius:9px;overflow-x:auto;font-size:13.5px;line-height:1.75;margin:16px 0}
 pre code{background:none;padding:0;color:inherit;font-size:inherit}
+pre .c{color:#7d8ea0}
 table{border-collapse:collapse;width:100%;margin:18px 0;font-size:15px}
 th,td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}
 th{background:var(--th);font-weight:700}
 .note{background:var(--soft);border:1px solid var(--line);border-radius:9px;padding:14px 20px;margin:20px 0;font-size:15px}
 .warn{background:#fdf5f4;border:1px solid #efd8d5;border-left:4px solid var(--warn);border-radius:0 9px 9px 0;padding:14px 20px;margin:20px 0;font-size:15px}
-.ok{background:#f3f9f6;border:1px solid #d6e8df;border-left:4px solid var(--ok);border-radius:0 9px 9px 0;padding:14px 20px;margin:20px 0;font-size:15px}
 ul{padding-left:24px}
 li{margin:6px 0}
 footer{margin:72px 0 60px;padding-top:24px;border-top:1px solid var(--line);font-size:14px;color:var(--muted)}
@@ -37,117 +37,118 @@ footer{margin:72px 0 60px;padding-top:24px;border-top:1px solid var(--line);font
 <body>
 <header>
 <nav class="top"><a href="../">← Decks &amp; Proposals</a></nav>
-<div class="eyebrow">产品定义 · 用户切面</div>
-<h1>会积累经验的编码助手</h1>
-<p class="lead">助手在每个 turn 的边界上积累材料。用户在需要的时候产出一个 mod、装上、之后更新。<b>不新造任何机制——产出物本身就是宿主已经认识的东西。</b></p>
-<p class="meta">2026-10-03 · 只定义用户切面</p>
+<div class="eyebrow">CLAUDE CODE MOD</div>
+<h1>Recall</h1>
+<p class="lead">一个 Claude Code mod。它在你干活的时候把经验记下来，在你需要的时候把这些记录提炼成一份<b>经验插件</b>——装上之后，Claude 在这个项目里就不再从零开始。</p>
+<p class="meta">2026-10-03 · 名字是占位 · 设计稿，尚未实现</p>
 </header>
 
 <main>
 
-<h2>0 · 核心：不在旁边包一层</h2>
+<h2>这个 mod 做什么</h2>
 
-<p>这套东西已经有一组完整的概念：一份可移植的经验（里面有知识、工具、角色），加上"从材料里产出下一版"这个动作。</p>
-
-<p><b>要做的是让这些概念落进宿主已有的东西里，而不是在旁边平行造一套。</b></p>
+<p>三件事，都在 Claude Code 内部完成：</p>
 
 <table>
-<thead><tr><th>这套 API 里的</th><th>落进宿主就是</th></tr></thead>
+<thead><tr><th></th><th>做什么</th><th>什么时候</th></tr></thead>
 <tbody>
-<tr><td>经验里的<b>工具</b></td><td>插件自带的工具服务</td></tr>
-<tr><td>经验里的<b>角色</b></td><td>插件自带的子 agent</td></tr>
-<tr><td>经验里的<b>知识</b></td><td>插件目录里的文件</td></tr>
-<tr><td>经验的<b>上下文</b></td><td>每个会话开头注入</td></tr>
-<tr><td><b>积累材料</b></td><td>turn 边界上的钩子</td></tr>
-<tr><td><b>产出下一版</b></td><td>一个命令</td></tr>
-<tr><td><b>装上 / 换版本</b></td><td><b>宿主本来就有</b></td></tr>
+<tr><td><b>记</b></td><td>在每个 turn 的边界上记下：要做什么、做了什么、环境返回了什么、成没成</td><td>一直，后台</td></tr>
+<tr><td><b>炼</b></td><td>把积累的记录提炼成一份经验插件</td><td>你敲命令时</td></tr>
+<tr><td><b>用</b></td><td>装上之后，在每个会话开头把这份经验交给 Claude</td><td>每次开新会话</td></tr>
 </tbody>
 </table>
 
-<div class="ok"><b>最后一行是关键：没有"部署"这一步。</b>产出物就是一个插件，装它用宿主自带的装插件方式。我们不写安装、不写更新、不写回滚——那些宿主已经做好了。</div>
+<p>"经验"是一份<b>可读的东西</b>：它知道这个项目的哪些约定、踩过哪些坑、还有哪些没搞清楚。不是一团权重，你随时能打开看。</p>
 
-<p>所以最终是<b>一个插件装着全部东西</b>：</p>
-
-<pre><code>一个插件
-├── 钩子        记录 + 注入上下文 + 提供产出命令
-├── 工具服务    经验里的工具
-├── 子 agent    经验里的角色
-└── 知识文件</code></pre>
-
-<p>产出下一版，就是产出这个插件的下一版。</p>
-
-<h2>1 · 平时做什么</h2>
-
-<p><b>在每个 turn 的边界上积累材料。</b>开始时记下要做什么，结束时记下做了什么、环境返回了什么、成没成。中间的工具调用、报错、重试都在这些边界上留痕。</p>
-
-<p><b>没有命令。</b>不需要开启、不需要确认、不需要标注。</p>
-
-<div class="warn"><b>零打扰是硬约束。</b>任何需要用户"配合一下"的记录机制，最后都会被关掉。</div>
-
-<h2>2 · 用户如何</h2>
-
-<h3>2.1 产出</h3>
-
-<pre><code>&gt; /evolve
-
-  从积累的材料里提炼中…（不阻塞，可以继续干活）
-  ✓ 产出 v2 — 看看它学到了什么再决定装不装</code></pre>
-
-<p>第一次运行时从空白开始；之后<b>自动以当前装着的那版为起点</b>，所以用户两次敲的是同一个命令。</p>
-
-<p>产出<b>不自动生效</b>，先给人看。</p>
-
-<h3>2.2 安装</h3>
-
-<p>用宿主自带的装插件方式。可以装自己产出的，也可以装别人产出的——<b>经验是可分享的</b>。</p>
-
-<p>一个项目一份，换项目换一份，互不污染。</p>
-
-<h3>2.3 更新</h3>
-
-<p>同样是 <code>/evolve</code>——它已经以当前版为起点，所以<b>产出和更新是同一个动作</b>，不需要第二个命令。</p>
-
-<p>换到新版、退回旧版，都用宿主自带的方式。旧版本身没被改动过，所以回滚就是继续用它。</p>
-
-<h2>3 · 用户要学的新东西：一个命令</h2>
+<h2>它提供的命令</h2>
 
 <table>
-<thead><tr><th>动作</th><th>怎么做</th></tr></thead>
+<thead><tr><th>命令</th><th>做什么</th></tr></thead>
 <tbody>
-<tr><td>平时积累</td><td>（无，后台）</td></tr>
-<tr><td>产出 / 更新</td><td><code>/evolve</code> ← <b>唯一新增的</b></td></tr>
-<tr><td>装上 / 换版本 / 回滚 / 查看装了哪些</td><td>宿主自带</td></tr>
+<tr><td><code>/recall</code></td><td>从积累的记录产出下一版经验</td></tr>
+<tr><td><code>/recall show</code></td><td>看最新一版学到了什么</td></tr>
+<tr><td><code>/recall status</code></td><td>现在攒了多少记录、上次产出是什么时候</td></tr>
 </tbody>
 </table>
 
-<div class="note">命令名是占位，可以改。这里要定的是<b>只有一个新动作</b>，其余全部复用宿主已有的东西。</div>
+<div class="note"><b>装上、换版本、回滚，不用这个 mod 的命令</b>——产出物本身就是一个普通插件，用 Claude Code 自带的 <code>/plugin</code> 那套就行。这个 mod 不重复造。</div>
 
-<h2>4 · 还没定的一件事</h2>
+<h2>怎么用</h2>
 
-<p>底层产出一版时，接的是<b>一批材料</b>。那么"这次用哪批"是谁决定的？</p>
+<h3>1. 装上 mod</h3>
+
+<pre><code>&gt; /plugin install recall@&lt;源&gt;</code></pre>
+
+<p>装完就开始记了。<b>不需要开启，也不会问你任何问题。</b></p>
+
+<h3>2. 正常干活</h3>
+
+<p>该怎么用 Claude Code 就怎么用。记录在背后进行，不打断、不弹窗。</p>
+
+<pre><code>&gt; /recall status
+
+  已记录 142 条（最早 9 月 20 日）
+  还没产出过经验</code></pre>
+
+<h3>3. 产出第一版</h3>
+
+<pre><code>&gt; /recall
+
+  提炼中…（不阻塞，你可以继续干活）
+
+  ✓ 产出 recall-api-gateway v1
+    敲 /recall show 看它学到了什么</code></pre>
+
+<pre><code>&gt; /recall show
+
+  <span class="c"># 它知道的</span>
+  · 这个项目的迁移脚本必须先跑 dry-run —— 来自 9/22 那次回滚
+  · 配置改动走 PR，不直接改线上 —— 来自 9/28 被拒的那次
+
+  <span class="c"># 它还不确定的</span>
+  · 测试超时的阈值是 30s 还是 60s，两次记录不一致</code></pre>
+
+<div class="note">注意最后那段。<b>它会把自己没搞清楚的事情列出来</b>，而不是硬给一个结论。</div>
+
+<h3>4. 装上这份经验</h3>
+
+<pre><code>&gt; /plugin install recall-api-gateway</code></pre>
+
+<p>从下一个会话开始，Claude 就带着这份经验干活了。</p>
+
+<h3>5. 攒一阵子，再产一版</h3>
+
+<pre><code>&gt; /recall
+
+  <span class="c"># 这次自动以当前装着的 v1 为起点</span>
+  ✓ 产出 recall-api-gateway v2
+
+&gt; /plugin update recall-api-gateway</code></pre>
+
+<p>不满意就不更新，v1 一直在那儿。</p>
+
+<h2>它不做什么</h2>
 
 <ul>
-<li>自上次产出以来的全部？</li>
-<li>按项目分开、各自一直往里追加？</li>
-<li>用户自己圈一个范围？</li>
+<li><b>不自动装。</b>产出之后等你看过再决定。Claude 学到的也可能是错的，而一条错误的"经验"会被反复应用，还每次都显得有道理。</li>
+<li><b>不打扰你。</b>记录全程不提问、不弹窗、不要求配合。你应该感觉不到它存在。</li>
+<li><b>不猜对错。</b>没把握的事它标注"还不确定"，不硬编一个结论。</li>
 </ul>
 
-<p>这个决定下来，上面 2.1 那一步的形状才算定死。<b>它是产品决策，不是底层能提供的。</b></p>
-
-<h2>5 · 边界</h2>
+<h2>什么项目适合</h2>
 
 <p>效果取决于<b>能不能判断对错</b>。</p>
 
 <table>
 <thead><tr><th></th><th>场景</th></tr></thead>
 <tbody>
-<tr><td><b>有效</b></td><td>跑一下就知道成没成的事：写代码、跑作业、调用有明确契约的接口</td></tr>
-<tr><td><b>无效</b></td><td>没有客观判据的事：这段文案好不好、这个设计合不合理</td></tr>
+<tr><td><b>合适</b></td><td>跑一下就知道成没成的：写代码、跑作业、调用有明确契约的接口</td></tr>
+<tr><td><b>不合适</b></td><td>没有客观判据的：这段文案好不好、这个设计合不合理</td></tr>
 </tbody>
 </table>
 
-<p>无效的那一类只能靠猜，<b>而我们不猜</b>——不知道就标注不知道。先把窄的做对。</p>
+<p>不合适的那类只能靠猜，而它不猜。</p>
 
 </main>
-<footer>Changyi Yang · 2026-10-03 · 产品形态定义</footer>
+<footer>Changyi Yang · 2026-10-03 · 设计稿</footer>
 </body></html>
