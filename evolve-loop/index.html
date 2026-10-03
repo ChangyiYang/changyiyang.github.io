@@ -1,0 +1,238 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>把持续学习的循环接上：一个落地计划</title>
+<meta name="description" content="Harness adapter 的部署和进化都已就绪，缺的是起点——没人把真实工作变成训练数据。用 Claude Code mod 补上记录这一环的具体计划：三件要加的东西、verdict 的三档可信度、最终的用户形态。">
+<link rel="canonical" href="https://changyiyang.github.io/evolve-loop/">
+<meta property="og:title" content="把持续学习的循环接上：一个落地计划"><meta property="og:type" content="article"><meta property="og:locale" content="zh_CN">
+<style>
+:root{--ink:#17212b;--muted:#627182;--line:#e1e7ec;--accent:#236477;--warn:#a13c35;--ok:#2f6b55;--amber:#a8621c;--violet:#6a4c93;--bg:#fff;--soft:#f5f9fa;--code-bg:#f4f6f8;--pre-bg:#10212b;--pre-ink:#e6edf3;--card:#fcfdfe;--th:#f4f7f9}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:20px}
+body{margin:0;overflow-wrap:break-word;background:var(--bg);color:var(--ink);font:16px/1.85 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+a{color:var(--accent);text-underline-offset:3px}
+a:hover{color:#0e7490}
+header,main,footer{max-width:1080px;margin:auto;padding:0 28px}
+header{padding-top:36px}
+nav.top{font-size:14px;color:var(--muted)}
+.eyebrow{margin-top:46px;color:var(--accent);font-size:12px;font-weight:750;letter-spacing:.14em}
+h1{font-size:clamp(30px,4.4vw,48px);line-height:1.23;letter-spacing:-.03em;margin:14px 0 24px}
+h1 small{display:block;font-size:.46em;letter-spacing:0;margin-top:16px;font-weight:600;color:#526374;line-height:1.5}
+.lead{font-size:18.5px;max-width:900px}
+.meta{font-size:13px;color:var(--muted);margin:22px 0 28px}
+.intro{border-left:4px solid var(--accent);background:var(--soft);padding:18px 24px;margin:28px 0}
+.intro p{margin:0 0 10px}.intro p:last-child{margin:0}
+.toc{display:grid;grid-template-columns:1fr 1fr;gap:4px 28px;border:1px solid var(--line);padding:22px 26px;border-radius:9px;margin:32px 0 56px;font-size:14px;line-height:1.7}
+.toc a{text-decoration:none}
+.toc .grp{grid-column:1/-1;font-weight:750;color:var(--muted);font-size:12px;letter-spacing:.1em;margin-top:10px}
+h2{font-size:27px;letter-spacing:-.02em;margin:64px 0 6px;padding-top:12px;border-top:1px solid var(--line)}
+h3{font-size:19px;margin:38px 0 8px;letter-spacing:-.01em}
+p{margin:12px 0}
+code{background:var(--code-bg);padding:.12em .36em;border-radius:4px;font-size:.88em;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+pre{background:var(--pre-bg);color:var(--pre-ink);padding:18px 20px;border-radius:9px;overflow-x:auto;font-size:13.5px;line-height:1.7;margin:18px 0}
+pre code{background:none;padding:0;color:inherit;font-size:inherit}
+table{border-collapse:collapse;width:100%;margin:20px 0;font-size:14.5px}
+th,td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}
+th{background:var(--th);font-weight:700}
+.note{background:var(--soft);border:1px solid var(--line);border-radius:9px;padding:16px 20px;margin:22px 0;font-size:15px}
+.warn{background:#fdf5f4;border:1px solid #efd8d5;border-left:4px solid var(--warn);border-radius:0 9px 9px 0;padding:16px 20px;margin:22px 0;font-size:15px}
+.ok{background:#f3f9f6;border:1px solid #d6e8df;border-left:4px solid var(--ok);border-radius:0 9px 9px 0;padding:16px 20px;margin:22px 0;font-size:15px}
+.tag{display:inline-block;font-size:12px;padding:2px 9px;border-radius:999px;background:var(--soft);border:1px solid var(--line);color:var(--muted);margin-right:6px}
+.tag.done{background:#f3f9f6;border-color:#d6e8df;color:var(--ok);font-weight:700}
+.tag.todo{background:#fdf7f0;border-color:#efdfcc;color:var(--amber);font-weight:700}
+ul,ol{padding-left:24px}
+li{margin:7px 0}
+footer{margin:80px 0 60px;padding-top:24px;border-top:1px solid var(--line);font-size:14px;color:var(--muted)}
+@media(max-width:720px){.toc{grid-template-columns:1fr}header,main,footer{padding:0 18px}}
+</style>
+</head>
+<body>
+<header>
+<nav class="top"><a href="../">← Decks &amp; Proposals</a></nav>
+<div class="eyebrow">持续学习 · 落地计划</div>
+<h1>把持续学习的循环接上<small>部署和进化都已就绪，缺的是起点：没有人把真实工作变成训练数据。这是补上那一环的计划。</small></h1>
+<p class="lead">一个 agent 要在同一个环境里反复干活，理想状态是它从每次经验里积累对这个环境的认识。实现这件事的框架已经存在：可移植的 harness adapter、沙箱隔离的进化会话、候选产物与人工评审。但整条链在最左端是断的——<b>没有任何东西负责把"agent 实际干了什么"变成可供学习的记录</b>。本文是补上这一环的具体计划，以及补完之后用户看到的形态。</p>
+<p class="meta">2026-10-03 · 计划文档，非实现报告 · 三件中已完成一件</p>
+</header>
+
+<main>
+
+<div class="intro">
+<p><b>一句话：</b>缺的不是工程量，是一个<b>输入</b>。进化需要"带判定的记录"，而真实使用中没有人产生它。</p>
+<p><b>解法：</b>用 Claude Code 的 <a href="../agent-plugins/">mod</a> 在会话内部记录 episode，并把判定来源分三档可信度写进记录本身。</p>
+</div>
+
+<div class="toc">
+  <div class="grp">背景</div>
+  <a href="#gap">1 · 断在哪里</a>
+  <a href="#have">2 · 现在有什么</a>
+  <div class="grp">计划</div>
+  <a href="#recorder">3 · 记录器</a>
+  <a href="#verdict">4 · verdict 的三档</a>
+  <a href="#target">5 · plugin 部署目标</a>
+  <a href="#evolve">6 · /evolve 命令</a>
+  <div class="grp">结果</div>
+  <a href="#ux">7 · 最终的用户形态</a>
+  <a href="#not">8 · 刻意不做的</a>
+  <a href="#open">9 · 仍未解决的</a>
+</div>
+
+<h2 id="gap">1 · 断在哪里</h2>
+
+<p>把这套东西类比成模型训练，对应关系相当整齐：</p>
+
+<table>
+<thead><tr><th>模型训练</th><th>这里</th><th>状态</th></tr></thead>
+<tbody>
+<tr><td>模型结构</td><td>adapter 的起始布局</td><td>有</td></tr>
+<tr><td>训练出来的权重</td><td>adapter：学到的 prompt、知识、工具、角色</td><td>有</td></tr>
+<tr><td>训练算法</td><td>Evolver</td><td>有</td></tr>
+<tr><td>推理</td><td>部署到 host</td><td>有</td></tr>
+<tr><td><b>训练数据</b></td><td><b>录下来的 episode</b></td><td><b>没有人产生</b></td></tr>
+</tbody>
+</table>
+
+<p>前四行都已经实现得相当扎实。第五行是空的——不是没做好，是<b>整个采集环节不在框架的职责范围内</b>。它的设计假设是：谁用它，谁负责提供数据。</p>
+
+<p>这个假设在 benchmark 里成立：benchmark 自带判分器，每道题的对错是免费的。<b>在真实工作里不成立</b>——没有人告诉你 agent 这次干得对不对。</p>
+
+<div class="warn"><b>所以"用户边用我们边收集"这个直觉，只对了一半。</b>轨迹好拿（会话里什么都看得见），<b>标签没地方来</b>。这是整件事唯一的硬骨头，其余都是工程。</div>
+
+<h2 id="have">2 · 现在有什么</h2>
+
+<table>
+<thead><tr><th>环节</th><th>状态</th></tr></thead>
+<tbody>
+<tr><td>adapter 契约（context / tools / roles 三个导出面）</td><td><span class="tag done">已有</span> 带版本号、强制校验</td></tr>
+<tr><td>部署到 Codex / Claude Code</td><td><span class="tag done">已有</span> 两个 host connector</td></tr>
+<tr><td>沙箱隔离的进化会话</td><td><span class="tag done">已有</span> OS 级强制，fail-closed</td></tr>
+<tr><td>候选产物 + 人工评审</td><td><span class="tag done">已有</span> 从不自动晋升</td></tr>
+<tr><td><code>/evolve</code> 用户命令</td><td><span class="tag done">已完成</span> 本次新增</td></tr>
+<tr><td><b>episode 记录器</b></td><td><span class="tag todo">要做</span> 关键的一件</td></tr>
+<tr><td>plugin 部署目标</td><td><span class="tag todo">要做</span> 量小</td></tr>
+</tbody>
+</table>
+
+<h2 id="recorder">3 · 记录器（关键的一件）</h2>
+
+<p>Claude Code 的 mod 跑在它自己的进程里，能看见会话的全部事件。挂三个 hook 就够：</p>
+
+<pre><code>on('turn.complete', ...)   // 这一轮要做什么、做完了什么
+on('tool.call', ...)       // 调了哪些工具、返回了什么
+on('session.append', ...)  // 每条被留存的记录</code></pre>
+
+<p>写出来是一个普通目录，一条记录一个文件：</p>
+
+<pre><code>{
+  "id":         "稳定地址，被引用时用它",
+  "task":       "要干什么",
+  "did":        "实际做了什么",
+  "outcome":    "环境用它自己的话返回了什么",
+  "verdict":    "right | wrong | undetermined",
+  "checked_by": "这个 verdict 是谁给的",
+  "note":       "为什么"
+}</code></pre>
+
+<div class="note"><b><code>checked_by</code> 是刻意加的字段。</b>它把"标签从哪来"写进记录本身，让后续的学习者自己判断这条证据有多硬——而不是把所有 verdict 一视同仁。</div>
+
+<h2 id="verdict">4 · verdict 的三档</h2>
+
+<p>不猜。按可信度分三档，每一档都在 <code>checked_by</code> 里留痕：</p>
+
+<table>
+<thead><tr><th>档位</th><th>怎么拿</th><th><code>checked_by</code></th><th>可信度</th></tr></thead>
+<tbody>
+<tr><td><b>机械判据</b></td><td>配一条验证命令（测试、构建、lint），看退出码</td><td><code>"exit code of &lt;cmd&gt;"</code></td><td>最高</td></tr>
+<tr><td><b>用户显式标</b></td><td><code>/mark right|wrong [理由]</code></td><td><code>"human"</code></td><td>中</td></tr>
+<tr><td><b>默认</b></td><td>什么信号都没有</td><td><code>"undetermined"</code></td><td>—</td></tr>
+</tbody>
+</table>
+
+<p><b>默认写 <code>undetermined</code> 而不是猜。</b>这不是保守，是必需：一条被当成"已验证"的错误结论，比一条诚实的"还不确定"有害得多。方法本身也要求区分"已验证的事实"和"当前的工作默认值"。</p>
+
+<div class="ok"><b>一个真实的反面教材。</b>某个评测装置把工具输出截断在 800 字符，而被评测的环境本身不截断。于是干活的 agent 看到完整响应，学习者只看到一半。<b>学习者把截断归因于环境</b>，写下"关键信息在 800 字符上限之外"，然后<b>连续八轮</b>记录"是这个上限而不是我的推理限制了结论"。
+<p style="margin:10px 0 0">一个没写文档的管道参数，让学习者连着八轮得出系统性错误的结论——而且它的推理过程看起来完全合理。<b>证据管道上的每一处加工都必须对学习者可见。</b></p></div>
+
+<h2 id="target">5 · plugin 部署目标</h2>
+
+<p>现有的部署产出和 Claude Code plugin 的布局差得不多：</p>
+
+<pre><code>现在写出的：  项目指令文件   MCP 配置   原生子 agent 定义
+plugin 要的： skills/        MCP 配置   agents/   + 一份 manifest</code></pre>
+
+<p>加一个 connector 即可，跟现有的并列。好处是直接解决"只能生成独立 workspace、无法合并进已有项目设置"这个已知限制——<b>plugin 本身就是那个合并机制</b>。</p>
+
+<div class="warn"><b>但 adapter 本身必须保持 host 中立。</b>harness adapter 的全部意义是一份产物能部署到不同的 agent 产品。如果最终产出直接就是某一家的 plugin 格式，可移植性就没了，"adapter"这个概念也就没了。<b>plugin 是第三个出口，不是产物格式。</b></div>
+
+<h2 id="evolve">6 · <code>/evolve</code> 命令</h2>
+
+<p><span class="tag done">已完成</span></p>
+
+<p>一个 mod 注册 <code>/evolve</code>，把进化会话作为<b>独立进程</b>拉起来，然后轮询结果。</p>
+
+<div class="note"><b>为什么进化本身不能跑在 mod 里：</b>mod 的 hook 单事件只有 10 秒预算，而一轮进化要几分钟到半小时；更重要的是 mod <b>不在沙箱里</b>，而整个进化流程的严谨性恰恰建立在 OS 级隔离上。所以 mod 只做扳机，进化留在外面——沙箱完整保留。</div>
+
+<p>实现上有两个坑值得记下来：</p>
+
+<ul>
+<li><b>不能用流式的 spawn 接口 fire-and-forget</b>——它是异步生成器，不消费流进程就不会跑完。改成通过 shell 后台化，启动调用立刻返回，进程完全独立于会话。</li>
+<li><b>轮询会和框架写文件撞上</b>——读到半个 JSON 必须不抛异常，下一个周期再试。这条有测试覆盖。</li>
+</ul>
+
+<h2 id="ux">7 · 最终的用户形态</h2>
+
+<h3>装两个东西</h3>
+<pre><code>/plugin install evolve-kit@&lt;源&gt;      # 稳定：/evolve + 自动记录
+/plugin install my-adapter@&lt;源&gt;      # 数据：学到的东西，每轮换版本</code></pre>
+<p>拆成两个是因为生命周期不同：trigger 基本不变，adapter 每轮都变。捆在一起意味着每出一个候选都要重发 trigger 的代码，而且会变成"一个运行中的插件热替换自己"。</p>
+
+<h3>平时：什么都不用做</h3>
+<p>正常干活。记录在后台进行——<b>不打断、不起新对话、不要求用户做任何事</b>。偶尔标一下：</p>
+<pre><code>&gt; /mark wrong 这次漏了必填的参数</code></pre>
+<p>配了验证命令的项目连这步都省——退出码自动当标签。</p>
+
+<h3>想学一轮：敲一个命令</h3>
+<pre><code>&gt; /evolve
+
+● evolve-kit
+  Evolution session started. Nothing is adopted automatically.</code></pre>
+<p>prompt 下方出现一行常驻状态。<b>不阻塞</b>，用户继续干活。几分钟后状态更新，transcript 里多一行暗色结果，右上角弹一个提示。</p>
+
+<h3>采用：人来决定</h3>
+<pre><code>cat  &lt;session&gt;/control/report.md     # 学习者自己写的报告
+git -C &lt;session&gt;/adapter log -p      # 它到底改了什么</code></pre>
+<p>觉得行再发版、更新插件。<b>没有任何东西自动上线。</b></p>
+
+<h3>整条链路</h3>
+<pre><code>正常工作 ──(自动记录)──> LearningMaterial
+                              │
+                         /evolve（手动）
+                              │
+                   候选 adapter（带完整 git 历史）
+                              │
+                          人 review
+                              │
+                    更新插件 / 部署到别的 host</code></pre>
+
+<p><b>跟今天的区别只有一处，但它是决定性的：左边那个"自动记录"。</b>没有它，这条链在起点就断了。</p>
+
+<h2 id="not">8 · 刻意不做的</h2>
+
+<ul>
+<li><b>自动晋升。</b>评审是唯一挡在"学歪了"和"上线"之间的东西。候选的状态标记只表示"跑完了且结构检查通过"，<b>不表示效果变好</b>——自动采用等于把这个区别抹掉。</li>
+<li><b>把进化搬进宿主进程。</b>省掉的是一个子进程，丢掉的是 OS 级隔离。不划算。</li>
+<li><b>猜测 verdict。</b>宁可标 <code>undetermined</code>。</li>
+<li><b>追求通用。</b>见下。</li>
+</ul>
+
+<h2 id="open">9 · 仍未解决的</h2>
+
+<p><b>可验证场景之外，<code>verdict</code> 没有好来源。</b></p>
+
+<p>机械判据只在有客观判据的地方成立：测试过没过、命令退出码、环境明确报错。写代码、跑集群作业、调用有明确契约的 API——这些都够用。</p>
+
+<p>但"这段文案写得好不好""这个设计合不合理"这类，没有机械判据。可选的替代品各有问题：隐式信号（有没有被 revert）噪声大且"没被 revert"不等于"对"；模型评判有偏、可被刷，而且违反"只写能对照环境判定对错的东西"这条准入原则。</p>
+
+<div class="note"><b>所以建议先只在可验证场景用，不要追求通用。</b>窄，但标签免费且干净。一个在窄场景里真的有效的循环，比一个在宽场景里产出可疑结论的循环有价值得多。</div>
+
+</main>
+<footer>Changyi Yang · 2026-10-03 · 计划文档；实现状态以仓库为准</footer>
+</body></html>
