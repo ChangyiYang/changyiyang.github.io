@@ -50,6 +50,8 @@ footer{margin:72px 0 60px;padding-top:24px;border-top:1px solid var(--line);font
 
 <p>全程<b>零打扰</b>：不提问、不弹窗、不要求用户配合。用户应该感觉不到它存在。</p>
 
+<p><b>这一步没有命令。</b>用户不需要开启、不需要确认、不需要标注。</p>
+
 <div class="warn"><b>零打扰是硬约束，不是体验优化。</b>任何需要用户"配合一下"的记录机制，最后都会被关掉。</div>
 
 <h2>2 · 用户如何</h2>
@@ -60,23 +62,64 @@ footer{margin:72px 0 60px;padding-top:24px;border-top:1px solid var(--line);font
 
 <p>产出是<b>可读的</b>：它知道什么、从哪次经历学来的、还不确定什么。不是一团权重。</p>
 
-<p>产出<b>不自动生效</b>。用户看过之后再决定装不装。</p>
+<pre><code>&gt; /learn --since 2026-09-20        # 指定时间段
+&gt; /learn --from api-gateway        # 指定项目
+&gt; /learn                           # 不指定：用全部未提炼的材料
+
+  从 142 条记录提炼中…（不阻塞，可以继续干活）
+  ✓ 产出 api-gateway-mod v1
+    报告：.mods/api-gateway-mod/v1/REPORT.md</code></pre>
+
+<p>先看报告，再决定装不装：</p>
+
+<pre><code>&gt; /learn --show api-gateway-mod    # 它学到了什么、从哪来、还不确定什么</code></pre>
+
+<p>产出<b>不自动生效</b>。</p>
 
 <h3>2.2 安装已有 mod</h3>
 
 <p>装上就是把那份经验接到当前会话上。</p>
 
-<p>可以装别人产出的——<b>mod 是可分享的</b>。一个项目一个 mod，换项目换一个，互不污染。</p>
+<pre><code>&gt; /plugin install api-gateway-mod          # 装自己产出的
+&gt; /plugin install team-conventions@liquid  # 装别人产出的
+&gt; /plugin list                             # 看当前装了哪些</code></pre>
+
+<p><b>mod 是可分享的</b>。一个项目一个 mod，换项目换一个，互不污染。</p>
 
 <h3>2.3 更新 mod</h3>
 
 <p>积累了新材料之后，在已有 mod 的基础上再产一版。</p>
 
+<pre><code>&gt; /learn --update api-gateway-mod   # 在 v1 基础上产出 v2
+  ✓ 产出 api-gateway-mod v2
+    报告：.mods/api-gateway-mod/v2/REPORT.md（含 v1 → v2 的变化）
+
+&gt; /plugin update api-gateway-mod    # 看过之后，换到 v2
+&gt; /plugin rollback api-gateway-mod  # 后悔了，退回 v1</code></pre>
+
 <p>更新同样不自动生效：出新版、用户看、用户决定换不换。<b>旧版一直在，随时回滚。</b></p>
 
 <div class="note"><b>三个动作共用一条规矩：产出和更新都只是给用户一个东西看，上线与否永远是人决定的。</b>助手学到的也可能是错的，而一条错误的"经验"会被反复应用，还每次都显得有道理。</div>
 
-<h2>3 · 边界</h2>
+<h2>3 · 命令一览</h2>
+
+<table>
+<thead><tr><th>命令</th><th>做什么</th><th>来源</th></tr></thead>
+<tbody>
+<tr><td>（无）</td><td>平时积累材料</td><td>后台</td></tr>
+<tr><td><code>/learn [范围]</code></td><td>从指定材料产出一个 mod</td><td><b>要做</b></td></tr>
+<tr><td><code>/learn --show &lt;mod&gt;</code></td><td>看它学到了什么</td><td><b>要做</b></td></tr>
+<tr><td><code>/learn --update &lt;mod&gt;</code></td><td>在已有 mod 上产新一版</td><td><b>要做</b></td></tr>
+<tr><td><code>/plugin install &lt;mod&gt;</code></td><td>装上</td><td>宿主自带</td></tr>
+<tr><td><code>/plugin update &lt;mod&gt;</code></td><td>换到新版</td><td>宿主自带</td></tr>
+<tr><td><code>/plugin rollback &lt;mod&gt;</code></td><td>退回旧版</td><td>待确认</td></tr>
+<tr><td><code>/plugin list</code></td><td>看装了哪些</td><td>宿主自带</td></tr>
+</tbody>
+</table>
+
+<div class="note">只有 <code>/learn</code> 这一组是要新建的；装卸更新走宿主已有的插件机制，不另造一套。<b>命令名是占位，可以改</b>——这里要定的是「有哪几个动作」，不是叫什么。</div>
+
+<h2>4 · 边界</h2>
 
 <p>效果取决于<b>能不能判断对错</b>。</p>
 
