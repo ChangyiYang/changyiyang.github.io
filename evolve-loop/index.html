@@ -1,6 +1,6 @@
 <!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>会积累经验的编码助手：产品形态</title>
-<meta name="description" content="助手在每个 turn 的边界上积累学习材料；用户指定内容产出 mod、安装已有 mod、更新 mod。">
+<meta name="description" content="不在旁边包一层，而是让产出物本身就是宿主认识的东西。用户只学一个新命令，其余全是他本来就会的。">
 <link rel="canonical" href="https://changyiyang.github.io/evolve-loop/">
 <meta property="og:title" content="会积累经验的编码助手：产品形态"><meta property="og:type" content="article"><meta property="og:locale" content="zh_CN">
 <style>
@@ -9,7 +9,7 @@
 body{margin:0;overflow-wrap:break-word;background:var(--bg);color:var(--ink);font:16px/1.85 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
 a{color:var(--accent);text-underline-offset:3px}
 a:hover{color:#0e7490}
-header,main,footer{max-width:820px;margin:auto;padding:0 28px}
+header,main,footer{max-width:840px;margin:auto;padding:0 28px}
 header{padding-top:36px}
 nav.top{font-size:14px;color:var(--muted)}
 .eyebrow{margin-top:46px;color:var(--accent);font-size:12px;font-weight:750;letter-spacing:.14em}
@@ -17,14 +17,17 @@ h1{font-size:clamp(30px,4.4vw,46px);line-height:1.23;letter-spacing:-.03em;margi
 .lead{font-size:18.5px}
 .meta{font-size:13px;color:var(--muted);margin:20px 0 10px}
 h2{font-size:25px;letter-spacing:-.02em;margin:58px 0 6px;padding-top:12px;border-top:1px solid var(--line)}
-h3{font-size:18px;margin:34px 0 6px;letter-spacing:-.01em}
+h3{font-size:18px;margin:32px 0 6px;letter-spacing:-.01em}
 p{margin:12px 0}
 code{background:var(--code-bg);padding:.12em .36em;border-radius:4px;font-size:.88em;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+pre{background:var(--pre-bg);color:var(--pre-ink);padding:16px 20px;border-radius:9px;overflow-x:auto;font-size:13.5px;line-height:1.7;margin:16px 0}
+pre code{background:none;padding:0;color:inherit;font-size:inherit}
 table{border-collapse:collapse;width:100%;margin:18px 0;font-size:15px}
 th,td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}
 th{background:var(--th);font-weight:700}
 .note{background:var(--soft);border:1px solid var(--line);border-radius:9px;padding:14px 20px;margin:20px 0;font-size:15px}
 .warn{background:#fdf5f4;border:1px solid #efd8d5;border-left:4px solid var(--warn);border-radius:0 9px 9px 0;padding:14px 20px;margin:20px 0;font-size:15px}
+.ok{background:#f3f9f6;border:1px solid #d6e8df;border-left:4px solid var(--ok);border-radius:0 9px 9px 0;padding:14px 20px;margin:20px 0;font-size:15px}
 ul{padding-left:24px}
 li{margin:6px 0}
 footer{margin:72px 0 60px;padding-top:24px;border-top:1px solid var(--line);font-size:14px;color:var(--muted)}
@@ -36,91 +39,102 @@ footer{margin:72px 0 60px;padding-top:24px;border-top:1px solid var(--line);font
 <nav class="top"><a href="../">← Decks &amp; Proposals</a></nav>
 <div class="eyebrow">产品定义 · 用户切面</div>
 <h1>会积累经验的编码助手</h1>
-<p class="lead">助手平时在后台积累学习材料。用户在需要的时候把材料变成一个 mod，装上，之后再更新。</p>
-<p class="meta">2026-10-03 · 只定义用户切面，实现方案另行讨论</p>
+<p class="lead">助手在每个 turn 的边界上积累材料。用户在需要的时候产出一个 mod、装上、之后更新。<b>不新造任何机制——产出物本身就是宿主已经认识的东西。</b></p>
+<p class="meta">2026-10-03 · 只定义用户切面</p>
 </header>
 
 <main>
 
-<h2>1 · 平时做什么</h2>
+<h2>0 · 核心：不在旁边包一层</h2>
 
-<p><b>在每个 turn 的边界上积累学习材料。</b></p>
+<p>这套东西已经有一组完整的概念：一份可移植的经验（里面有知识、工具、角色），加上"从材料里产出下一版"这个动作。</p>
 
-<p>一个 turn 开始时记下要做什么，结束时记下做了什么、环境返回了什么、成没成。中间的工具调用、报错和重试都在这些边界上留下痕迹。</p>
-
-<p>全程<b>零打扰</b>：不提问、不弹窗、不要求用户配合。用户应该感觉不到它存在。</p>
-
-<p><b>这一步没有命令。</b>用户不需要开启、不需要确认、不需要标注。</p>
-
-<div class="warn"><b>零打扰是硬约束，不是体验优化。</b>任何需要用户"配合一下"的记录机制，最后都会被关掉。</div>
-
-<h2>2 · 用户如何</h2>
-
-<h3>2.1 指定某个内容，产出一个 mod</h3>
-
-<p>用户圈定一段材料——一个项目、一个时间段、一类任务——让助手从中提炼出一个 mod。</p>
-
-<p>产出是<b>可读的</b>：它知道什么、从哪次经历学来的、还不确定什么。不是一团权重。</p>
-
-<p><b>"指定内容"就是指定一个材料目录。</b>底层只接一个目录，不接时间范围或标签这类过滤条件：</p>
-
-<pre><code>evolve &lt;起点&gt; --learning-material &lt;材料目录&gt;
-  → 一个候选目录，里面有它改出来的东西和一份 report.md</code></pre>
-
-<p>起点是一个<b>空白架构</b>（从零开始）。看报告就是读产出目录里的 <code>report.md</code>。</p>
-
-<p>产出<b>不自动生效</b>。</p>
-
-<div class="warn"><b>这里有一个产品决策还没做。</b>既然底层只接"一个目录"，那么"我想从最近两周的记录里学"这种需求，<b>必须有东西先把那批材料挑出来、攒成一个目录</b>。谁来挑、按什么挑，是产品要定的，不是底层能提供的。</div>
-
-<h3>2.2 安装已有 mod</h3>
-
-<p>装上就是把那份经验接到当前会话上。</p>
-
-<pre><code>&gt; /plugin install api-gateway-mod          # 装自己产出的
-&gt; /plugin install team-conventions@liquid  # 装别人产出的
-&gt; /plugin list                             # 看当前装了哪些</code></pre>
-
-<p><b>mod 是可分享的</b>。一个项目一个 mod，换项目换一个，互不污染。</p>
-
-<h3>2.3 更新 mod</h3>
-
-<p>积累了新材料之后，在已有 mod 的基础上再产一版。</p>
-
-<p><b>更新和产出是同一个动作</b>，区别只在于起点：</p>
-
-<pre><code>evolve &lt;空白架构&gt;   --learning-material &lt;目录&gt;   # 从零：产出第一版
-evolve &lt;已有的那版&gt; --learning-material &lt;目录&gt;   # 迭代：在它基础上产下一版</code></pre>
-
-<p>所以不需要一个单独的"更新"命令——<b>把当前这版当起点传进去，就是更新</b>。</p>
-
-<p>更新同样不自动生效：出新版、用户看、用户决定换不换。旧版本身没有被改动过，所以回滚就是继续用它。</p>
-
-<div class="note"><b>三个动作共用一条规矩：产出和更新都只是给用户一个东西看，上线与否永远是人决定的。</b>助手学到的也可能是错的，而一条错误的"经验"会被反复应用，还每次都显得有道理。</div>
-
-<h2>3 · 命令一览</h2>
-
-<p>底层已经有的两个动作：</p>
+<p><b>要做的是让这些概念落进宿主已有的东西里，而不是在旁边平行造一套。</b></p>
 
 <table>
-<thead><tr><th>动作</th><th>底层命令</th><th>产出</th></tr></thead>
+<thead><tr><th>这套 API 里的</th><th>落进宿主就是</th></tr></thead>
 <tbody>
-<tr><td>产出 / 更新</td><td><code>evolve &lt;起点&gt; --learning-material &lt;目录&gt;</code></td><td>一个候选目录 + <code>report.md</code></td></tr>
-<tr><td>装上</td><td><code>deploy &lt;候选目录&gt; --host &lt;宿主&gt;</code></td><td>在宿主上生效</td></tr>
+<tr><td>经验里的<b>工具</b></td><td>插件自带的工具服务</td></tr>
+<tr><td>经验里的<b>角色</b></td><td>插件自带的子 agent</td></tr>
+<tr><td>经验里的<b>知识</b></td><td>插件目录里的文件</td></tr>
+<tr><td>经验的<b>上下文</b></td><td>每个会话开头注入</td></tr>
+<tr><td><b>积累材料</b></td><td>turn 边界上的钩子</td></tr>
+<tr><td><b>产出下一版</b></td><td>一个命令</td></tr>
+<tr><td><b>装上 / 换版本</b></td><td><b>宿主本来就有</b></td></tr>
 </tbody>
 </table>
 
-<p>用户切面要做的，是把这两步包成顺手的样子，<b>而不是另造一套语义</b>。包装层需要补的只有三件：</p>
+<div class="ok"><b>最后一行是关键：没有"部署"这一步。</b>产出物就是一个插件，装它用宿主自带的装插件方式。我们不写安装、不写更新、不写回滚——那些宿主已经做好了。</div>
+
+<p>所以最终是<b>一个插件装着全部东西</b>：</p>
+
+<pre><code>一个插件
+├── 钩子        记录 + 注入上下文 + 提供产出命令
+├── 工具服务    经验里的工具
+├── 子 agent    经验里的角色
+└── 知识文件</code></pre>
+
+<p>产出下一版，就是产出这个插件的下一版。</p>
+
+<h2>1 · 平时做什么</h2>
+
+<p><b>在每个 turn 的边界上积累材料。</b>开始时记下要做什么，结束时记下做了什么、环境返回了什么、成没成。中间的工具调用、报错、重试都在这些边界上留痕。</p>
+
+<p><b>没有命令。</b>不需要开启、不需要确认、不需要标注。</p>
+
+<div class="warn"><b>零打扰是硬约束。</b>任何需要用户"配合一下"的记录机制，最后都会被关掉。</div>
+
+<h2>2 · 用户如何</h2>
+
+<h3>2.1 产出</h3>
+
+<pre><code>&gt; /evolve
+
+  从积累的材料里提炼中…（不阻塞，可以继续干活）
+  ✓ 产出 v2 — 看看它学到了什么再决定装不装</code></pre>
+
+<p>第一次运行时从空白开始；之后<b>自动以当前装着的那版为起点</b>，所以用户两次敲的是同一个命令。</p>
+
+<p>产出<b>不自动生效</b>，先给人看。</p>
+
+<h3>2.2 安装</h3>
+
+<p>用宿主自带的装插件方式。可以装自己产出的，也可以装别人产出的——<b>经验是可分享的</b>。</p>
+
+<p>一个项目一份，换项目换一份，互不污染。</p>
+
+<h3>2.3 更新</h3>
+
+<p>同样是 <code>/evolve</code>——它已经以当前版为起点，所以<b>产出和更新是同一个动作</b>，不需要第二个命令。</p>
+
+<p>换到新版、退回旧版，都用宿主自带的方式。旧版本身没被改动过，所以回滚就是继续用它。</p>
+
+<h2>3 · 用户要学的新东西：一个命令</h2>
+
+<table>
+<thead><tr><th>动作</th><th>怎么做</th></tr></thead>
+<tbody>
+<tr><td>平时积累</td><td>（无，后台）</td></tr>
+<tr><td>产出 / 更新</td><td><code>/evolve</code> ← <b>唯一新增的</b></td></tr>
+<tr><td>装上 / 换版本 / 回滚 / 查看装了哪些</td><td>宿主自带</td></tr>
+</tbody>
+</table>
+
+<div class="note">命令名是占位，可以改。这里要定的是<b>只有一个新动作</b>，其余全部复用宿主已有的东西。</div>
+
+<h2>4 · 还没定的一件事</h2>
+
+<p>底层产出一版时，接的是<b>一批材料</b>。那么"这次用哪批"是谁决定的？</p>
 
 <ul>
-<li><b>攒材料</b>：把 turn 边界上的记录变成一个合规的材料目录</li>
-<li><b>挑材料</b>：决定这次用哪批（上面那个待定的产品决策）</li>
-<li><b>管版本</b>：候选目录 ↔ 宿主上装着的那版，之间的对应关系</li>
+<li>自上次产出以来的全部？</li>
+<li>按项目分开、各自一直往里追加？</li>
+<li>用户自己圈一个范围？</li>
 </ul>
 
-<div class="note"><b>产出物是一个候选目录，不是直接就装好的东西。</b>"产出一个 mod"在底层其实是两步：先 evolve 出候选，人看过之后再 deploy。这个两步结构是刻意的——中间那一步就是人做决定的地方。</div>
+<p>这个决定下来，上面 2.1 那一步的形状才算定死。<b>它是产品决策，不是底层能提供的。</b></p>
 
-<h2>4 · 边界</h2>
+<h2>5 · 边界</h2>
 
 <p>效果取决于<b>能不能判断对错</b>。</p>
 
