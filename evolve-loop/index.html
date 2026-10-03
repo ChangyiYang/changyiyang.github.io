@@ -1,10 +1,10 @@
 <!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>把持续学习的循环接上：一个落地计划</title>
-<meta name="description" content="Harness adapter 的部署和进化都已就绪，缺的是起点——没人把真实工作变成训练数据。用 Claude Code mod 补上记录这一环的具体计划：三件要加的东西、verdict 的三档可信度、最终的用户形态。">
+<title>会积累经验的编码助手：产品形态</title>
+<meta name="description" content="定义用户切面：用户装什么、平时做什么、看到什么、在哪里做决定，以及我们承诺与不承诺的事。实现方式留到之后。">
 <link rel="canonical" href="https://changyiyang.github.io/evolve-loop/">
-<meta property="og:title" content="把持续学习的循环接上：一个落地计划"><meta property="og:type" content="article"><meta property="og:locale" content="zh_CN">
+<meta property="og:title" content="会积累经验的编码助手：产品形态"><meta property="og:type" content="article"><meta property="og:locale" content="zh_CN">
 <style>
-:root{--ink:#17212b;--muted:#627182;--line:#e1e7ec;--accent:#236477;--warn:#a13c35;--ok:#2f6b55;--amber:#a8621c;--violet:#6a4c93;--bg:#fff;--soft:#f5f9fa;--code-bg:#f4f6f8;--pre-bg:#10212b;--pre-ink:#e6edf3;--card:#fcfdfe;--th:#f4f7f9}
+:root{--ink:#17212b;--muted:#627182;--line:#e1e7ec;--accent:#236477;--warn:#a13c35;--ok:#2f6b55;--amber:#a8621c;--violet:#6a4c93;--bg:#fff;--soft:#f5f9fa;--code-bg:#f4f6f8;--pre-bg:#10212b;--pre-ink:#e6edf3;--th:#f4f7f9}
 *{box-sizing:border-box}
 html{scroll-behavior:smooth;scroll-padding-top:20px}
 body{margin:0;overflow-wrap:break-word;background:var(--bg);color:var(--ink);font:16px/1.85 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
@@ -22,7 +22,6 @@ h1 small{display:block;font-size:.46em;letter-spacing:0;margin-top:16px;font-wei
 .intro p{margin:0 0 10px}.intro p:last-child{margin:0}
 .toc{display:grid;grid-template-columns:1fr 1fr;gap:4px 28px;border:1px solid var(--line);padding:22px 26px;border-radius:9px;margin:32px 0 56px;font-size:14px;line-height:1.7}
 .toc a{text-decoration:none}
-.toc .grp{grid-column:1/-1;font-weight:750;color:var(--muted);font-size:12px;letter-spacing:.1em;margin-top:10px}
 h2{font-size:27px;letter-spacing:-.02em;margin:64px 0 6px;padding-top:12px;border-top:1px solid var(--line)}
 h3{font-size:19px;margin:38px 0 8px;letter-spacing:-.01em}
 p{margin:12px 0}
@@ -35,9 +34,9 @@ th{background:var(--th);font-weight:700}
 .note{background:var(--soft);border:1px solid var(--line);border-radius:9px;padding:16px 20px;margin:22px 0;font-size:15px}
 .warn{background:#fdf5f4;border:1px solid #efd8d5;border-left:4px solid var(--warn);border-radius:0 9px 9px 0;padding:16px 20px;margin:22px 0;font-size:15px}
 .ok{background:#f3f9f6;border:1px solid #d6e8df;border-left:4px solid var(--ok);border-radius:0 9px 9px 0;padding:16px 20px;margin:22px 0;font-size:15px}
-.tag{display:inline-block;font-size:12px;padding:2px 9px;border-radius:999px;background:var(--soft);border:1px solid var(--line);color:var(--muted);margin-right:6px}
-.tag.done{background:#f3f9f6;border-color:#d6e8df;color:var(--ok);font-weight:700}
-.tag.todo{background:#fdf7f0;border-color:#efdfcc;color:var(--amber);font-weight:700}
+.promise{border:1px solid var(--line);border-radius:9px;padding:4px 24px 18px;margin:22px 0;background:var(--soft)}
+.promise h3{margin:20px 0 6px;font-size:17px}
+.promise p{margin:6px 0 0;font-size:15px}
 ul,ol{padding-left:24px}
 li{margin:7px 0}
 footer{margin:80px 0 60px;padding-top:24px;border-top:1px solid var(--line);font-size:14px;color:var(--muted)}
@@ -47,192 +46,157 @@ footer{margin:80px 0 60px;padding-top:24px;border-top:1px solid var(--line);font
 <body>
 <header>
 <nav class="top"><a href="../">← Decks &amp; Proposals</a></nav>
-<div class="eyebrow">持续学习 · 落地计划</div>
-<h1>把持续学习的循环接上<small>部署和进化都已就绪，缺的是起点：没有人把真实工作变成训练数据。这是补上那一环的计划。</small></h1>
-<p class="lead">一个 agent 要在同一个环境里反复干活，理想状态是它从每次经验里积累对这个环境的认识。实现这件事的框架已经存在：可移植的 harness adapter、沙箱隔离的进化会话、候选产物与人工评审。但整条链在最左端是断的——<b>没有任何东西负责把"agent 实际干了什么"变成可供学习的记录</b>。本文是补上这一环的具体计划，以及补完之后用户看到的形态。</p>
-<p class="meta">2026-10-03 · 计划文档，非实现报告 · 三件中已完成一件</p>
+<div class="eyebrow">产品定义 · 用户切面</div>
+<h1>会积累经验的编码助手<small>定义用户看到和做的那一层：装什么、平时怎样、在哪里做决定、我们承诺什么。实现方式留到之后。</small></h1>
+<p class="lead">今天的编码助手每开一个新会话都是一张白纸。上一次摸清的约定、踩过的坑、验证过的做法，下一次全不记得——同一个错误可以犯很多遍。这份文档定义的产品要解决的就是这件事，并且只定义<b>用户能看到和能做的部分</b>。</p>
+<p class="meta">2026-10-03 · 产品形态定义 · 不含实现方案</p>
 </header>
 
 <main>
 
 <div class="intro">
-<p><b>一句话：</b>缺的不是工程量，是一个<b>输入</b>。进化需要"带判定的记录"，而真实使用中没有人产生它。</p>
-<p><b>解法：</b>用 Claude Code 的 <a href="../agent-plugins/">mod</a> 在会话内部记录 episode，并把判定来源分三档可信度写进记录本身。</p>
+<p><b>一句话：</b>一个会把工作经验攒下来的助手。它在你干活时安静地记录，你想让它学的时候敲一个命令，学完给你一份可读的报告，<b>采不采用你说了算</b>。</p>
 </div>
 
 <div class="toc">
-  <div class="grp">背景</div>
-  <a href="#gap">1 · 断在哪里</a>
-  <a href="#have">2 · 现在有什么</a>
-  <div class="grp">计划</div>
-  <a href="#recorder">3 · 记录器</a>
-  <a href="#verdict">4 · verdict 的三档</a>
-  <a href="#target">5 · plugin 部署目标</a>
-  <a href="#evolve">6 · /evolve 命令</a>
-  <div class="grp">结果</div>
-  <a href="#ux">7 · 最终的用户形态</a>
-  <a href="#not">8 · 刻意不做的</a>
-  <a href="#open">9 · 仍未解决的</a>
+  <a href="#why">1 · 用户的问题</a>
+  <a href="#install">2 · 用户装什么</a>
+  <a href="#daily">3 · 日常：三种状态</a>
+  <a href="#see">4 · 用户看到什么</a>
+  <a href="#decide">5 · 决定权在哪</a>
+  <a href="#promise">6 · 四条产品承诺</a>
+  <a href="#scope">7 · 什么场景有效</a>
+  <a href="#later">8 · 这一版不定义什么</a>
 </div>
 
-<h2 id="gap">1 · 断在哪里</h2>
+<h2 id="why">1 · 用户的问题</h2>
 
-<p>把这套东西类比成模型训练，对应关系相当整齐：</p>
-
-<table>
-<thead><tr><th>模型训练</th><th>这里</th><th>状态</th></tr></thead>
-<tbody>
-<tr><td>模型结构</td><td>adapter 的起始布局</td><td>有</td></tr>
-<tr><td>训练出来的权重</td><td>adapter：学到的 prompt、知识、工具、角色</td><td>有</td></tr>
-<tr><td>训练算法</td><td>Evolver</td><td>有</td></tr>
-<tr><td>推理</td><td>部署到 host</td><td>有</td></tr>
-<tr><td><b>训练数据</b></td><td><b>录下来的 episode</b></td><td><b>没有人产生</b></td></tr>
-</tbody>
-</table>
-
-<p>前四行都已经实现得相当扎实。第五行是空的——不是没做好，是<b>整个采集环节不在框架的职责范围内</b>。它的设计假设是：谁用它，谁负责提供数据。</p>
-
-<p>这个假设在 benchmark 里成立：benchmark 自带判分器，每道题的对错是免费的。<b>在真实工作里不成立</b>——没有人告诉你 agent 这次干得对不对。</p>
-
-<div class="warn"><b>所以"用户边用我们边收集"这个直觉，只对了一半。</b>轨迹好拿（会话里什么都看得见），<b>标签没地方来</b>。这是整件事唯一的硬骨头，其余都是工程。</div>
-
-<h2 id="have">2 · 现在有什么</h2>
-
-<table>
-<thead><tr><th>环节</th><th>状态</th></tr></thead>
-<tbody>
-<tr><td>adapter 契约（context / tools / roles 三个导出面）</td><td><span class="tag done">已有</span> 带版本号、强制校验</td></tr>
-<tr><td>部署到 Codex / Claude Code</td><td><span class="tag done">已有</span> 两个 host connector</td></tr>
-<tr><td>沙箱隔离的进化会话</td><td><span class="tag done">已有</span> OS 级强制，fail-closed</td></tr>
-<tr><td>候选产物 + 人工评审</td><td><span class="tag done">已有</span> 从不自动晋升</td></tr>
-<tr><td><code>/evolve</code> 用户命令</td><td><span class="tag done">已完成</span> 本次新增</td></tr>
-<tr><td><b>episode 记录器</b></td><td><span class="tag todo">要做</span> 关键的一件</td></tr>
-<tr><td>plugin 部署目标</td><td><span class="tag todo">要做</span> 量小</td></tr>
-</tbody>
-</table>
-
-<h2 id="recorder">3 · 记录器（关键的一件）</h2>
-
-<p>Claude Code 的 mod 跑在它自己的进程里，能看见会话的全部事件。挂三个 hook 就够：</p>
-
-<pre><code>on('turn.complete', ...)   // 这一轮要做什么、做完了什么
-on('tool.call', ...)       // 调了哪些工具、返回了什么
-on('session.append', ...)  // 每条被留存的记录</code></pre>
-
-<p>写出来是一个普通目录，一条记录一个文件：</p>
-
-<pre><code>{
-  "id":         "稳定地址，被引用时用它",
-  "task":       "要干什么",
-  "did":        "实际做了什么",
-  "outcome":    "环境用它自己的话返回了什么",
-  "verdict":    "right | wrong | undetermined",
-  "checked_by": "这个 verdict 是谁给的",
-  "note":       "为什么"
-}</code></pre>
-
-<div class="note"><b><code>checked_by</code> 是刻意加的字段。</b>它把"标签从哪来"写进记录本身，让后续的学习者自己判断这条证据有多硬——而不是把所有 verdict 一视同仁。</div>
-
-<h2 id="verdict">4 · verdict 的三档</h2>
-
-<p>不猜。按可信度分三档，每一档都在 <code>checked_by</code> 里留痕：</p>
-
-<table>
-<thead><tr><th>档位</th><th>怎么拿</th><th><code>checked_by</code></th><th>可信度</th></tr></thead>
-<tbody>
-<tr><td><b>机械判据</b></td><td>配一条验证命令（测试、构建、lint），看退出码</td><td><code>"exit code of &lt;cmd&gt;"</code></td><td>最高</td></tr>
-<tr><td><b>用户显式标</b></td><td><code>/mark right|wrong [理由]</code></td><td><code>"human"</code></td><td>中</td></tr>
-<tr><td><b>默认</b></td><td>什么信号都没有</td><td><code>"undetermined"</code></td><td>—</td></tr>
-</tbody>
-</table>
-
-<p><b>默认写 <code>undetermined</code> 而不是猜。</b>这不是保守，是必需：一条被当成"已验证"的错误结论，比一条诚实的"还不确定"有害得多。方法本身也要求区分"已验证的事实"和"当前的工作默认值"。</p>
-
-<div class="ok"><b>一个真实的反面教材。</b>某个评测装置把工具输出截断在 800 字符，而被评测的环境本身不截断。于是干活的 agent 看到完整响应，学习者只看到一半。<b>学习者把截断归因于环境</b>，写下"关键信息在 800 字符上限之外"，然后<b>连续八轮</b>记录"是这个上限而不是我的推理限制了结论"。
-<p style="margin:10px 0 0">一个没写文档的管道参数，让学习者连着八轮得出系统性错误的结论——而且它的推理过程看起来完全合理。<b>证据管道上的每一处加工都必须对学习者可见。</b></p></div>
-
-<h2 id="target">5 · plugin 部署目标</h2>
-
-<p>现有的部署产出和 Claude Code plugin 的布局差得不多：</p>
-
-<pre><code>现在写出的：  项目指令文件   MCP 配置   原生子 agent 定义
-plugin 要的： skills/        MCP 配置   agents/   + 一份 manifest</code></pre>
-
-<p>加一个 connector 即可，跟现有的并列。好处是直接解决"只能生成独立 workspace、无法合并进已有项目设置"这个已知限制——<b>plugin 本身就是那个合并机制</b>。</p>
-
-<div class="warn"><b>但 adapter 本身必须保持 host 中立。</b>harness adapter 的全部意义是一份产物能部署到不同的 agent 产品。如果最终产出直接就是某一家的 plugin 格式，可移植性就没了，"adapter"这个概念也就没了。<b>plugin 是第三个出口，不是产物格式。</b></div>
-
-<h2 id="evolve">6 · <code>/evolve</code> 命令</h2>
-
-<p><span class="tag done">已完成</span></p>
-
-<p>一个 mod 注册 <code>/evolve</code>，把进化会话作为<b>独立进程</b>拉起来，然后轮询结果。</p>
-
-<div class="note"><b>为什么进化本身不能跑在 mod 里：</b>mod 的 hook 单事件只有 10 秒预算，而一轮进化要几分钟到半小时；更重要的是 mod <b>不在沙箱里</b>，而整个进化流程的严谨性恰恰建立在 OS 级隔离上。所以 mod 只做扳机，进化留在外面——沙箱完整保留。</div>
-
-<p>实现上有两个坑值得记下来：</p>
+<p>用户的原话通常是这几句：</p>
 
 <ul>
-<li><b>不能用流式的 spawn 接口 fire-and-forget</b>——它是异步生成器，不消费流进程就不会跑完。改成通过 shell 后台化，启动调用立刻返回，进程完全独立于会话。</li>
-<li><b>轮询会和框架写文件撞上</b>——读到半个 JSON 必须不抛异常，下一个周期再试。这条有测试覆盖。</li>
+<li>"这个我上周跟你说过了。"</li>
+<li>"每次都得重新解释一遍我们的规矩。"</li>
+<li>"它又用了那个我们早就废弃的写法。"</li>
 </ul>
 
-<h2 id="ux">7 · 最终的用户形态</h2>
+<p>共同点是：<b>助手没有跨会话的记忆，而用户有</b>。于是维护这份记忆的成本全压在用户身上——写文档、写项目指令、每次开头粘一段说明。写了还会过期，过期了还得自己发现。</p>
 
-<h3>装两个东西</h3>
-<pre><code>/plugin install evolve-kit@&lt;源&gt;      # 稳定：/evolve + 自动记录
-/plugin install my-adapter@&lt;源&gt;      # 数据：学到的东西，每轮换版本</code></pre>
-<p>拆成两个是因为生命周期不同：trigger 基本不变，adapter 每轮都变。捆在一起意味着每出一个候选都要重发 trigger 的代码，而且会变成"一个运行中的插件热替换自己"。</p>
+<p>这个产品把这份维护工作接过来：<b>从实际发生过的事情里积累，而不是靠人去写和维护。</b></p>
 
-<h3>平时：什么都不用做</h3>
-<p>正常干活。记录在后台进行——<b>不打断、不起新对话、不要求用户做任何事</b>。偶尔标一下：</p>
-<pre><code>&gt; /mark wrong 这次漏了必填的参数</code></pre>
-<p>配了验证命令的项目连这步都省——退出码自动当标签。</p>
+<h2 id="install">2 · 用户装什么</h2>
 
-<h3>想学一轮：敲一个命令</h3>
-<pre><code>&gt; /evolve
+<p>两样东西，一次装好：</p>
 
-● evolve-kit
-  Evolution session started. Nothing is adopted automatically.</code></pre>
-<p>prompt 下方出现一行常驻状态。<b>不阻塞</b>，用户继续干活。几分钟后状态更新，transcript 里多一行暗色结果，右上角弹一个提示。</p>
+<table>
+<thead><tr><th>装的东西</th><th>是什么</th><th>多久变一次</th></tr></thead>
+<tbody>
+<tr><td><b>助手本体</b></td><td>提供记录和学习能力。装了就不用管。</td><td>基本不变</td></tr>
+<tr><td><b>经验包</b></td><td>它为你这个项目学到的东西：约定、做法、避坑、专门的检查工具。</td><td>每学一轮换一版</td></tr>
+</tbody>
+</table>
 
-<h3>采用：人来决定</h3>
-<pre><code>cat  &lt;session&gt;/control/report.md     # 学习者自己写的报告
-git -C &lt;session&gt;/adapter log -p      # 它到底改了什么</code></pre>
-<p>觉得行再发版、更新插件。<b>没有任何东西自动上线。</b></p>
+<p><b>为什么分开：</b>经验包是会长大的，本体不是。分开之后，"更新经验"和"更新软件"是两件事，用户可以只更新前者；一个项目一个经验包，换项目换一包，互不污染。</p>
 
-<h3>整条链路</h3>
-<pre><code>正常工作 ──(自动记录)──> LearningMaterial
-                              │
-                         /evolve（手动）
-                              │
-                   候选 adapter（带完整 git 历史）
-                              │
-                          人 review
-                              │
-                    更新插件 / 部署到别的 host</code></pre>
+<div class="note"><b>经验包是可读、可分享、可回滚的。</b>它不是一团不透明的权重，而是一份你随时能打开看的东西：它知道什么、从哪次经历学来的、什么时候确认过。队友可以直接拿走用。</div>
 
-<p><b>跟今天的区别只有一处，但它是决定性的：左边那个"自动记录"。</b>没有它，这条链在起点就断了。</p>
+<h2 id="daily">3 · 日常：三种状态</h2>
 
-<h2 id="not">8 · 刻意不做的</h2>
+<h3>状态一：什么都不做（绝大多数时间）</h3>
+<p>正常干活。记录在背后进行，<b>不打断、不提问、不弹窗、不多花你一秒钟</b>。用户完全感觉不到它存在。</p>
+
+<div class="warn"><b>这是最重要的一条设计约束。</b>任何需要用户"配合一下"的记录机制最后都会被关掉。记录必须是零成本的，否则这个产品在第二周就死了。</div>
+
+<h3>状态二：一句话（偶尔）</h3>
+<p>当助手做错了而且这件事值得记住时，用户说一句：</p>
+<pre><code>&gt; /mark wrong 这里不该直接改配置，要走审批流程</code></pre>
+<p>就这一句，不用填表、不用打分。做得特别好同理。</p>
+<p>在有客观判据的项目里（测试、构建、lint），<b>连这句都不用说</b>——对错由那个判据自动决定。</p>
+
+<h3>状态三：一个命令（想学的时候）</h3>
+<pre><code>&gt; /evolve</code></pre>
+<p>助手开始从最近的记录里学习。<b>这个过程不阻塞</b>：用户继续干自己的活，学习在后台进行，几分钟后告诉你结果。</p>
+
+<p>什么时候敲这个命令由用户决定——一个阶段做完、一周结束、或者刚踩完一个坑想让它记住。<b>产品不替用户决定这个节奏。</b></p>
+
+<h2 id="see">4 · 用户看到什么</h2>
+
+<p>一共四样，没有更多：</p>
+
+<table>
+<thead><tr><th>时机</th><th>看到什么</th><th>要不要理它</th></tr></thead>
+<tbody>
+<tr><td>平时</td><td>什么都没有</td><td>不用</td></tr>
+<tr><td>学习中</td><td>一行不起眼的状态提示</td><td>不用，可以继续干活</td></tr>
+<tr><td>学完了</td><td>一条结果通知</td><td>方便时看一眼</td></tr>
+<tr><td>你点进去</td><td>一份报告：学到了什么、从哪次经历学的、它自己还不确定什么</td><td>决定要不要采用</td></tr>
+</tbody>
+</table>
+
+<p>那份报告是<b>给人读的</b>，不是日志。它要能回答三个问题：</p>
 
 <ul>
-<li><b>自动晋升。</b>评审是唯一挡在"学歪了"和"上线"之间的东西。候选的状态标记只表示"跑完了且结构检查通过"，<b>不表示效果变好</b>——自动采用等于把这个区别抹掉。</li>
-<li><b>把进化搬进宿主进程。</b>省掉的是一个子进程，丢掉的是 OS 级隔离。不划算。</li>
-<li><b>猜测 verdict。</b>宁可标 <code>undetermined</code>。</li>
-<li><b>追求通用。</b>见下。</li>
+<li><b>它新知道了什么？</b></li>
+<li><b>这个结论是从哪件事来的？</b>（能追到具体那次经历）</li>
+<li><b>它自己承认还不确定什么？</b></li>
 </ul>
 
-<h2 id="open">9 · 仍未解决的</h2>
+<div class="ok"><b>第三条是刻意的。</b>一个只报告成果不报告疑问的助手，用户没法判断该信多少。<b>它必须把"我还不知道"显式说出来</b>，并且说清楚什么样的情况能验证它。</div>
 
-<p><b>可验证场景之外，<code>verdict</code> 没有好来源。</b></p>
+<h2 id="decide">5 · 决定权在哪</h2>
 
-<p>机械判据只在有客观判据的地方成立：测试过没过、命令退出码、环境明确报错。写代码、跑集群作业、调用有明确契约的 API——这些都够用。</p>
+<p><b>永远在用户手上。</b>学习结束后，产品的动作是"给你一份报告"，不是"已经帮你更新好了"。</p>
 
-<p>但"这段文案写得好不好""这个设计合不合理"这类，没有机械判据。可选的替代品各有问题：隐式信号（有没有被 revert）噪声大且"没被 revert"不等于"对"；模型评判有偏、可被刷，而且违反"只写能对照环境判定对错的东西"这条准入原则。</p>
+<pre><code>学习完成  →  报告  →  用户看  →  用户决定采不采用</code></pre>
 
-<div class="note"><b>所以建议先只在可验证场景用，不要追求通用。</b>窄，但标签免费且干净。一个在窄场景里真的有效的循环，比一个在宽场景里产出可疑结论的循环有价值得多。</div>
+<p>采用了，经验包换一版；不采用，什么都没发生，原来那版继续用。</p>
+
+<div class="warn"><b>为什么不自动采用。</b>助手学到的东西也可能是错的——它可能从一次偶然的成功里归纳出一条普遍规律。<b>一条错误的"经验"比没有经验更糟</b>，因为它会被反复应用而且看起来很有道理。评审是唯一挡在这中间的东西，所以它不能被省掉。</div>
+
+<h2 id="promise">6 · 四条产品承诺</h2>
+
+<div class="promise">
+<h3>一、不打扰</h3>
+<p>记录永远是零成本的。不提问、不弹窗、不要求配合。用户想不起来它存在，是正常状态。</p>
+
+<h3>二、不猜</h3>
+<p>当产品不知道某次做得对不对时，它<b>标注"不确定"，而不是猜一个</b>。一条被当作已验证的错误结论，会被反复应用，而且每次看起来都很合理——这种损害比承认不知道大得多。</p>
+
+<h3>三、不自作主张</h3>
+<p>任何学到的东西上线之前，都要经过用户点头。没有"自动更新你的助手行为"这回事。</p>
+
+<h3>四、可解释</h3>
+<p>经验包里的每一条都能追到它从哪次经历来的、什么时候确认过。用户随时可以问"你为什么这么认为"，并且得到一个具体的答案而不是"我学到的"。</p>
+</div>
+
+<h2 id="scope">7 · 什么场景有效</h2>
+
+<p>这个产品的效果<b>强依赖于"能不能判断对错"</b>。所以要诚实地说清楚边界：</p>
+
+<table>
+<thead><tr><th></th><th>场景</th><th>为什么</th></tr></thead>
+<tbody>
+<tr><td><b>有效</b></td><td>写代码、跑作业、调用有明确契约的接口、任何"跑一下就知道成没成"的事</td><td>对错是客观的，产品能自动拿到，而且拿到的是硬信号</td></tr>
+<tr><td><b>勉强</b></td><td>用户愿意偶尔说一句"这次不对"的场景</td><td>信号稀疏，但真实</td></tr>
+<tr><td><b>无效</b></td><td>"这段文案写得好不好""这个设计合不合理"</td><td>没有客观判据，产品只能猜——而我们承诺不猜</td></tr>
+</tbody>
+</table>
+
+<div class="note"><b>先做窄的。</b>一个在可验证场景里真的管用的产品，比一个在所有场景里都输出可疑结论的产品有价值得多。前者能建立信任，后者会毁掉信任。</div>
+
+<h2 id="later">8 · 这一版不定义什么</h2>
+
+<p>以下全部留到实现阶段，<b>刻意不在这里锁死</b>：</p>
+
+<ul>
+<li>记录在技术上怎么采集</li>
+<li>经验包的内部结构和格式</li>
+<li>学习过程本身怎么跑、跑在哪</li>
+<li>怎么分发、怎么更新</li>
+<li>支持哪些助手产品</li>
+</ul>
+
+<p>这些都是实现方案的事。<b>只要上面七节定义的用户切面不变，底下换一套做法不应该影响用户。</b>这正是先定义切面的原因。</p>
 
 </main>
-<footer>Changyi Yang · 2026-10-03 · 计划文档；实现状态以仓库为准</footer>
+<footer>Changyi Yang · 2026-10-03 · 产品形态定义；实现方案另行讨论</footer>
 </body></html>
