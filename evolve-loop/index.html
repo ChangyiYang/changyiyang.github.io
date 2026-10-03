@@ -75,11 +75,20 @@ footer{margin:72px 0 60px;padding-top:24px;border-top:1px solid var(--line);font
 
 <h2>怎么用</h2>
 
-<h3>1. 装上 mod</h3>
+<h3>1. 装上 mod，回答一个问题</h3>
 
-<pre><code>&gt; /plugin install recall@&lt;源&gt;</code></pre>
+<pre><code>&gt; /plugin install recall@&lt;源&gt;
 
-<p>装完就开始记了。<b>不需要开启，也不会问你任何问题。</b></p>
+  这个项目是做什么的？一句话就行。
+  &gt; 一个 Go 写的 API 网关；配置改动走 PR，不直接改线上
+
+  ✓ 装好了，开始记录</code></pre>
+
+<p><b>这是它唯一会问你的一次。</b>之后再也不问。</p>
+
+<p>这句话决定它<b>该往哪个方向学</b>——同样一堆记录，"这是个 API 网关"和"这是个数据分析脚本"该总结出来的东西不一样。填一次，后面每次产出都沿用。</p>
+
+<div class="note">写得具体一点更有用。"一个服务"几乎等于没说；"Go 写的 API 网关，配置走 PR，迁移必须先 dry-run"能让它知道该留意什么。<b>写错了也不要紧，装好之后可以改。</b></div>
 
 <h3>2. 正常干活</h3>
 
@@ -131,7 +140,7 @@ footer{margin:72px 0 60px;padding-top:24px;border-top:1px solid var(--line);font
 
 <ul>
 <li><b>不自动装。</b>产出之后等你看过再决定。Claude 学到的也可能是错的，而一条错误的"经验"会被反复应用，还每次都显得有道理。</li>
-<li><b>不打扰你。</b>记录全程不提问、不弹窗、不要求配合。你应该感觉不到它存在。</li>
+<li><b>不打扰你。</b>除了装上时那一个问题，记录全程不提问、不弹窗、不要求配合。你应该感觉不到它存在。</li>
 <li><b>不猜对错。</b>没把握的事它标注"还不确定"，不硬编一个结论。</li>
 </ul>
 
