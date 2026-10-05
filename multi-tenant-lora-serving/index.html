@@ -1,0 +1,445 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="从 LoRA、PetS、Punica、S-LoRA、LoRAX 到 dLoRA、CaraServe、vLLM 与 SGLang：multi-tenant LoRA serving 的系统演化史。" />
+  <meta property="og:title" content="Multi-tenant LoRA Serving：从共享权重到共享系统" />
+  <meta property="og:description" content="论文、开源实现与生产系统如何把一个低秩更新，变成可服务成千上万个租户的推理栈。" />
+  <meta property="og:type" content="article" />
+  <meta property="og:image" content="https://changyiyang.github.io/multi-tenant-lora-serving/og.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <title>Multi-tenant LoRA Serving：从共享权重到共享系统</title>
+  <style>
+    :root {
+      --paper: #f4efe5;
+      --paper-2: #ebe2d3;
+      --ink: #181a1b;
+      --muted: #6c6b66;
+      --line: #cec4b3;
+      --panel: rgba(255, 252, 245, .72);
+      --cyan: #137a8b;
+      --cyan-pale: #d8edf0;
+      --coral: #d45e42;
+      --coral-pale: #f3ddd5;
+      --violet: #7057a7;
+      --violet-pale: #e8e0f4;
+      --yellow: #b17718;
+      --shadow: 0 18px 55px rgba(42, 35, 24, .09);
+      --serif: "Iowan Old Style", "Palatino Linotype", "Noto Serif SC", "Songti SC", Georgia, serif;
+      --sans: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 7% 3%, rgba(19,122,139,.10), transparent 24rem),
+        radial-gradient(circle at 91% 20%, rgba(212,94,66,.08), transparent 26rem),
+        var(--paper);
+      font-family: var(--sans);
+      font-size: 17px;
+      line-height: 1.72;
+    }
+    body::before {
+      content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 20; opacity: .22;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.13'/%3E%3C/svg%3E");
+    }
+    a { color: var(--cyan); text-underline-offset: 3px; }
+    a:hover { color: var(--coral); }
+    .progress { position: fixed; z-index: 30; inset: 0 auto auto 0; height: 3px; width: 0; background: linear-gradient(90deg, var(--cyan), var(--coral)); }
+    .topbar { max-width: 1180px; margin: 0 auto; padding: 22px 28px; display: flex; justify-content: space-between; align-items: center; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; }
+    .topbar a { text-decoration: none; color: var(--ink); font-weight: 760; }
+    .topbar .stamp { color: var(--muted); font-weight: 650; }
+    header { max-width: 1180px; margin: 0 auto; padding: 70px 28px 92px; }
+    .kicker { display: flex; gap: 10px; align-items: center; color: var(--coral); text-transform: uppercase; letter-spacing: .13em; font-size: 12px; font-weight: 820; }
+    .kicker::before { content: ""; width: 38px; height: 2px; background: var(--coral); }
+    h1 { font: 500 clamp(48px, 8vw, 102px)/.98 var(--serif); letter-spacing: -.045em; margin: 26px 0 28px; max-width: 1020px; }
+    h1 em { color: var(--cyan); font-style: italic; }
+    .dek { font: 400 clamp(20px, 2.2vw, 30px)/1.45 var(--serif); max-width: 890px; color: #41413e; }
+    .hero-grid { margin-top: 58px; display: grid; grid-template-columns: 1.6fr .9fr; gap: 28px; align-items: stretch; }
+    .thesis { border-top: 2px solid var(--ink); padding: 24px 0 0; font-size: 20px; }
+    .thesis strong { color: var(--coral); }
+    .fact-card { background: #171a1c; color: #f7f0e3; padding: 28px; border-radius: 3px; box-shadow: var(--shadow); display: flex; flex-direction: column; justify-content: space-between; }
+    .fact-card b { font: 500 52px/1 var(--serif); color: #6fd3df; }
+    .fact-card span { font-size: 14px; color: #c7c3bb; margin-top: 18px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 0 28px 110px; }
+    section { padding: 78px 0; border-top: 1px solid var(--line); }
+    .section-head { display: grid; grid-template-columns: 190px 1fr; gap: 42px; margin-bottom: 42px; }
+    .section-no { color: var(--coral); font-weight: 820; letter-spacing: .08em; font-size: 13px; text-transform: uppercase; }
+    h2 { font: 500 clamp(34px, 4.5vw, 58px)/1.06 var(--serif); letter-spacing: -.035em; margin: 0; }
+    h3 { font: 600 25px/1.25 var(--serif); margin: 0 0 12px; }
+    .section-intro { margin: 14px 0 0; max-width: 820px; color: var(--muted); font-size: 18px; }
+    .callout { padding: 24px 26px; background: var(--cyan-pale); border-left: 4px solid var(--cyan); margin: 28px 0; }
+    .equation-panel { background: #171a1c; color: #f5eee1; padding: clamp(28px, 5vw, 56px); display: grid; grid-template-columns: 1.1fr .9fr; gap: 40px; border-radius: 3px; box-shadow: var(--shadow); }
+    .equation { font: 500 clamp(35px, 5vw, 62px)/1.2 var(--serif); letter-spacing: .01em; }
+    .equation .base { color: #75d4de; }
+    .equation .adapter { color: #ff846a; }
+    .equation-note { color: #c8c3ba; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
+    .chip { padding: 6px 11px; border: 1px solid #54585b; border-radius: 999px; font-size: 12px; color: #ded9d0; }
+    .shift-grid { margin-top: 24px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .shift { padding: 22px; background: var(--panel); border: 1px solid var(--line); min-height: 190px; }
+    .shift .big { display: block; font: italic 500 36px/1 var(--serif); color: var(--coral); margin-bottom: 18px; }
+    .shift p { margin: 0; color: var(--muted); font-size: 15px; }
+    .timeline { position: relative; }
+    .timeline::before { content: ""; position: absolute; left: 147px; top: 0; bottom: 0; width: 1px; background: var(--line); }
+    .era { display: grid; grid-template-columns: 120px 1fr; gap: 54px; position: relative; padding: 0 0 54px; }
+    .era:last-child { padding-bottom: 0; }
+    .era::before { content: ""; position: absolute; left: 140px; top: 10px; width: 15px; height: 15px; border-radius: 50%; background: var(--paper); border: 3px solid var(--coral); }
+    .year { font: 600 25px/1 var(--serif); color: var(--coral); padding-top: 7px; }
+    .event { padding: 0 0 0 12px; }
+    .event .label { display: inline-block; color: var(--cyan); background: var(--cyan-pale); font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; padding: 4px 8px; margin-bottom: 12px; }
+    .event p { max-width: 820px; margin: 0 0 12px; color: #4f4e49; }
+    .event .takeaway { color: var(--ink); font-weight: 720; }
+    sup a { text-decoration: none; font: 750 11px var(--sans); color: var(--coral); }
+    .stack { display: grid; grid-template-columns: 1fr 1.4fr; gap: 34px; align-items: start; }
+    .layers { display: flex; flex-direction: column; gap: 9px; }
+    .layer { display: grid; grid-template-columns: 74px 1fr; gap: 16px; padding: 18px; border: 1px solid var(--line); background: var(--panel); }
+    .layer .id { font: 600 12px var(--sans); letter-spacing: .08em; color: var(--coral); }
+    .layer strong { display: block; margin-bottom: 4px; }
+    .layer small { color: var(--muted); line-height: 1.45; }
+    .request-flow { background: #181a1c; padding: 28px; color: #f6efe2; box-shadow: var(--shadow); }
+    .flow-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; align-items: center; margin: 20px 0; }
+    .node { min-height: 92px; padding: 12px 9px; display: flex; align-items: center; justify-content: center; text-align: center; border: 1px solid #555b5d; font-size: 12px; position: relative; }
+    .node:not(:last-child)::after { content: "→"; position: absolute; right: -13px; z-index: 2; color: #f59a75; font-size: 18px; }
+    .node:nth-child(1) { border-color: #58c5d2; }
+    .node:nth-child(3) { border-color: #f07d62; }
+    .node:nth-child(5) { border-color: #9f87d3; }
+    .legend { color: #a9aaa5; font-size: 13px; }
+    .decision-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-top: 22px; }
+    .decision { padding: 18px; background: #25282a; border-left: 3px solid var(--coral); font-size: 14px; color: #d6d1c8; }
+    .matrix-wrap { overflow-x: auto; border: 1px solid var(--line); background: rgba(255,255,255,.28); }
+    table { width: 100%; border-collapse: collapse; min-width: 880px; }
+    th, td { padding: 17px 16px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); background: rgba(235,226,211,.7); }
+    td { font-size: 14px; }
+    td:first-child { font-weight: 760; color: var(--cyan); }
+    tr:last-child td { border-bottom: 0; }
+    .repo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .repo { border: 1px solid var(--line); background: var(--panel); padding: 22px; display: flex; flex-direction: column; min-height: 235px; }
+    .repo .repo-type { font-size: 11px; text-transform: uppercase; font-weight: 820; letter-spacing: .08em; color: var(--coral); }
+    .repo h3 { margin-top: 10px; }
+    .repo p { color: var(--muted); font-size: 14px; flex: 1; }
+    .repo a { font-size: 13px; font-weight: 780; }
+    .truth { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .truth-card { padding: 28px; background: var(--panel); border-top: 3px solid var(--cyan); }
+    .truth-card:nth-child(even) { border-top-color: var(--coral); }
+    .truth-card p { color: var(--muted); margin-bottom: 0; }
+    .verdict { background: var(--coral); color: #fff8ed; padding: clamp(28px, 5vw, 58px); display: grid; grid-template-columns: .75fr 1.25fr; gap: 40px; align-items: start; }
+    .verdict .yes { font: italic 500 clamp(70px, 10vw, 130px)/.8 var(--serif); }
+    .verdict h2 { color: #fff8ed; }
+    .verdict p { color: #ffe2d8; }
+    .sources { columns: 2; column-gap: 46px; }
+    .source { break-inside: avoid; margin: 0 0 16px; padding-left: 30px; position: relative; font-size: 14px; color: var(--muted); }
+    .source b { position: absolute; left: 0; color: var(--coral); }
+    .source a { color: var(--ink); font-weight: 700; }
+    footer { max-width: 1180px; margin: 0 auto; padding: 32px 28px 60px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; color: var(--muted); font-size: 13px; }
+    @media (max-width: 860px) {
+      .hero-grid, .equation-panel, .stack, .verdict { grid-template-columns: 1fr; }
+      .section-head { grid-template-columns: 1fr; gap: 8px; }
+      .shift-grid, .repo-grid { grid-template-columns: 1fr; }
+      .truth { grid-template-columns: 1fr; }
+      .flow-row { grid-template-columns: 1fr; }
+      .node:not(:last-child)::after { content: "↓"; right: auto; bottom: -20px; }
+      .timeline::before { left: 14px; }
+      .era { grid-template-columns: 1fr; gap: 10px; padding-left: 42px; }
+      .era::before { left: 7px; }
+      .event { padding-left: 0; }
+      .decision-list { grid-template-columns: 1fr; }
+      .sources { columns: 1; }
+    }
+    @media (max-width: 540px) {
+      body { font-size: 16px; }
+      header { padding-top: 40px; }
+      h1 { font-size: 48px; }
+      .topbar .stamp { display: none; }
+      section { padding: 58px 0; }
+      footer { display: block; }
+    }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  </style>
+</head>
+<body>
+  <div class="progress" id="progress"></div>
+  <nav class="topbar" aria-label="站点导航">
+    <a href="../">← Changyi Yang / Notes</a>
+    <span class="stamp">Systems history · 2026-10</span>
+  </nav>
+
+  <header>
+    <div class="kicker">Paper → kernel → runtime → cluster</div>
+    <h1>Multi-tenant <em>LoRA</em> Serving</h1>
+    <p class="dek">从共享一份 base model，到让成千上万个 adapter 真正共享 GPU：一段由算子、显存、调度与路由共同推动的系统演化史。</p>
+    <div class="hero-grid">
+      <div class="thesis">
+        <strong>短答：是，已经搞了很久。</strong> 2021 年 LoRA 给出算法前提，2022 年 PetS 已经在做 parameter-efficient 多任务 serving；真正围绕 LoRA 的系统爆发发生在 2023–2024 年。此后问题不再只是“怎么把 LoRA 跑起来”，而是“怎么在异构、突发、跨 GPU 的真实租户流量里守住 P99 和成本”。
+      </div>
+      <div class="fact-card">
+        <b>5 layers</b>
+        <span>kernel · memory · scheduler · router · isolation<br/>少任何一层，都更像 demo 而不是 multi-tenant system。</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section id="why">
+      <div class="section-head">
+        <div class="section-no">01 / 原点</div>
+        <div>
+          <h2>LoRA 很小，租户问题很大</h2>
+          <p class="section-intro">LoRA 的算法形式天然适合共享：大矩阵 <code>W</code> 冻结，每个任务只带一对低秩矩阵。但推理一旦混入不同 adapter，原本规则的 dense batch 就被切碎了。</p>
+        </div>
+      </div>
+
+      <div class="equation-panel">
+        <div>
+          <div class="equation">y = <span class="base">Wx</span> + <span class="adapter">BᵢAᵢx</span></div>
+          <div class="chips">
+            <span class="chip">W：所有租户共享</span>
+            <span class="chip">Aᵢ / Bᵢ：租户 i 私有</span>
+            <span class="chip">i：随 request 改变</span>
+          </div>
+        </div>
+        <div class="equation-note">单个 adapter 可以先 merge 进 <code>W</code>，推理几乎没有额外路径；但多个 adapter 同时服务时，merge 会复制/改写大模型权重，失去共享的意义。系统于是选择保持 unmerged，在每层为不同 token 执行不同的低秩分支。LoRA 论文奠定了这个结构，multi-tenant serving 则接手了它的运行时后果。<sup><a href="#s1">[1]</a></sup></div>
+      </div>
+
+      <div class="shift-grid">
+        <div class="shift"><span class="big">Compute</span><h3>batch 不再同质</h3><p>同一个 decode step 里的 token 可能属于不同 adapter。逐 adapter 启动小 kernel 会导致 launch overhead 和低利用率。</p></div>
+        <div class="shift"><span class="big">Memory</span><h3>小权重也会爆</h3><p>adapter 数量远大于活跃数量；rank、target modules、dtype 还可能不同。需要 CPU/GPU 分层缓存与驱逐。</p></div>
+        <div class="shift"><span class="big">Policy</span><h3>谁先跑是系统问题</h3><p>热 adapter、冷 adapter、长短请求、不同租户 SLO 相互干扰。调度要同时看 locality、公平性与 tail latency。</p></div>
+      </div>
+    </section>
+
+    <section id="timeline">
+      <div class="section-head">
+        <div class="section-no">02 / 时间线</div>
+        <div>
+          <h2>六年里，瓶颈一层层外移</h2>
+          <p class="section-intro">这条历史不是“后一个系统替代前一个”，而是关注点从模型表示，依次推到 kernel、显存、单机调度，再推到整个 replica fleet。</p>
+        </div>
+      </div>
+
+      <div class="timeline">
+        <article class="era">
+          <div class="year">2021–22</div>
+          <div class="event">
+            <span class="label">Share parameters</span>
+            <h3>LoRA 与 PetS：先证明“共享 backbone”值得做</h3>
+            <p>LoRA 把任务差异压缩为低秩更新；USENIX ATC’22 的 PetS 则更早从系统角度统一 Adapter、Prefix/Prompt Tuning、BitFit 等 PET 任务，把共享算子与任务私有算子拆开，并让不同任务可以共同 batching。它还不是今天专门的 LoRA runtime，但已经提出了核心系统命题。<sup><a href="#s1">[1]</a></sup><sup><a href="#s2">[2]</a></sup></p>
+            <p class="takeaway">时代关键词：从“一任务一模型”改成“一 backbone，多任务增量”。</p>
+          </div>
+        </article>
+
+        <article class="era">
+          <div class="year">2023</div>
+          <div class="event">
+            <span class="label">Batch heterogeneity</span>
+            <h3>Punica：用 SGMV 把不同 adapter 放回同一个 batch</h3>
+            <p>Punica 的关键贡献是 Segmented Gather Matrix-Vector Multiplication：按 adapter 把 token 视作不同 segment，在一次 batched kernel 中执行各自的低秩矩阵运算。它还用 scheduler 将多租户工作负载合并进共享 GPU cluster；论文报告相对当时基线最高 12× 吞吐提升、每 token 约 2ms 额外延迟。<sup><a href="#s3">[3]</a></sup></p>
+            <p class="takeaway">时代关键词：不是只共享权重，还要共享一次 GPU launch。</p>
+          </div>
+        </article>
+
+        <article class="era">
+          <div class="year">2023–24</div>
+          <div class="event">
+            <span class="label">Page everything</span>
+            <h3>S-LoRA：把 adapter 和 KV cache 一起分页</h3>
+            <p>S-LoRA 将所有 adapter 保留在 host memory，只把当前活跃的部分搬到 GPU。Unified Paging 用统一内存池同时管理不同 rank 的 adapter weights 与不同长度的 KV tensors，避免预留大块连续空间造成碎片；配合定制 kernel 与 tensor parallelism，把目标从“几十个”推到“数千个 adapter”。论文报告最高 4× 吞吐提升。<sup><a href="#s4">[4]</a></sup></p>
+            <p class="takeaway">时代关键词：adapter catalog 可以无限大，GPU working set 必须有限。</p>
+          </div>
+        </article>
+
+        <article class="era">
+          <div class="year">2023–24</div>
+          <div class="event">
+            <span class="label">Productize</span>
+            <h3>LoRAX 与 TGI：把论文能力变成动态 adapter exchange</h3>
+            <p>Predibase 的 LoRAX 从 TGI 分叉，组合了异构 continuous batching、SGMV、GPU/CPU 分层缓存、异步 prefetch/offload、OpenAI-compatible API、可观测性和私有 adapter 隔离。它说明生产系统的难点不止 kernel：adapter 从对象存储到 RAM 再到 VRAM 的生命周期，本身就是 data plane。Hugging Face TGI 随后也提供多 LoRA 预加载与异构 batch。<sup><a href="#s5">[5]</a></sup><sup><a href="#s6">[6]</a></sup></p>
+            <p class="takeaway">时代关键词：从 benchmark engine 走向可部署 runtime。</p>
+          </div>
+        </article>
+
+        <article class="era">
+          <div class="year">2024</div>
+          <div class="event">
+            <span class="label">Choose the mode</span>
+            <h3>dLoRA：merged 与 unmerged，不必二选一</h3>
+            <p>dLoRA 观察到流量若高度偏向少数 adapter，直接 merge 可能比异构低秩 kernel 更划算；流量分散时则相反。它用 credit-based batching 动态 merge/unmerge，并把 request 与 adapter 在 replicas 间共同迁移，处理自回归长度差异导致的负载不均。OSDI’24 论文报告对 vLLM / PEFT 基线最高 57.9× / 26× 吞吐提升，并比 S-LoRA 最多降低 1.8× 平均延迟。<sup><a href="#s7">[7]</a></sup></p>
+            <p class="takeaway">时代关键词：execution mode 也成为在线调度决策。</p>
+          </div>
+        </article>
+
+        <article class="era">
+          <div class="year">2024–25</div>
+          <div class="event">
+            <span class="label">Protect the tail</span>
+            <h3>CaraServe 与 Chameleon：开始正面解决冷启动、rank 与 P99</h3>
+            <p>CaraServe 在 adapter 还从内存搬向 GPU 时，先用 CPU 执行 prefill，加载完成再切回 GPU，并以 rank-aware scheduling 提升 SLO attainment。Chameleon 则用 popularity-aware GPU cache 和非抢占多队列调度，避免 cache miss 与 head-of-line blocking；论文报告高负载下 P99 TTFT 降低 80.7%。<sup><a href="#s8">[8]</a></sup><sup><a href="#s9">[9]</a></sup></p>
+            <p class="takeaway">时代关键词：平均吞吐不够，cold path 与 tail 才决定产品体验。</p>
+          </div>
+        </article>
+
+        <article class="era">
+          <div class="year">2024–26</div>
+          <div class="event">
+            <span class="label">Mainstream stack</span>
+            <h3>vLLM、SGLang、Ray Serve：能力下沉到通用推理栈</h3>
+            <p>vLLM 已支持请求级 adapter、动态 load/unload、LoRA resolver 与 tensor-parallel 选项；SGLang 提供 Triton / chunked-SGMV backend、动态加载、GPU pinning、LRU/FIFO eviction；Ray Serve LLM 再往上一层做 adapter-aware replica routing 与每副本 LRU cache。multi-LoRA 从独立研究系统，变成 serving engine 与 cluster controller 的标准能力。<sup><a href="#s10">[10]</a></sup><sup><a href="#s11">[11]</a></sup><sup><a href="#s12">[12]</a></sup></p>
+            <p class="takeaway">时代关键词：单机 kernel 问题变成全栈 locality 问题。</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="system">
+      <div class="section-head">
+        <div class="section-no">03 / 系统视角</div>
+        <div>
+          <h2>今天的 multi-tenant LoRA，是五层协同</h2>
+          <p class="section-intro">把“支持 LoRA”写进 feature list 很容易。真正的 multi-tenant serving 要让同一个 adapter ID 从 API 一直贯穿到 GPU kernel，而且每一层都理解 locality 与隔离。</p>
+        </div>
+      </div>
+
+      <div class="stack">
+        <div class="layers">
+          <div class="layer"><div class="id">L5 API</div><div><strong>身份、权限与版本</strong><small>tenant → adapter 映射，版本固定，鉴权、配额与审计。论文通常从这里往下看，生产系统不能。</small></div></div>
+          <div class="layer"><div class="id">L4 Route</div><div><strong>adapter-aware routing</strong><small>优先去已经缓存该 adapter 且负载合适的 replica；否则决定在哪里触发 cold load。</small></div></div>
+          <div class="layer"><div class="id">L3 Sched</div><div><strong>continuous batching</strong><small>按 token 迭代重组 batch，同时权衡 adapter locality、rank、请求长度、公平性和 SLO。</small></div></div>
+          <div class="layer"><div class="id">L2 Memory</div><div><strong>分层缓存与 paging</strong><small>对象存储 / 磁盘 → host RAM → pinned memory → VRAM；adapter 与 KV cache 竞争同一块珍贵显存。</small></div></div>
+          <div class="layer"><div class="id">L1 Kernel</div><div><strong>SGMV / BGMV / GEMM</strong><small>base 路径照常做 dense GEMM；adapter 路径将异构 token 映射到正确 A/B weights，避免碎 kernel。</small></div></div>
+        </div>
+
+        <div class="request-flow">
+          <h3>一次请求真正走过的路径</h3>
+          <div class="flow-row" aria-label="请求处理流程">
+            <div class="node">tenant +<br/>adapter ID</div>
+            <div class="node">cache-aware<br/>router</div>
+            <div class="node">CPU ↔ GPU<br/>adapter cache</div>
+            <div class="node">heterogeneous<br/>continuous batch</div>
+            <div class="node">shared base<br/>+ LoRA kernel</div>
+          </div>
+          <p class="legend">命中热 adapter 时，链路看起来近似普通 vLLM 请求；cache miss 时，权重获取、校验、搬运、调度等待都会出现在 TTFT 尾部。</p>
+          <div class="decision-list">
+            <div class="decision"><b>Merge 还是 unmerged？</b><br/>热点集中、驻留稳定时 merge 有吸引力；长尾且并发异构时保持低秩分支更适合共享。</div>
+            <div class="decision"><b>按请求还是按 token batch？</b><br/>自回归生成长短不一，continuous batching 必须在每个 step 更新 adapter 映射。</div>
+            <div class="decision"><b>cache 什么？</b><br/>不仅 cache adapter 文件，还要考虑转换后的 layout、GPU buffer、CUDA graph 与 KV prefix。</div>
+            <div class="decision"><b>路由看什么？</b><br/>只看 replica queue 会牺牲 adapter locality；只看 locality 又可能把热点压到一张卡。</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout"><strong>最容易被混淆的一点：</strong>“multi-LoRA kernel”解决的是一个 batch 内不同 adapter 的计算；“multi-tenant serving”还必须解决 catalog、cache、routing、SLO 和安全边界。前者是必要条件，不是完整答案。</div>
+    </section>
+
+    <section id="compare">
+      <div class="section-head">
+        <div class="section-no">04 / 对照表</div>
+        <div>
+          <h2>每一代系统，都把边界往外推了一层</h2>
+          <p class="section-intro">下面不是跑分排名；不同论文的模型、GPU、流量和基线不可直接横比。更有价值的是看它们各自在系统栈上新增了什么。</p>
+        </div>
+      </div>
+      <div class="matrix-wrap">
+        <table>
+          <thead><tr><th>系统</th><th>主要年份</th><th>抓住的瓶颈</th><th>关键机制</th><th>留下的问题</th></tr></thead>
+          <tbody>
+            <tr><td>PetS</td><td>2022</td><td>PET 任务无法统一 batch</td><td>统一表示；共享/私有 operator 拆分；协调 batching</td><td>并非针对自回归 LLM 与大规模 adapter catalog</td></tr>
+            <tr><td>Punica</td><td>2023 / MLSys’24</td><td>异构 LoRA 小算子利用率低</td><td>SGMV；多租户 consolidation scheduler</td><td>rank/shape 异构、冷加载与大 catalog 仍在 kernel 之外</td></tr>
+            <tr><td>S-LoRA</td><td>2023 / MLSys’24</td><td>adapter + KV 的显存碎片与规模</td><td>Unified Paging；host-resident catalog；定制 kernel；TP</td><td>生产级 API、安全、复杂 fleet routing 不是论文重点</td></tr>
+            <tr><td>LoRAX</td><td>2023–</td><td>动态 adapter 生命周期</td><td>tiered cache；异步 exchange；异构 continuous batching</td><td>独立 runtime 的生态与模型覆盖要持续追赶通用引擎</td></tr>
+            <tr><td>dLoRA</td><td>OSDI’24</td><td>固定 execution mode 与 replica 失衡</td><td>动态 merge/unmerge；request-adapter co-migration</td><td>决策复杂度、迁移成本与工程集成</td></tr>
+            <tr><td>CaraServe</td><td>2024</td><td>cold start 与 rank 差异伤害 SLO</td><td>CPU-assisted prefill；rank-aware scheduling</td><td>CPU 余量、同步路径与更复杂硬件拓扑</td></tr>
+            <tr><td>Chameleon</td><td>2024</td><td>流量异构、链路搬运与 head-of-line blocking</td><td>自适应 cache；非抢占多队列</td><td>策略需适应真实 workload drift</td></tr>
+            <tr><td>vLLM / SGLang / Ray</td><td>2024–26</td><td>通用化、部署与 scale-out</td><td>动态加载；多种 kernel；eviction；adapter-aware routing</td><td>跨层策略仍分散；安全接口与 noisy neighbor 仍需自建</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="repos">
+      <div class="section-head">
+        <div class="section-no">05 / GitHub 谱系</div>
+        <div>
+          <h2>论文原型消退，机制进入主流仓库</h2>
+          <p class="section-intro">判断一个 ideas-to-production 过程，不能只看原论文 repo 还活不活；更应该看它的 kernel、paging 和 scheduling 思路有没有被下一代 runtime 吸收。</p>
+        </div>
+      </div>
+      <div class="repo-grid">
+        <article class="repo"><span class="repo-type">Research prototype</span><h3>Punica</h3><p>SGMV 的原点。仓库让论文机制可复现，后来 LoRAX、TGI、vLLM 等实现吸收了类似的 heterogeneous LoRA kernel 思路。</p><a href="https://github.com/punica-ai/punica">github.com/punica-ai/punica ↗</a></article>
+        <article class="repo"><span class="repo-type">Research prototype</span><h3>S-LoRA</h3><p>Unified Paging 与 scalable adapter residency 的参考实现。适合理解论文设计，不等同于一套开箱即用的生产控制面。</p><a href="https://github.com/S-LoRA/S-LoRA">github.com/S-LoRA/S-LoRA ↗</a></article>
+        <article class="repo"><span class="repo-type">Purpose-built runtime</span><h3>LoRAX</h3><p>最直接把“adapter exchange”做成产品能力的开源项目：远端来源、tiered cache、continuous batching、生产 API 与可观测性。</p><a href="https://github.com/predibase/lorax">github.com/predibase/lorax ↗</a></article>
+        <article class="repo"><span class="repo-type">General engine</span><h3>vLLM</h3><p>multi-LoRA 进入事实标准推理引擎：请求级选择、动态管理、resolver、并行与广泛模型支持。运行时 load API 明确带有安全警告。</p><a href="https://docs.vllm.ai/en/stable/features/lora/">vLLM LoRA docs ↗</a></article>
+        <article class="repo"><span class="repo-type">General engine</span><h3>SGLang</h3><p>把 S-LoRA/Punica 思路与自身调度栈结合，提供 Triton 与 CSGMV backend、GPU pinning、overlap loading 和 eviction policy。</p><a href="https://github.com/sgl-project/sglang/blob/main/docs/docs/advanced_features/lora.mdx">SGLang multi-LoRA docs ↗</a></article>
+        <article class="repo"><span class="repo-type">Cluster control</span><h3>Ray Serve LLM</h3><p>把视角上移到 replicas：先找缓存命中且不过载的副本，没有命中再选择新副本并动态加载，维护每副本 LRU。</p><a href="https://docs.ray.io/en/master/serve/llm/user-guides/multi-lora.html">Ray multi-LoRA docs ↗</a></article>
+      </div>
+    </section>
+
+    <section id="lessons">
+      <div class="section-head">
+        <div class="section-no">06 / 今天怎么看</div>
+        <div>
+          <h2>四个已经清楚、但还没完全解决的事实</h2>
+        </div>
+      </div>
+      <div class="truth">
+        <article class="truth-card"><h3>01. adapter locality 与 KV locality 会打架</h3><p>把请求送到有 adapter 的 replica，未必命中它的 prefix KV；反过来也一样。两个 cache 的联合路由仍是开放的策略空间。</p></article>
+        <article class="truth-card"><h3>02. rank 是资源维度，不只是训练超参</h3><p>不同 rank 改变权重大小、kernel shape、预留 buffer 与执行时间。为了“兼容最大 rank”而统一预分配，可能浪费大量显存。</p></article>
+        <article class="truth-card"><h3>03. 运行时动态加载本身就是安全接口</h3><p>adapter path、远端下载、tenant 映射和版本替换都扩大攻击面。vLLM 文档明确提醒动态 load/unload 不应直接暴露在非受信环境。<sup><a href="#s10">[10]</a></sup></p></article>
+        <article class="truth-card"><h3>04. “千 adapter”不等于“千 adapter 同时活跃”</h3><p>大 catalog 通常驻留在 host 或对象存储，VRAM 只装 working set。论文的规模数字必须和活跃并发、cache hit rate、rank 分布一起看。</p></article>
+      </div>
+    </section>
+
+    <section>
+      <div class="verdict">
+        <div class="yes">Yes.</div>
+        <div>
+          <h2>所以，这件事确实搞了很久。</h2>
+          <p>但它并没有“被一个 paper 解决”。算法让权重可共享，Punica 让异构 adapter 可同批，S-LoRA 让内存可扩展，LoRAX 把交换流程产品化，dLoRA / CaraServe / Chameleon 把在线决策与尾延迟拉进来，vLLM / SGLang / Ray 再把这些能力拆进通用 engine 与 cluster layer。</p>
+          <p><strong>multi-tenant LoRA 的变迁，本质上是边界持续外移：</strong>从矩阵分解，到 kernel；从 kernel，到 memory；从 memory，到 scheduler；最后到 routing、SLO 与隔离。今天最值得做的，已经不是再证明 LoRA 可以共享，而是把这五层做成一个可观测、可控、可演进的系统。</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="sources">
+      <div class="section-head">
+        <div class="section-no">Sources</div>
+        <div><h2>一手资料</h2><p class="section-intro">性能数字均按各论文原始实验口径陈述，不跨论文直接比较。</p></div>
+      </div>
+      <div class="sources">
+        <p class="source" id="s1"><b>[1]</b><a href="https://arxiv.org/abs/2106.09685">LoRA: Low-Rank Adaptation of Large Language Models</a>，arXiv 2021 / ICLR 2022。</p>
+        <p class="source" id="s2"><b>[2]</b><a href="https://www.usenix.org/conference/atc22/presentation/zhou-zhe">PetS: A Unified Framework for Parameter-Efficient Transformers Serving</a>，USENIX ATC 2022。</p>
+        <p class="source" id="s3"><b>[3]</b><a href="https://arxiv.org/abs/2310.18547">Punica: Multi-Tenant LoRA Serving</a>，arXiv 2023 / MLSys 2024；<a href="https://github.com/punica-ai/punica">code</a>。</p>
+        <p class="source" id="s4"><b>[4]</b><a href="https://proceedings.mlsys.org/paper_files/paper/2024/file/906419cd502575b617cc489a1a696a67-Paper-Conference.pdf">S-LoRA: Serving Thousands of Concurrent LoRA Adapters</a>，MLSys 2024；<a href="https://github.com/S-LoRA/S-LoRA">code</a>。</p>
+        <p class="source" id="s5"><b>[5]</b><a href="https://github.com/predibase/lorax">LoRAX</a>，dynamic adapter loading、heterogeneous continuous batching 与 tiered cache。</p>
+        <p class="source" id="s6"><b>[6]</b><a href="https://github.com/huggingface/text-generation-inference/blob/main/docs/source/conceptual/lora.md">Hugging Face TGI: LoRA</a>；<a href="https://huggingface.co/blog/multi-lora-serving">Multi-LoRA Serving blog</a>。</p>
+        <p class="source" id="s7"><b>[7]</b><a href="https://www.usenix.org/conference/osdi24/presentation/wu-bingyang">dLoRA: Dynamically Orchestrating Requests and Adapters</a>，OSDI 2024。</p>
+        <p class="source" id="s8"><b>[8]</b><a href="https://arxiv.org/abs/2401.11240">CaraServe: CPU-Assisted and Rank-Aware LoRA Serving</a>，2024。</p>
+        <p class="source" id="s9"><b>[9]</b><a href="https://arxiv.org/abs/2411.17741">Chameleon: Adaptive Caching and Scheduling for Many-Adapter LLM Inference Environments</a>，2024。</p>
+        <p class="source" id="s10"><b>[10]</b><a href="https://docs.vllm.ai/en/stable/features/lora/">vLLM: LoRA Adapters</a>，请求级 LoRA、动态加载、resolver 与安全说明。</p>
+        <p class="source" id="s11"><b>[11]</b><a href="https://github.com/sgl-project/sglang/blob/main/docs/docs/advanced_features/lora.mdx">SGLang: Multi-LoRA Serving</a>，kernel backend、加载、pinning 与 eviction。</p>
+        <p class="source" id="s12"><b>[12]</b><a href="https://docs.ray.io/en/master/serve/llm/user-guides/multi-lora.html">Ray Serve LLM: Multi-LoRA deployment</a>，adapter-aware routing 与 per-replica LRU。</p>
+        <p class="source" id="s13"><b>[13]</b><a href="https://nvidia.github.io/TensorRT-LLM/features/lora.html">TensorRT-LLM: LoRA</a>，multi-LoRA plugin 与 inflight batching 路径。</p>
+        <p class="source" id="s14"><b>[14]</b><a href="https://ojs.aaai.org/index.php/AAAI/article/view/34453">Dynamic Operator Optimization for Efficient Multi-Tenant LoRA Model Serving</a>，AAAI 2025。</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <span>Research note by Changyi Yang · updated 2026-10-04</span>
+    <span><a href="#why">Back to top ↑</a></span>
+  </footer>
+
+  <script>
+    const bar = document.getElementById('progress');
+    const update = () => {
+      const max = document.documentElement.scrollHeight - innerHeight;
+      bar.style.width = (max > 0 ? (scrollY / max) * 100 : 0) + '%';
+    };
+    addEventListener('scroll', update, { passive: true });
+    update();
+  </script>
+</body>
+</html>
