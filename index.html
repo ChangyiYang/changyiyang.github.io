@@ -74,6 +74,15 @@
 
   <h2>LLM Serving Systems</h2>
   <div class="cards">
+    <a class="card" href="./soft-prompt-serving/">
+      <h3>Serving Soft Prompts vs. LoRA：Infra Measurements</h3>
+      <p>Soft Prompt Without Regret 的 infra 部分：Qwen3-8B 在 B300 上，length-replay LiveCodeBench traffic 下比较 SP 与 unmerged LoRA 的单 adapter 性能、8–256 tenant 多租户、显存、prefix cache 和 speculative decoding。</p>
+      <div class="meta">
+        <span class="tag">Paper appendix</span>
+        <span class="tag blue">SP · LoRA · SGLang</span>
+        <span class="tag amber">2026-10-22</span>
+      </div>
+    </a>
     <a class="card" href="./multi-tenant-lora-serving/">
       <h3>Multi-tenant LoRA Serving：从共享权重到共享系统</h3>
       <p>从 LoRA、PetS、Punica、S-LoRA、LoRAX 到 dLoRA、CaraServe、vLLM 与 SGLang：论文、kernel、显存分页、调度和集群路由如何把一份 base model 变成多租户 serving 系统。</p>

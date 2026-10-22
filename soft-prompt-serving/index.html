@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Serving Soft Prompts vs. LoRA — Infrastructure Measurements</title>
+<meta name="description" content="Single-adapter, multi-tenant, memory and speculative-decoding measurements of soft prompts vs. unmerged LoRA on Qwen3-8B / SGLang, for Soft Prompt Without Regret." />
+<style>
+  :root { --ink:#16181a; --muted:#5f5e5a; --line:#d6d2c8; --paper:#fdfcf9; --accent:#2a78d6; --accent2:#c4502f;
+          --serif:"Charter","Iowan Old Style","Palatino Linotype",Georgia,serif;
+          --sans:Inter,ui-sans-serif,-apple-system,"Segoe UI",sans-serif; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:17px/1.65 var(--serif); }
+  main { max-width: 860px; margin: 0 auto; padding: 56px 24px 96px; }
+  .top { font:600 12px/1 var(--sans); letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+  .top a { color:var(--muted); text-decoration:none; }
+  h1 { font:600 34px/1.2 var(--serif); margin:22px 0 10px; letter-spacing:-.01em; }
+  .authors { font:15px/1.5 var(--sans); color:var(--muted); margin-bottom:28px; }
+  .abstract { border-top:1px solid var(--line); border-bottom:1px solid var(--line); padding:18px 0 14px; margin:22px 0 34px; }
+  .abstract h2 { font:700 13px/1 var(--sans); letter-spacing:.08em; text-transform:uppercase; margin:0 0 10px; }
+  h2 { font:600 23px/1.3 var(--serif); margin:44px 0 10px; }
+  h3 { font:600 18px/1.35 var(--serif); margin:28px 0 6px; }
+  p { margin: 10px 0; }
+  a { color:var(--accent); }
+  figure { margin:26px -60px; }
+  figure img { width:100%; border:1px solid var(--line); background:#fff; }
+  figcaption, .tcap { font:14px/1.5 var(--sans); color:var(--muted); margin-top:8px; }
+  .tcap { margin:24px 0 6px; }
+  .tcap b, figcaption b { color:var(--ink); }
+  table { width:100%; border-collapse:collapse; font:14px/1.45 var(--sans); margin:4px 0 8px; }
+  thead th { text-align:left; font-weight:650; border-top:1.5px solid var(--ink); border-bottom:1px solid var(--ink); padding:6px 8px; }
+  tbody td { padding:5px 8px; border-bottom:1px solid #ece9e1; font-variant-numeric: tabular-nums; }
+  tbody tr:last-child td { border-bottom:1.5px solid var(--ink); }
+  table.small { font-size:12.5px; }
+  .pm { color:var(--muted); font-size:.9em; }
+  .note { font:14px/1.55 var(--sans); background:#f4f1ea; border-left:3px solid var(--accent); padding:10px 14px; margin:16px 0; }
+  ul { padding-left: 22px; } li { margin: 4px 0; }
+  code { font-size:.86em; background:#f1eee6; padding:1px 4px; border-radius:3px; }
+  .findings li { margin:8px 0; }
+  @media (max-width: 1000px) { figure { margin: 26px 0; } }
+</style>
+</head>
+<body>
+<main>
+<div class="top"><a href="../">changyiyang.github.io</a> · infrastructure appendix · October 2026</div>
+<h1>Serving Soft Prompts vs. LoRA: Infrastructure Measurements for <i>Soft Prompt Without Regret</i></h1>
+<div class="authors">Measurements for the deployment section of the paper. Qwen3-8B · 1–8× NVIDIA B300 · SGLang. All numbers below are generated from the raw result files (see <a href="#repro">Reproducibility</a>).</div>
+
+<section class="abstract">
+<h2>Summary</h2>
+<p>We compare serving a learned 256-token soft prompt (SP) against an unmerged rank-1 LoRA on the same backbone, using a quality-matched pair: both adapters are distilled from the same post-RL teacher trajectories (AReaL-boba-2-8B → Qwen3-8B, LiveCodeBench) and both recover the teacher's gain. Under length-replayed LiveCodeBench traffic (real prompts, real output-length distribution, mean 14.5K output tokens), the soft prompt <b>decodes at the speed of the bare backbone</b> (median time per output token 6.1 ms vs. 6.1 ms at 0.1 req/s) and reaches the same peak throughput (3,481 vs. 3,492 tokens/s, −0.3%), whereas the unmerged LoRA costs 16.8 ms per token and saturates at 2,443 tokens/s (−30.0%). The soft prompt's price is paid in prefill and KV memory (256 extra prompt positions: single-request time to first token 39 vs. 20 ms; 36 MiB of KV per cached tenant prefix), not in decoding. With 8 to 256 GPU-resident tenants both costs stay flat in the tenant count, so the single-adapter gap carries over to many adapters. With per-prompt token identities in the prefix cache, tenants share a common system prompt (prefix-cache hit rate 63.5% vs. 47.1% for LoRA). Speculative decoding keeps working with both adapters, with 1–5% shorter accepted drafts.</p>
+</section>
+
+<h2>1&nbsp;&nbsp;Setup</h2>
+<ul>
+<li><b>Backbone and adapters.</b> Qwen/Qwen3-8B (rev. <code>b968826</code>). Soft prompt: 256 vectors, checkpoint <code>code-areal8/train/update_00000100</code> (sha256 <code>0e985b1f…</code>). LoRA: rank 1 on q/k/v/o/gate/up/down (2.7M parameters), checkpoint <code>code-areal8/lora/update-000164</code> (sha256 <code>a74f1315…</code>). Both from <code>namezz/soft-prompt-interpretability-six-pairs</code>. "Merged LoRA" is the same adapter folded into the weights (a single-tenant deployment with no adapter computation).</li>
+<li><b>Engine.</b> SGLang at <code>ChangyiYang/sglang-moe-fix@ccf36ca6c</code>, which adds the multi-tenant soft-prompt implementation used here: a GPU pool of prompt embeddings, placeholder tokens replaced at prefill, and per-prompt token identities in the radix prefix cache. Default attention backend (<code>trtllm_mha</code>, page size 64), CUDA graphs on, <code>--mem-fraction-static 0.85</code>, one GPU per server.</li>
+<li><b>Traffic (length replay).</b> Prompts are the 164 LiveCodeBench v5 (2410–2502) problems rendered with the evaluation template (thinking mode). Each request's output length is the token length of a real student completion from the pair's evaluation (164 × 8 completions, 32K cap; mean 14.5K, median 13.3K output tokens); generation runs to that length (<code>ignore_eos</code>), so every configuration does identical token work. Requests arrive as a Poisson process at 0.1, 0.2, 0.3, 0.45 req/s, with max(64, 600·rate) requests per point and two seeds (different request subsets, identical across configurations). Client: SGLang <code>bench_serving</code> (custom dataset) with a small patch to send <code>soft_prompt</code> and to draw Zipf-distributed tenants.</li>
+<li><b>Metrics.</b> Time per output token (TPOT) per request, median and p99; time to first token (TTFT); output throughput. Error bars are ± one standard deviation across the two seeds. We report TPOT rather than the median inter-token gap: under load, tokens are streamed in bursts and the per-gap median collapses toward zero.</li>
+</ul>
+
+<h2>2&nbsp;&nbsp;Single adapter: soft prompt vs. unmerged LoRA</h2>
+<figure><img src="figures/fig1_single_adapter.png" alt="Single-adapter latency and throughput vs. load" />
+<figcaption><b>Figure 1.</b> Length-replayed LiveCodeBench traffic on one B300. The soft prompt (blue) overlaps the backbone and the merged LoRA in decoding latency and throughput across all loads; the unmerged LoRA pays a per-step cost that grows with load and lowers the saturation throughput. At 0.45 req/s the unmerged LoRA (csgmv) is past saturation and its tail TTFT reaches 238 s (soft prompt: 15.8 s). Points are the mean of two seeds; bars show ±1 s.d. (omitted in the log-scale panel b, where p99 TTFT near saturation varies by more than its mean).</figcaption></figure>
+
+<div class="tcap"><b>Table 1.</b> Median time per output token (ms), mean ± std over two seeds.</div>
+<table class=""><thead><tr><th>Configuration</th><th>0.1 req/s</th><th>0.2 req/s</th><th>0.3 req/s</th><th>0.45 req/s</th></tr></thead><tbody><tr><td>Base (no adapter)</td><td>6.1<span class=pm> ± 0.5</span></td><td>9.6<span class=pm> ± 0.6</span></td><td>13.9<span class=pm> ± 1.0</span></td><td>21.3<span class=pm> ± 0.6</span></td></tr><tr><td>LoRA merged into weights</td><td>6.1<span class=pm> ± 0.5</span></td><td>9.7<span class=pm> ± 0.6</span></td><td>13.9<span class=pm> ± 1.0</span></td><td>21.2<span class=pm> ± 0.6</span></td></tr><tr><td>Soft prompt, 256 tokens</td><td>6.1<span class=pm> ± 0.5</span></td><td>9.7<span class=pm> ± 0.6</span></td><td>14.0<span class=pm> ± 1.0</span></td><td>21.1<span class=pm> ± 0.5</span></td></tr><tr><td>Unmerged LoRA r1 (triton)</td><td>10.4<span class=pm> ± 0.1</span></td><td>14.1<span class=pm> ± 1.0</span></td><td>18.8<span class=pm> ± 0.8</span></td><td>26.0<span class=pm> ± 1.1</span></td></tr><tr><td>Unmerged LoRA r1 (csgmv, default)</td><td>16.8<span class=pm> ± 0.0</span></td><td>21.3<span class=pm> ± 1.3</span></td><td>26.6<span class=pm> ± 1.0</span></td><td>32.4<span class=pm> ± 0.9</span></td></tr></tbody></table>
+<div class="tcap"><b>Table 2.</b> Output throughput (tokens/s).</div>
+<table class=""><thead><tr><th>Configuration</th><th>0.1 req/s</th><th>0.2 req/s</th><th>0.3 req/s</th><th>0.45 req/s</th></tr></thead><tbody><tr><td>Base (no adapter)</td><td>1,255<span class=pm> ± 55</span></td><td>2,198<span class=pm> ± 47</span></td><td>2,939<span class=pm> ± 45</span></td><td>3,492<span class=pm> ± 39</span></td></tr><tr><td>LoRA merged into weights</td><td>1,256<span class=pm> ± 55</span></td><td>2,198<span class=pm> ± 47</span></td><td>2,938<span class=pm> ± 45</span></td><td>3,491<span class=pm> ± 40</span></td></tr><tr><td>Soft prompt, 256 tokens</td><td>1,255<span class=pm> ± 55</span></td><td>2,194<span class=pm> ± 46</span></td><td>2,931<span class=pm> ± 47</span></td><td>3,481<span class=pm> ± 37</span></td></tr><tr><td>Unmerged LoRA r1 (triton)</td><td>1,108<span class=pm> ± 21</span></td><td>1,942<span class=pm> ± 33</span></td><td>2,589<span class=pm> ± 46</span></td><td>3,050<span class=pm> ± 19</span></td></tr><tr><td>Unmerged LoRA r1 (csgmv, default)</td><td>908<span class=pm> ± 11</span></td><td>1,600<span class=pm> ± 61</span></td><td>2,145<span class=pm> ± 37</span></td><td>2,443<span class=pm> ± 24</span></td></tr></tbody></table>
+<div class="tcap"><b>Table 3.</b> Single request at a time (16 requests, same lengths). The soft prompt adds 256 prompt positions, which shows up only in TTFT.</div>
+<table class=""><thead><tr><th>Configuration</th><th>Prompt tokens (server)</th><th>TPOT (ms)</th><th>TTFT (ms)</th><th>Output tok/s</th></tr></thead><tbody><tr><td>Base (no adapter)</td><td>604</td><td>3.78</td><td>19.9</td><td>259.1</td></tr><tr><td>LoRA merged into weights</td><td>604</td><td>3.73</td><td>20.4</td><td>262.7</td></tr><tr><td>Soft prompt, 256 tokens</td><td>860</td><td>3.80</td><td>39.1</td><td>258.2</td></tr><tr><td>Unmerged LoRA r1 (triton)</td><td>604</td><td>6.59</td><td>32.6</td><td>149.7</td></tr><tr><td>Unmerged LoRA r1 (csgmv, default)</td><td>604</td><td>12.04</td><td>35.6</td><td>82.5</td></tr></tbody></table>
+
+<h3>Natural stopping</h3>
+<p>Length replay removes one deployment effect on purpose: adapters change how long the model writes. Letting the model stop on its own (32K cap, 0.2 req/s) shows it: the soft-prompted and LoRA models produce longer solutions than the backbone (17,188 and 18,445 vs. 14,298 tokens on average, consistent with the post-RL teacher's longer outputs), so end-to-end request latency grows with the adapted behavior itself, independent of serving overhead.</p>
+<div class="tcap"><b>Table 4.</b> Natural stopping, 0.2 req/s, one seed.</div>
+<table class=""><thead><tr><th>Configuration</th><th>Mean output tokens</th><th>TPOT median (ms)</th><th>TTFT median (ms)</th><th>Output tok/s</th></tr></thead><tbody><tr><td>Base (no adapter)</td><td>14,298</td><td>9.9</td><td>40.3</td><td>2,108</td></tr><tr><td>Soft prompt, 256 tokens</td><td>17,188</td><td>12.7</td><td>71.8</td><td>2,245</td></tr><tr><td>Unmerged LoRA r1 (csgmv, default)</td><td>18,445</td><td>26.0</td><td>70.4</td><td>1,620</td></tr></tbody></table>
+
+<h2>3&nbsp;&nbsp;Many adapters</h2>
+<p>Each tenant is a separately named copy of the same adapter: every request selects its tenant's prompt or LoRA, and the serving cost does not depend on the adapter values. Tenants are drawn from a Zipf(1) or uniform popularity distribution; all adapters are GPU-resident (no host offload).</p>
+<figure><img src="figures/fig2_multi_tenant.png" alt="Multi-tenant scaling" />
+<figcaption><b>Figure 2.</b> Time per output token and throughput at 0.3 req/s as the number of distinct tenants grows. Both curves are nearly flat from 8 to 256 tenants when every adapter is GPU-resident: soft-prompt decoding runs the unmodified base model, so its cost stays at the base level, while unmerged LoRA pays its per-layer adapter kernels on every decode step (about 2× the soft-prompt TPOT here), and mixing more distinct adapters in a batch adds only 1–5% on top.</figcaption></figure>
+<div class="tcap"><b>Table 5.</b> Multi-tenant serving at 0.3 req/s.</div>
+<table class=""><thead><tr><th>Tenants</th><th>Popularity</th><th>SP TPOT (ms)</th><th>SP tok/s</th><th>SP TTFT p99 (ms)</th><th>LoRA TPOT (ms)</th><th>LoRA tok/s</th><th>LoRA TTFT p99 (ms)</th></tr></thead><tbody><tr><td>8</td><td>Zipf(1)</td><td>14.1</td><td>2,781</td><td>325</td><td>26.7</td><td>2,081</td><td>1,109</td></tr><tr><td>8</td><td>uniform</td><td>15.0</td><td>2,949</td><td>381</td><td>27.4</td><td>2,167</td><td>2,149</td></tr><tr><td>64</td><td>Zipf(1)</td><td>14.1</td><td>2,783</td><td>299</td><td>27.2</td><td>2,064</td><td>319</td></tr><tr><td>64</td><td>uniform</td><td>15.1</td><td>2,947</td><td>346</td><td>28.3</td><td>2,135</td><td>236</td></tr><tr><td>256</td><td>Zipf(1)</td><td>14.1</td><td>2,779</td><td>298</td><td>27.5</td><td>2,056</td><td>215</td></tr><tr><td>256</td><td>uniform</td><td>15.1</td><td>2,945</td><td>332</td><td>28.7</td><td>2,119</td><td>239</td></tr></tbody></table>
+
+<h3>Shared system prompt</h3>
+<p>Requests of all 64 tenants start with the same 918-token system prompt, followed by the tenant's adapter. Because soft-prompt positions carry per-prompt token identities, the radix tree diverges only where the soft prompt starts, and the system prompt is cached once for all tenants. LoRA changes every layer's keys and values, so a cached prefix can only be reused by requests of the same adapter.</p>
+<div class="tcap"><b>Table 6.</b> 64 Zipf tenants with a shared system prompt. Hit rate = cached / total prompt tokens over the run (server log).</div>
+<table class=""><thead><tr><th>Configuration</th><th>req/s</th><th>Prefix-cache hit rate (run)</th><th>TPOT (ms)</th><th>TTFT (ms)</th><th>Output tok/s</th></tr></thead><tbody><tr><td>Soft prompt (64 tenants)</td><td>0.15</td><td>63.5%</td><td>8.7</td><td>42.7</td><td>1,687</td></tr><tr><td>Soft prompt (64 tenants)</td><td>0.3</td><td>63.5%</td><td>14.5</td><td>168.6</td><td>2,756</td></tr><tr><td>Unmerged LoRA r1 (64 tenants)</td><td>0.15</td><td>47.1%</td><td>20.6</td><td>76.0</td><td>1,213</td></tr><tr><td>Unmerged LoRA r1 (64 tenants)</td><td>0.3</td><td>47.1%</td><td>28.5</td><td>97.4</td><td>2,019</td></tr></tbody></table>
+
+<h2>4&nbsp;&nbsp;Memory</h2>
+<p>A soft prompt stores 256 × 4,096 values (2 MiB in bf16). Its larger cost is the KV of its 256 positions, 144 KiB per token on Qwen3-8B (36 layers × 8 KV heads × 128 × K/V × 2 bytes): 36 MiB per tenant whose prefix is cached. That cost is paid only for tenants with cached prefixes, it is shared by all of a tenant's requests, and an evicted prefix is recomputed with a 256-token prefill. An unmerged LoRA costs its weights per resident adapter slot, independent of request count, and an evicted adapter must be reloaded from host memory before its requests can run.</p>
+<div class="tcap"><b>Table 7.</b> Per-tenant memory, Qwen3-8B, bf16.</div>
+<table class=""><thead><tr><th>Adapter</th><th>Parameters</th><th>Static GPU memory / tenant</th><th>Extra KV</th><th>Paid</th></tr></thead><tbody><tr><td>Soft prompt, 256 tokens</td><td>1.0 M</td><td>2.0 MiB</td><td>36 MiB per cached tenant prefix</td><td>per tenant whose prefix is cached; recomputable (256-token prefill)</td></tr><tr><td>Unmerged LoRA, rank 1</td><td>2.7 M</td><td>5.2 MiB</td><td>0</td><td>per resident adapter slot; reload from host when evicted</td></tr><tr><td>Unmerged LoRA, rank 16</td><td>43.6 M</td><td>83 MiB</td><td>0</td><td>same</td></tr><tr><td>LoRA merged / separate checkpoint</td><td>—</td><td>16 GiB per tenant (full copy)</td><td>0</td><td>one backbone per tenant</td></tr></tbody></table>
+<div class="tcap"><b>Table 8.</b> Measured KV-cache capacity of the servers used above (one B300). Both adapter pools are allocated before the KV cache is sized, so their memory comes out of KV capacity.</div>
+<table class=""><thead><tr><th>Server (0.85 static memory fraction)</th><th>KV-cache capacity (tokens)</th></tr></thead><tbody><tr><td>Base</td><td>1,540,672</td></tr><tr><td>Soft-prompt pool, 64 slots × 256 (128 MiB)</td><td>1,539,776</td></tr><tr><td>Soft-prompt pool, 256 slots × 256 (512 MiB)</td><td>1,537,088</td></tr><tr><td>LoRA r1, 2 slots</td><td>1,540,608</td></tr><tr><td>LoRA r1, 256 slots</td><td>1,531,072</td></tr></tbody></table>
+<figure><img src="figures/fig3_memory.png" alt="Memory vs tenants" />
+<figcaption><b>Figure 3.</b> GPU memory for N resident tenants. A rank-1 LoRA is smaller than a soft prompt's cached prefix KV; a rank-16 LoRA is larger. Both are small next to one 16 GiB backbone copy per tenant.</figcaption></figure>
+<div class="note">The common "virtual token" deployment of a soft prompt (appending rows to the vocabulary) does not scale to many tenants: Qwen3's padded vocabulary has only 267 free rows, and each extra row also enlarges the LM head read at every decode step. The pool used here keeps prompts input-only.</div>
+
+<h2>5&nbsp;&nbsp;Speculative decoding</h2>
+<p>Drafters are trained for the backbone and left unadapted. LiveCodeBench v5 (first 64 problems), thinking mode, temperature 1.0, outputs capped at 8,192 tokens, 16 concurrent requests, SGLang 0.5.21; the soft prompt is served as virtual tokens here. In a separate greedy check (3 prompts, 192 tokens), the multi-tenant implementation produced outputs and verify-step counts identical to this virtual-token reference for both EAGLE-3 and DFlash, i.e. the drafter sees identical inputs.</p>
+<div class="tcap"><b>Table 9.</b> Mean accepted tokens per verify step (relative change vs. base) and output throughput.</div>
+<table class=""><thead><tr><th>Drafter</th><th>Accept len: base</th><th>+ SP256</th><th>+ LoRA r1</th><th>tok/s: base</th><th>+ SP256</th><th>+ LoRA r1</th></tr></thead><tbody><tr><td>EAGLE-3 Tengyunw (chain 4)</td><td>2.35</td><td>2.28 (−2.9%)</td><td>2.31 (−1.5%)</td><td>4,675</td><td>4,731</td><td>3,108</td></tr><tr><td>EAGLE-3 AngelSlim (chain 4)</td><td>2.03</td><td>2.01 (−0.8%)</td><td>2.02 (−0.2%)</td><td>4,182</td><td>4,155</td><td>2,719</td></tr><tr><td>DFlash (block 16)</td><td>2.93</td><td>2.83 (−3.2%)</td><td>2.85 (−2.8%)</td><td>2,851</td><td>2,835</td><td>2,267</td></tr><tr><td>No speculation</td><td>—</td><td>—</td><td>—</td><td>2,632</td><td>2,660</td><td>1,589</td></tr></tbody></table>
+<div class="note">DFlash drafters for Qwen3 use token id 151669 as their block-diffusion mask. A virtual-token soft-prompt export that starts at the end of the tokenizer (151669) overwrites that embedding and drops DFlash acceptance to 1.28. Soft-prompt ids must avoid it.</div>
+
+<h2>6&nbsp;&nbsp;Long inputs</h2>
+<p>The preliminary long-context estimate in the paper (Table 6, read from plots) corresponds to the measurements below: 32K-token inputs, 1,024 output tokens, 128 Zipf tenants with GPU-resident adapters, Poisson arrivals, SGLang 0.5.21. Here the LoRA is a rank-16 adapter with random weights (serving cost only), and each tenant's soft prompt is modeled as a fixed 256-token prefix served through the prefix cache (this predates the soft-prompt pool). The paper's estimate used median inter-token gaps (~24 vs ~32 ms); we report TPOT, which stays meaningful under load.</p>
+<div class="tcap"><b>Table 10.</b> TPOT (ms), TTFT (ms) and output throughput (tokens/s).</div>
+<table class="small"><thead><tr><th>req/s</th><th>TPOT base</th><th>SP256</th><th>LoRA r16</th><th>TTFT base</th><th>SP256</th><th>LoRA r16</th><th>tok/s base</th><th>SP256</th><th>LoRA r16</th></tr></thead><tbody><tr><td>0.3</td><td>7.9</td><td>8.1</td><td>17.3</td><td>608</td><td>663</td><td>766</td><td>323</td><td>323</td><td>300</td></tr><tr><td>0.5</td><td>12.4</td><td>12.6</td><td>27.8</td><td>624</td><td>675</td><td>740</td><td>519</td><td>518</td><td>456</td></tr><tr><td>0.8</td><td>38.9</td><td>39.8</td><td>52.7</td><td>772</td><td>891</td><td>1,280</td><td>696</td><td>691</td><td>560</td></tr></tbody></table>
+
+<h2>7&nbsp;&nbsp;Limitations</h2>
+<ul>
+<li>One backbone (Qwen3-8B), one task (LiveCodeBench), one GPU type; tensor and data parallelism are not covered.</li>
+<li>Two seeds per load point; multi-tenant and natural-stopping runs use one seed.</li>
+<li>Multi-tenant results replicate one adapter under many names; adapter values do not affect serving cost, but adapter ranks and target modules would.</li>
+<li>LoRA uses SGLang's kernels (csgmv by default, triton as an alternative); other engines or kernels will shift the LoRA numbers. Prefill batches containing soft-prompt positions currently run without the prefill CUDA graph.</li>
+<li>Sections 5–6 come from earlier runs on SGLang 0.5.21 with an 8K and 1K output cap respectively; their configurations differ from Sections 2–4.</li>
+</ul>
+
+<h2 id="repro">8&nbsp;&nbsp;Reproducibility</h2>
+<ul>
+<li>Engine: <a href="https://github.com/ChangyiYang/sglang-moe-fix/tree/ccf36ca6c">ChangyiYang/sglang-moe-fix@ccf36ca6c</a> (docs: <code>docs/advanced_features/soft_prompt.mdx</code>).</li>
+<li>Scripts, raw results and figure code for Sections 2–4: <a href="https://github.com/ChangyiYang/multitenant-serving-bench/tree/main/paper">multitenant-serving-bench/paper</a>; Section 5: <a href="https://github.com/ChangyiYang/multitenant-serving-bench/tree/main/spec">…/spec</a>; Section 6: the repository root (<code>run_long.sh</code>).</li>
+</ul>
+</main>
+</body>
+</html>
