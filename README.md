@@ -5,6 +5,7 @@ Changyi Yang 的 decks & proposals 总站。
 👉 <https://changyiyang.github.io/>
 
 ## 目录
+- [`rl-dis-validation-checkpoint/`](https://changyiyang.github.io/rl-dis-validation-checkpoint/) — verl、slime、Miles 训推分离下的 validation 阻塞、snapshot eval 与 checkpoint 完成协议（2026-10-29 源码审计）
 - [`multi-tenant-lora-serving/`](https://changyiyang.github.io/multi-tenant-lora-serving/) — Multi-tenant LoRA serving 系统演化史：从 LoRA / PetS 到 Punica、S-LoRA、LoRAX、dLoRA、CaraServe，再到 vLLM / SGLang / Ray Serve
 - [`rollout-monitoring/`](https://changyiyang.github.io/rollout-monitoring/) — RL rollout 监控资料索引：人话版总结、Tool 专题、人话版速读和完整版（66 个 reward hacking / 坏数据 pattern 的出处、案例、机制与检测，外加分层 monitor 设计）
 - [`sglang-overlap/`](https://changyiyang.github.io/sglang-overlap/) — SGLang SBO / TBO 源码长文：6 张架构与时序图、ping-pong 调度、当前版本支持边界

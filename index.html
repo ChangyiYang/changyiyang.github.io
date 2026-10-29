@@ -72,6 +72,15 @@
   <h1>Decks &amp; Proposals</h1>
   <p class="lead">ML systems、RL infra 与 full-duplex 语音交互方向的提案和调研。用 ← / → 或空格翻页。</p>
 
+  <h2>RL Infrastructure</h2>
+  <div class="cards">
+    <a class="card green" href="./rl-dis-validation-checkpoint/">
+      <h3>训推分离之后，validation 和 checkpoint 还会卡住训练吗？</h3>
+      <p>对照 verl V1、slime 与 Miles 的当前源码：评测等待、独立 snapshot eval、异步写盘，以及训练恢复需要的同步边界。</p>
+      <div class="meta"><span class="tag">源码分析</span><span class="tag blue">verl · slime · Miles</span><span class="tag amber">2026-10-29</span></div>
+    </a>
+  </div>
+
   <h2>LLM Serving Systems</h2>
   <div class="cards">
     <a class="card" href="./soft-prompt-serving/">

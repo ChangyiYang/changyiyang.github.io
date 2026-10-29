@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>训推分离之后，validation 和 checkpoint 还会卡住训练吗？ | Changyi Yang</title><meta name="description" content="基于 2026-10-29 上游源码，比较 verl V1、slime、Miles 在训推分离下的 validation 等待、独立 snapshot eval 和 checkpoint 异步落盘边界。"><meta property="og:title" content="训推分离之后，validation 和 checkpoint 还会卡住训练吗？"><meta property="og:type" content="article"><link rel="canonical" href="https://changyiyang.github.io/rl-dis-validation-checkpoint/"><style>
+:root{--bg:#f7f4ee;--paper:#fffdfa;--ink:#24303a;--muted:#68757c;--line:#ddd8cd;--accent:#245f73}
+*{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:24px}body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.9 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}a{color:var(--accent);text-underline-offset:4px;overflow-wrap:anywhere}a:hover{color:#12394a}header{max-width:1200px;margin:auto;padding:30px 34px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:16px;font-size:14px}header a{text-decoration:none}.brand{font-weight:750}main{max-width:1200px;margin:auto;padding:48px 34px 80px;display:grid;grid-template-columns:210px minmax(0,1fr);gap:48px}aside{font-size:13px;position:sticky;top:28px;align-self:start;max-height:90vh;overflow:auto}aside .label{font-size:11px;letter-spacing:.14em;color:var(--muted);font-weight:700}aside ul{list-style:none;padding:0;margin:8px 0}aside ul ul{padding-left:12px;border-left:1px solid var(--line);margin:5px 0 12px}aside li{margin:8px 0}aside a{text-decoration:none;line-height:1.6;display:block}article{min-width:0;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:40px 42px;box-shadow:0 10px 35px #302d2606}h1{font-size:clamp(29px,3.2vw,42px);line-height:1.4;letter-spacing:-.025em;margin:0 0 12px}h1+p{font-size:13px;color:var(--muted);margin-bottom:30px}h2{font-size:26px;line-height:1.5;margin:50px 0 20px;padding-top:14px;border-top:1px solid var(--line)}h3{font-size:20px;line-height:1.6;margin:30px 0 14px}p{margin:18px 0}strong{font-weight:720}code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.84em;background:#edf1f1;border-radius:4px;padding:.12em .3em;overflow-wrap:anywhere}pre{padding:20px;background:#edf1f1;border:1px solid #dce3e3;border-radius:7px;overflow-x:auto;line-height:1.7;font-size:14px}pre code{padding:0;background:none;white-space:pre;overflow-wrap:normal;font-size:inherit}.table-scroll{overflow-x:auto;margin:24px 0}table{border-collapse:collapse;font-size:14px;line-height:1.7;width:100%;min-width:570px}th,td{text-align:left;vertical-align:top;border:1px solid var(--line);padding:12px}th{background:#eaf0ef;font-weight:650}td:first-child{width:26%}li{margin:8px 0}footer{max-width:1200px;margin:auto;padding:0 34px 42px;color:var(--muted);font-size:13px}.permalink{font-size:15px;margin-left:7px;color:#a0a8ac;text-decoration:none}@media(max-width:1000px){main{grid-template-columns:1fr;gap:22px;max-width:860px}aside{position:static;max-height:none}aside .toc>ul{columns:2}aside ul ul{display:none}article{padding:32px}}@media(max-width:600px){body{font-size:16px}header{padding:20px}header span{display:none}main{padding:25px 14px 45px}article{padding:26px 20px}h2{font-size:23px}h3{font-size:19px}aside{padding:0 8px}aside .toc>ul{columns:1}pre{padding:14px;font-size:12px}footer{padding:0 20px 28px}}@media print{aside,header{display:none}main{display:block;padding:0}article{border:0;box-shadow:none}body{background:white;font-size:11pt}a{color:inherit}}
+</style></head><body><header><a class="brand" href="../">Changyi Yang / RL Infrastructure</a><span>2026-10-29 · Source audit</span><a href="article.md">Markdown 源稿 ↗</a></header><main><aside><div class="label">目录 / CONTENTS</div><div class="toc">
+<ul>
+<li><a href="#_1">先看结论</a></li>
+<li><a href="#verl-v1">verl：当前默认 V1，评测仍在训练循环里</a><ul>
+<li><a href="#v1-separate_async">V1 separate_async：异步采样没有带来异步评测</a></li>
+<li><a href="#experimental-fully-asyncawait-trainer">experimental fully async：await 远端评测，trainer 仍要等</a></li>
+<li><a href="#checkpointfsdp-megatron">checkpoint：FSDP 同步，Megatron 只能异步掉其中一部分</a></li>
+</ul>
+</li>
+<li><a href="#slimefully-async-eval">slime：fully async 的是数据生产，主循环仍然等 eval</a><ul>
+<li><a href="#checkpoint">异步 checkpoint 会在恢复边界重新同步</a></li>
+</ul>
+</li>
+<li><a href="#miles">Miles：独立评测已经有了，但默认仍然阻塞</a><ul>
+<li><a href="#fleet-checkpoint-backend">独立 fleet / 外部 checkpoint backend 可以后台评测</a></li>
+<li><a href="#checkpoint_1">训练 checkpoint 的异步能力仍由后端决定</a></li>
+</ul>
+</li>
+<li><a href="#run">放到实际 run 里怎么判断</a></li>
+<li><a href="#_2">复查用的版本</a></li>
+</ul>
+</div>
+</aside><article><h1 id="validation-checkpoint">训推分离之后，validation 和 checkpoint 还会卡住训练吗？</h1>
+<p>verl、slime、Miles 源码对照 · 2026-10-29</p>
+<p><strong>会。把 trainer 和 rollout 放到不同 GPU 上，并不会自动把 validation 和 checkpoint 移出训练的关键路径。</strong> 当前三套框架的常规评测都要等结果返回，下一次参数更新才能继续。Miles 已经有独立的快照评测路径，可以让评测推理和训练重叠，但快照导出、积压反压和退出收尾仍有等待。checkpoint 则取决于后端：Megatron 可以异步写 shard，保存前的状态准备和需要确认完成的边界仍然要停。</p>
+<p>这里把 dis 理解为 disaggregated，也就是训推分离。讨论的“阻塞主 run”指 trainer 无法进入下一次训练更新；Ray 的其他 actor、后台写盘进程、rollout 请求是否还在运行，是另一件事。</p>
+<p>本文是调用链审计，没有跑 GPU benchmark。等待点可以从源码确认，停多少秒要在具体模型、并行拓扑和存储上测。下文的“保存完成”采用框架自身的完成协议，不额外声称文件系统已经提供断电持久性。</p>
+<h2 id="_1">先看结论</h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>路径</th>
+<th>Validation 会挡下一次训练更新吗？</th>
+<th>Checkpoint 落盘会挡吗？</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>verl V1 <code>separate_async</code></td>
+<td>会。主循环直接调用 <code>_validate()</code></td>
+<td>默认会；Megatron <code>async_save</code> 可把部分 shard 写盘放到后台，调用本身仍有同步工作</td>
+</tr>
+<tr>
+<td>verl experimental fully async</td>
+<td>会。trainer <code>await</code> rollouter 的评测 RPC</td>
+<td>保存函数仍在训练步骤里；后端决定写盘能否异步，不能套用 V1 的全部完成协议</td>
+</tr>
+<tr>
+<td>slime <code>train.py</code>，含 fully async rollout</td>
+<td>会。显式 <code>ray.get(eval.remote(...))</code></td>
+<td>默认同步；Megatron 开异步后可重叠部分写盘，straw / recovery 等边界会强制等完成</td>
+</tr>
+<tr>
+<td>Miles 默认共享 rollout 引擎评测</td>
+<td>会。dispatcher 直接 <code>await eval()</code></td>
+<td>Megatron 可异步写 shard；默认关闭；HF 导出仍是额外工作</td>
+</tr>
+<tr>
+<td>Miles 独立 eval fleet / checkpoint eval backend</td>
+<td>不必等本次评测推理结束；快照导出、队列反压会等</td>
+<td>评测快照和训练恢复 checkpoint 是两条链路；FSDP 保存仍同步</td>
+</tr>
+</tbody>
+</table></div>
+<p>这个表概括的是下面逐条引用的入口和后端。自定义 eval 函数、保存 hook 或独立外部服务可以改变行为，不能只凭框架名给所有部署下结论。</p>
+<h2 id="verl-v1">verl：当前默认 V1，评测仍在训练循环里</h2>
+<p>verl 变化比较快。此次检查的配置中，<code>trainer.use_v1: true</code> 已经是默认值，V1 支持 <code>sync</code>、<code>colocate_async</code>、<code>separate_async</code>。主入口按配置选择 trainer；旧 experimental fully async 不能代表整个当前实现。<a href="https://github.com/volcengine/verl/blob/a08ea02a784d7d4982b1d81df36d188a476192bb/verl/trainer/config/ppo_trainer.yaml#L232-L261">配置与入口</a> <a href="https://github.com/volcengine/verl/blob/a08ea02a784d7d4982b1d81df36d188a476192bb/verl/trainer/main_ppo.py#L122-L194">入口选择</a></p>
+<h3 id="v1-separate_async">V1 separate_async：异步采样没有带来异步评测</h3>
+<p>V1 的基类 <code>PPOTrainer.fit()</code> 把这几个操作顺序写在同一个循环里：</p>
+<pre><code class="language-text">step：采样、训练更新
+  → 到保存点：_save_checkpoint()
+  → on_step_end()
+  → 到评测点：on_validate_begin() → _validate() → on_validate_end()
+  → 记录指标、清理、global_steps += 1
+</code></pre>
+<p><code>_validate()</code> 没有作为独立后台任务提交。它遍历验证集，把请求送到 agent loop，再从 replay buffer 的 <code>val</code> partition 收齐结果、统计分数。直到函数返回，循环才推进。<code>separate_async</code> 的 <code>on_validate_begin()</code> 还会在 hybrid engine 当前处于 trainer 模式时将其切回 rollout 模式。<a href="https://github.com/volcengine/verl/blob/a08ea02a784d7d4982b1d81df36d188a476192bb/verl/trainer/ppo/v1/trainer_base.py#L413-L532">V1 主循环</a> <a href="https://github.com/volcengine/verl/blob/a08ea02a784d7d4982b1d81df36d188a476192bb/verl/trainer/ppo/v1/trainer_base.py#L1032-L1204">验证实现</a> <a href="https://github.com/volcengine/verl/blob/a08ea02a784d7d4982b1d81df36d188a476192bb/verl/trainer/ppo/v1/trainer_separate_async.py#L247-L250">模式切换</a></p>
+<p>因此，评测期间独立 rollout GPU 上可能还有其他请求在跑，但 trainer 不会继续做下一次 update。若启用了 hybrid GPU，还要加上模式切换的代价。纯分离配置是否切换，取决于当时的 engine mode。</p>
+<h3 id="experimental-fully-asyncawait-trainer">experimental fully async：await 远端评测，trainer 仍要等</h3>
+<p>旧路径也值得核对，因为现有脚本可能仍在用。<code>FullyAsyncTrainer.fit_step()</code> 依次执行 <code>await self._fit_validate()</code> 和 <code>self._fit_save_checkpoint()</code>。普通验证分支是：</p>
+<pre><code class="language-python">val_metrics = await self.rollouter.do_validate.remote()
+</code></pre>
+<p>rollouter 的 <code>do_validate()</code> 内部调用 <code>_validate()</code> 后才返回。这让 RPC 等待期间的事件循环有机会处理其他任务，却不会让当前训练协程自动跨过这个等待点。<a href="https://github.com/volcengine/verl/blob/a08ea02a784d7d4982b1d81df36d188a476192bb/verl/experimental/fully_async_policy/fully_async_trainer.py#L536-L600">训练步骤</a> <a href="https://github.com/volcengine/verl/blob/a08ea02a784d7d4982b1d81df36d188a476192bb/verl/experimental/fully_async_policy/fully_async_trainer.py#L812-L830">验证分支</a> <a href="https://github.com/volcengine/verl/blob/a08ea02a784d7d4982b1d81df36d188a476192bb/verl/experimental/fully_async_policy/fully_async_rollouter.py#L648-L653">rollouter</a></p>
+<p><code>use_trainer_do_validate</code> 更明确：先把 trainer GPU 切成 rollout replicas，跑验证，再切回训练。它借用训练资源加速验证，trainer 在这段时间里无法更新参数。<a href="https://github.com/volcengine/verl/blob/a08ea02a784d7d4982b1d81df36d188a476192bb/verl/experimental/fully_async_policy/fully_async_trainer.py#L832-L871">trainer-side validation</a></p>
+<h3 id="checkpointfsdp-megatron">checkpoint：FSDP 同步，Megatron 只能异步掉其中一部分</h3>
+<p>V1 <code>_save_checkpoint()</code> 在主线程中调用 actor / critic 保存，接着保存 dataloader。异步模式还会保存 TransferQueue，让已取出但尚未训练的 prompt 能在重启后恢复：完成的 trajectory 恢复，未完成的请求重新发出。这里只备份模型权重是不够的。<a href="https://github.com/volcengine/verl/blob/a08ea02a784d7d4982b1d81df36d188a476192bb/verl/trainer/ppo/v1/trainer_base.py#L949-L1030">V1 保存入口</a></p>
+<p>FSDP 的保存非常直接：各 rank 构造 CPU shard，用 <code>torch.save</code> 写模型、optimizer 和 extra state，前后都有 <code>torch.distributed.barrier()</code>。选了 HF 权重导出还会多做一次导出和等待。这个实现没有因为通用配置里存在 <code>async_save</code> 就变成异步。<a href="https://github.com/volcengine/verl/blob/a08ea02a784d7d4982b1d81df36d188a476192bb/verl/utils/checkpoint/fsdp_checkpoint_manager.py#L360-L523">FSDP writer</a></p>
+<p>Megatron 的 <code>async_save</code> 默认是 <code>False</code>。开启后，manager 可以把 model、optimizer、extra 的分布式保存请求加入 AsyncCallsQueue，最后一个请求挂 finalize callback。状态字典构造、必要的通信、HF config 和通过 bridge 导出 HF 权重仍在调用链上；Megatron-FSDP 的专用 writer 也明确采用同步保存。<a href="https://github.com/volcengine/verl/blob/a08ea02a784d7d4982b1d81df36d188a476192bb/verl/trainer/config/actor/actor.yaml#L134-L142">默认配置</a> <a href="https://github.com/volcengine/verl/blob/a08ea02a784d7d4982b1d81df36d188a476192bb/verl/utils/checkpoint/megatron_checkpoint_manager.py#L1151-L1281">Megatron 保存</a> <a href="https://github.com/volcengine/verl/blob/a08ea02a784d7d4982b1d81df36d188a476192bb/verl/utils/checkpoint/megatron_checkpoint_manager.py#L1128-L1149">异步调度</a></p>
+<p>完成协议也要读清：manager 在所有 per-content 写入完成后写 <code>ckpt_contents.json</code>，然后处理 HDFS 上传、latest tracker 和 retention。V1 看到 actor 的 <code>async_save</code> 开启，就跳过自己立即写 latest tracker 的动作，把模型完成标记交给后端。HDFS copy 发生在 finalize 函数里，不能把“后台写 shard”推导成“上传也永远不占主流程”。manifest 表示本地内容写完，也不表示远端上传已经完成。<a href="https://github.com/volcengine/verl/blob/a08ea02a784d7d4982b1d81df36d188a476192bb/verl/utils/checkpoint/megatron_checkpoint_manager.py#L1081-L1126">finalize</a> <a href="https://github.com/volcengine/verl/blob/a08ea02a784d7d4982b1d81df36d188a476192bb/verl/trainer/ppo/v1/trainer_base.py#L949-L1030">V1 tracker 分支</a></p>
+<p>experimental fully async 的 <code>_save_checkpoint()</code> 是另一份实现：它保存 actor / critic，<code>ray.get</code> rollouter 的状态保存后直接写 latest tracker。这里没有 V1 那个 async-save 分支。若要在这个旧入口启用异步保存，需要继续核验所用 worker 的 finalize 驱动和恢复选择逻辑；单看这份函数，无法证明 latest tracker 与后台模型写完严格对齐。<a href="https://github.com/volcengine/verl/blob/a08ea02a784d7d4982b1d81df36d188a476192bb/verl/experimental/fully_async_policy/fully_async_trainer.py#L917-L978">旧路径保存</a></p>
+<h2 id="slimefully-async-eval">slime：fully async 的是数据生产，主循环仍然等 eval</h2>
+<p>当前 slime 的 fully async 示例使用标准 <code>python3 train.py</code>，通过 <code>--rollout-function-path</code> 换成持续生产数据的实现。它没有另起一份“评测自动后台化”的 trainer。<a href="https://github.com/THUDM/slime/blob/540ea919e45b8b929198abce008a103be9cfc779/examples/fully_async/README.md#L43-L80">fully async 使用说明</a></p>
+<p><code>train.py</code> 在训练前评测和周期评测两处都调用：</p>
+<pre><code class="language-python">ray.get(rollout_manager.eval.remote(rollout_id))
+</code></pre>
+<p>周期评测位于权重同步之后；<code>RolloutManager.eval()</code> 调用评测 rollout 函数，处理结果并记录指标后才返回。下一轮训练要等这条 RPC 完成。默认评测共享 rollout engines；持续生产 worker 的存在不改变 trainer 的等待关系。<a href="https://github.com/THUDM/slime/blob/540ea919e45b8b929198abce008a103be9cfc779/train.py#L13-L99">训练主循环</a> <a href="https://github.com/THUDM/slime/blob/540ea919e45b8b929198abce008a103be9cfc779/slime/ray/rollout.py#L392-L412">eval 实现</a></p>
+<p>共享引擎上是否仍有在途训练请求、如何分配并发，还取决于 rollout 实现。这里不把 trainer 等待夸大成“所有 GPU 都空闲”，也不把后台还在生成等同于“主 run 没有停”。</p>
+<h3 id="checkpoint">异步 checkpoint 会在恢复边界重新同步</h3>
+<p>保存调用先经过 <code>RayTrainGroup.save_model()</code>，它对所有训练 rank 的保存 RPC 做 <code>ray.get</code>。因此，即使开了异步写盘，driver 也要等各 rank 把保存调用执行到返回。<a href="https://github.com/THUDM/slime/blob/540ea919e45b8b929198abce008a103be9cfc779/slime/ray/actor_group.py#L168-L176">actor group</a></p>
+<p>Megatron actor 的 <code>save_model()</code> 有几个明确的等待点：保存前对上一份 async save 调 <code>maybe_finalize_async_save(blocking=True)</code>；提交当前保存；如果 <code>force_sync</code>，再以 blocking 模式等当前保存完成；随后可能额外导出 HF 权重。offload 配置还会加入 wake / sleep。<a href="https://github.com/THUDM/slime/blob/540ea919e45b8b929198abce008a103be9cfc779/slime/backends/megatron_utils/actor.py#L601-L626">actor 保存</a></p>
+<p><code>force_sync</code> 由更上层的联合保存逻辑决定。当前代码在以下情况强制等待：</p>
+<ul>
+<li>straw checkpoint：满足代码里的 straw、actor 正在训练、非 debug 等条件；</li>
+<li>training recovery 开启；</li>
+<li><code>release_train</code>，或最后一个 rollout。</li>
+</ul>
+<p>模型、optimizer 和 rollout 数据进度必须形成同一个可恢复边界。straw 分支在模型和 rollout 保存成功后才发布 joint commit；recovery 通知也放在最后。否则训练状态还没写完，消费过的数据就可能被当作已安全保存而释放。<a href="https://github.com/THUDM/slime/blob/540ea919e45b8b929198abce008a103be9cfc779/slime/data/checkpoint.py#L39-L72">联合 checkpoint 协议</a></p>
+<p>所以 slime 的普通周期保存，在不触发这些强制条件且 Megatron 开启 async save 时，可以让本次 shard 写盘与后续训练重叠。开启 straw / recovery 后，保存边界主动收回了这部分重叠。这里的停顿有明确的一致性目的。</p>
+<h2 id="miles">Miles：独立评测已经有了，但默认仍然阻塞</h2>
+<p>Miles 要按 eval backend 分开看。<code>EvalDispatcher.dispatch()</code> 的第一个分支就决定了主行为：没有启用 snapshot eval，直接 <code>await rollout_manager.eval(rollout_id)</code>，执行结束才返回。<a href="https://github.com/radixark/miles/blob/ae6bea66e8497391c73e9eb1bbe1a9eaeb9df1d4/miles/ray/rollout/eval_dispatch.py#L11-L101">dispatcher</a></p>
+<p>fully async 的共享引擎评测还会清除 producer 的 resumed event，暂停提交新的生产请求；验证结束后恢复。已有在途请求可以继续完成，但这不消除训练 driver 对评测的等待。<a href="https://github.com/radixark/miles/blob/ae6bea66e8497391c73e9eb1bbe1a9eaeb9df1d4/miles/rollout/fully_async_rollout.py#L123-L143">共享引擎 eval</a></p>
+<h3 id="fleet-checkpoint-backend">独立 fleet / 外部 checkpoint backend 可以后台评测</h3>
+<p>设置 <code>--eval-num-gpus N</code> 选择独立 fleet，或者把 <code>--eval-function-path</code> 指向 <code>CheckpointEvalFn</code>，会启用 snapshot eval。两者互斥，独立 fleet 的文档入口是 <code>train_async.py</code>。默认 <code>eval_num_gpus=0</code> 的共享引擎路径不会自动切过来。<a href="https://github.com/radixark/miles/blob/ae6bea66e8497391c73e9eb1bbe1a9eaeb9df1d4/miles/utils/arguments.py#L151-L165">backend 选择</a> <a href="https://github.com/radixark/miles/blob/ae6bea66e8497391c73e9eb1bbe1a9eaeb9df1d4/docs/user-guide/cli-reference.md#L156-L214">参数说明</a></p>
+<p>独立路径中，dispatcher 获取某个 rollout 对应的 HF snapshot，再用 <code>asyncio.ensure_future(...)</code> 提交评测任务。训练循环只等 dispatch 完成，不必等这次评测推理完成。snapshot 路径还带完整性检查，结果按提交时的 rollout ID 记录，并提供 <code>eval/lag_steps</code>。<a href="https://github.com/radixark/miles/blob/ae6bea66e8497391c73e9eb1bbe1a9eaeb9df1d4/miles/ray/rollout/eval_dispatch.py#L11-L101">dispatcher</a> <a href="https://github.com/radixark/miles/blob/ae6bea66e8497391c73e9eb1bbe1a9eaeb9df1d4/miles/ray/rollout/rollout_executor.py#L336-L383">checkpoint eval</a></p>
+<pre><code class="language-text">trainer： update(k) → 导出 snapshot(k) ──→ update(k+1) → update(k+2)
+eval：                               └→ 加载 snapshot(k) → 推理、打分 → 结果记在 k
+                                    ↑ 后台评测从这里开始
+</code></pre>
+<p>这条路径仍有三处可能让 run 等待。</p>
+<p>第一处是快照导出。使用 <code>--eval-hf-dir</code> 时，<code>dispatch()</code> 会 <code>await self._export(...)</code>，内部等待 actor 的 collective <code>export_hf</code>。把目录放在 <code>/dev/shm</code> 可以避开磁盘 I/O，仍要付权重转换、通信和内存拷贝的代价。若复用周期 <code>--save-hf</code>，就不再为评测单独导出，但原来的 HF 保存成本还在；文档要求这种复用模式的 <code>eval_interval</code> 是 <code>save_interval</code> 的整数倍。<a href="https://github.com/radixark/miles/blob/ae6bea66e8497391c73e9eb1bbe1a9eaeb9df1d4/miles/ray/rollout/eval_dispatch.py#L11-L101">导出调用</a> <a href="https://github.com/radixark/miles/blob/ae6bea66e8497391c73e9eb1bbe1a9eaeb9df1d4/miles/backends/megatron_utils/actor.py#L954-L968">collective export</a> <a href="https://github.com/radixark/miles/blob/ae6bea66e8497391c73e9eb1bbe1a9eaeb9df1d4/docs/user-guide/fully-async.md#L300-L329">快照来源约束</a></p>
+<p>第二处是积压。<code>--eval-max-in-flight</code> 默认 2，<code>--eval-overflow-policy</code> 默认 <code>backpressure</code>：到新评测点时，如果 pending 已满，就等最老的任务。选择 <code>skip</code> 可以跳过新点，不过最后一个 rollout 会传入 <code>force=True</code>，仍可能等待。增大 pending 上限只允许多积压快照；后端的 <code>_eval_lock</code> 依然串行处理 snapshot eval。<a href="https://github.com/radixark/miles/blob/ae6bea66e8497391c73e9eb1bbe1a9eaeb9df1d4/miles/utils/args/configs/eval.py#L55-L76">默认值</a> <a href="https://github.com/radixark/miles/blob/ae6bea66e8497391c73e9eb1bbe1a9eaeb9df1d4/miles/ray/rollout/eval_dispatch.py#L11-L101">队列逻辑</a> <a href="https://github.com/radixark/miles/blob/ae6bea66e8497391c73e9eb1bbe1a9eaeb9df1d4/miles/ray/rollout/rollout_executor.py#L336-L383">后端锁</a></p>
+<p>第三处是退出。driver 把 <code>eval_dispatcher.drain</code> 注册为 disposer，收尾时会等 pending 评测完成。因此“训练更新没有等待每次 eval”与“整个进程可以随时退出”也要分开。<a href="https://github.com/radixark/miles/blob/ae6bea66e8497391c73e9eb1bbe1a9eaeb9df1d4/train_async.py#L74-L171">async driver</a> <a href="https://github.com/radixark/miles/blob/ae6bea66e8497391c73e9eb1bbe1a9eaeb9df1d4/miles/ray/rollout/eval_dispatch.py#L11-L101">drain</a></p>
+<h3 id="checkpoint_1">训练 checkpoint 的异步能力仍由后端决定</h3>
+<p><code>train_async.py</code> 在保存点 <code>await model.save_model(...)</code>，随后保存 rollout 状态。外部 sentinel 触发和最后一个 rollout 会传 <code>force_sync=True</code>。这条 await 保证保存 RPC 返回；是否还存在后台写盘，由 actor 的实现决定。<a href="https://github.com/radixark/miles/blob/ae6bea66e8497391c73e9eb1bbe1a9eaeb9df1d4/train_async.py#L74-L171">async driver</a></p>
+<p>Megatron actor 在提交新保存前等待前一份异步保存；当前保存若 <code>force_sync</code> 就再等一次。配置了 post-save hook 时，rank 0 也会先 finalize 再调用 hook。<code>--async-save</code> 默认关闭；开启后 native checkpoint 写入可以和后续 HF 导出重叠，但 HF 导出本身没有因此消失。<a href="https://github.com/radixark/miles/blob/ae6bea66e8497391c73e9eb1bbe1a9eaeb9df1d4/miles/backends/megatron_utils/actor.py#L913-L952">Megatron actor</a> <a href="https://github.com/radixark/miles/blob/ae6bea66e8497391c73e9eb1bbe1a9eaeb9df1d4/docs/user-guide/cli-reference.md#L156-L214">保存参数</a></p>
+<p>FSDP 的 torch-native actor 则直接拒绝 <code>backend.async_save</code>。其 writer 先 synchronize，再同步 <code>dcp.save</code> model、optimizer、scheduler，保存 RNG 和 metadata，最后 barrier。<a href="https://github.com/radixark/miles/blob/ae6bea66e8497391c73e9eb1bbe1a9eaeb9df1d4/miles/backends/training_utils/torch_native/actor.py#L117-L121">torch-native actor</a> <a href="https://github.com/radixark/miles/blob/ae6bea66e8497391c73e9eb1bbe1a9eaeb9df1d4/miles/backends/fsdp_utils/checkpoint.py#L204-L268">FSDP writer</a></p>
+<p>评测 HF snapshot 通常只有推理需要的权重；恢复训练还需要 optimizer、scheduler、RNG，以及相应的数据进度。它们可以共享一次权重导出的产物，但不能把 eval snapshot 当作完整的训练 checkpoint。</p>
+<h2 id="run">放到实际 run 里怎么判断</h2>
+<p>如果目标是长评测集不拖慢参数更新，当前 Miles 的独立 fleet / checkpoint backend 已经提供了明确的后台调度路径。需要同时考虑快照导出时间、存储容量和满队列策略。<code>skip</code> 牺牲评测点完整性换取较稳定的训练节奏；<code>backpressure</code> 保留评测点，但慢评测会反压训练。这是部署选择，不能只开一个“async”就忽略。</p>
+<p>verl V1 和 slime 的上述入口中，validation 都还在主循环上。若想把完整评测外置，需要增加不可变权重快照、版本标记、结果归属和积压处理。直接删除 <code>ray.get</code> 或 <code>await</code>，可能让评测跑在持续更新的模型上，或者把资源冲突和异常处理留给后台。</p>
+<p>checkpoint 的调优要先拆时间。建议分别记录保存调用返回耗时、后台 writer 完成耗时、远端上传耗时，以及最后一个可恢复版本落后当前训练多少步。独立 rollout 在保存期间还能继续产数据，也要看队列是否满、训练恢复后是否立刻有可用 batch。只看 GPU utilization，很容易把后台忙碌误读成训练没有停。</p>
+<p>如果要求 straw / recovery 那样严格的数据与模型共同恢复边界，就要接受 commit 前的等待，或者另行设计能证明正确的异步提交协议。把等待删掉并不会让状态自动变得一致。</p>
+<h2 id="_2">复查用的版本</h2>
+<p>以下均为调研时拉取的上游 <code>main</code>，链接固定到 commit。结论覆盖本文列出的入口与 backend，不代表所有插件或未来版本。</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>仓库</th>
+<th>Commit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>volcengine/verl</td>
+<td><code>a08ea02a784d7d4982b1d81df36d188a476192bb</code></td>
+</tr>
+<tr>
+<td>THUDM/slime</td>
+<td><code>540ea919e45b8b929198abce008a103be9cfc779</code></td>
+</tr>
+<tr>
+<td>radixark/miles</td>
+<td><code>ae6bea66e8497391c73e9eb1bbe1a9eaeb9df1d4</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>主要证据是训练循环的等待关系、保存 writer 和完成标记；没有据此估算吞吐收益或暂停秒数。</p></article></main><footer>源码链接固定到 commit · 调用链分析，无 GPU 性能测量 · <a href="../">返回首页</a></footer></body></html>
